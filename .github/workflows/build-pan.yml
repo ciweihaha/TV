@@ -18,8 +18,18 @@ jobs:
       - name: Install SDK packages
         run: |
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0" "cmake;3.22.1" "ndk;28.2.13676358"
+          yes | sdkmanager --licenses || true
+          echo "--- installed platforms ---"
+          ls "$ANDROID_HOME/platforms" || true
+          echo "--- available android-37 packages ---"
+          sdkmanager --list 2>/dev/null | grep -i "android-37" || true
+          sdkmanager "platform-tools" || true
+          sdkmanager "build-tools;37.0.0" || true
+          sdkmanager "cmake;3.22.1" || true
+          sdkmanager "ndk;28.2.13676358" || true
+          sdkmanager "platforms;android-37" || sdkmanager --channel=3 "platforms;android-37" || true
+          echo "--- platforms after install ---"
+          ls "$ANDROID_HOME/platforms" || true
       - name: Restore signing keystore from cache
         id: keystore-cache
         uses: actions/cache@v4
