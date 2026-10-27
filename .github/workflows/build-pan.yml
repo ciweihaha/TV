@@ -1,0 +1,43 @@
+name: Build Pan TV (leanback)
+on:
+  push:
+    branches: [pan-private]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0" "cmake;3.22.1" "ndk;28.2.13676358"
+      - name: Restore signing keystore from cache
+        id: keystore-cache
+        uses: actions/cache@v4
+        with:
+          path: app/pan.jks
+          key: pan-keystore-v1
+      - name: Generate signing keystore if missing
+        run: |
+          if [ ! -f app/pan.jks ]; then
+            keytool -genkeypair -keystore app/pan.jks -alias pan -keyalg RSA -keysize 2048 -validity 10000 -storepass pan123456 -keypass pan123456 -dname "CN=Pan, OU=Personal, O=Personal, C=CN"
+          fi
+          printf 'storeFile=%s\nkeyAlias=pan\nstorePassword=pan123456\n' "$GITHUB_WORKSPACE/app/pan.jks" > local.properties
+      - name: Build leanback release APK
+        run: ./gradlew :app:assembleLeanbackRelease --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pan-tv-leanback
+          path: app/build/outputs/apk/leanback/release/*.apk
+          if-no-files-found: error
