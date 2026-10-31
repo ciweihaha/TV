@@ -42,7 +42,9 @@ jobs:
             keytool -genkeypair -keystore app/pan.jks -alias pan -keyalg RSA -keysize 2048 -validity 10000 -storepass pan123456 -keypass pan123456 -dname "CN=Pan, OU=Personal, O=Personal, C=CN"
           fi
           printf 'storeFile=%s\nkeyAlias=pan\nstorePassword=pan123456\n' "$GITHUB_WORKSPACE/app/pan.jks" > local.properties
-      - name: Build leanback release APK
+      - name: make gradlew executable
+              run: chmod +x ./gradlew
+              - name: Build leanback release APK
         run: ./gradlew :app:assembleLeanbackRelease --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
