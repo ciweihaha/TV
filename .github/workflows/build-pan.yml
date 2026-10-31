@@ -44,7 +44,7 @@ jobs:
           printf 'storeFile=%s\nkeyAlias=pan\nstorePassword=pan123456\n' "$GITHUB_WORKSPACE/app/pan.jks" > local.properties
       - name: make gradlew executable
         run: chmod +x ./gradlew
-              - name: Build leanback release APK
+  - name: Build leanback release APK
         run: ./gradlew :app:assembleLeanbackRelease --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
