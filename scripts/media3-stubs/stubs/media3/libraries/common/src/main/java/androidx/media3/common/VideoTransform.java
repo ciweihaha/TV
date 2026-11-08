@@ -27,7 +27,8 @@ public final class VideoTransform {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof VideoTransform other)) return false;
+    if (!(o instanceof VideoTransform)) return false;
+    VideoTransform other = (VideoTransform) o;
     return Float.compare(scaleX, other.scaleX) == 0
         && Float.compare(scaleY, other.scaleY) == 0
         && Float.compare(panX, other.panX) == 0

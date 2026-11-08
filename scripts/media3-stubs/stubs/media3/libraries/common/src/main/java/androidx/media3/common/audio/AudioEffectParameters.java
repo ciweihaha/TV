@@ -163,7 +163,8 @@ public final class AudioEffectParameters {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof AudioEffectParameters other)) return false;
+    if (!(o instanceof AudioEffectParameters)) return false;
+    AudioEffectParameters other = (AudioEffectParameters) o;
     return Arrays.equals(equalizerFrequencies, other.equalizerFrequencies)
         && Arrays.equals(equalizerLevels, other.equalizerLevels)
         && Float.compare(stability, other.stability) == 0

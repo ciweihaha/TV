@@ -57,7 +57,8 @@ public final class SubtitleSelectionState {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof SubtitleSelectionState other)) return false;
+    if (!(o instanceof SubtitleSelectionState)) return false;
+    SubtitleSelectionState other = (SubtitleSelectionState) o;
     return Objects.equals(primarySelection, other.primarySelection)
         && Objects.equals(activeSecondarySelection, other.activeSecondarySelection)
         && Objects.equals(secondaryCandidates, other.secondaryCandidates)

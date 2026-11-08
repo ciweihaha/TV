@@ -23,7 +23,8 @@ public final class SubtitleOffsets {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof SubtitleOffsets other)) return false;
+    if (!(o instanceof SubtitleOffsets)) return false;
+    SubtitleOffsets other = (SubtitleOffsets) o;
     return primaryMs == other.primaryMs && secondaryMs == other.secondaryMs;
   }
 

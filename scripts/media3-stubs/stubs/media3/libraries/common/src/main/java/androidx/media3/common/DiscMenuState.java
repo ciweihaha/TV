@@ -37,7 +37,8 @@ public final class DiscMenuState {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof DiscMenuState other)) return false;
+    if (!(o instanceof DiscMenuState)) return false;
+    DiscMenuState other = (DiscMenuState) o;
     return availability == other.availability
         && phase == other.phase
         && navigationPlaybackOngoing == other.navigationPlaybackOngoing;
