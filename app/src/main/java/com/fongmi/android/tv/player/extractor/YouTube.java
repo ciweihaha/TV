@@ -95,7 +95,7 @@ public class YouTube implements Source.Extractor {
         Vod vod = new Vod();
         vod.setName(info.getName());
         vod.setDirector(info.getUploaderName());
-        if (info.getDescription() != null) vod.setContent(info.getDescription().getContent());
+        if (info.getDescription() != null) vod.setContent(info.getDescription().content());
         if (!info.getThumbnails().isEmpty()) vod.setPic(info.getThumbnails().get(info.getThumbnails().size() - 1).getUrl());
         return vod;
     }
