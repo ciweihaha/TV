@@ -12,7 +12,7 @@
 
 ## 做法
 
-本目录提供这 45 个类的最小兼容实现（API 按 TV 代码的实际用法反推），以及对 5 个
+本目录提供这 45 个类的最小兼容实现（API 按 TV 代码的实际用法反推），以及对 13 个
 真实 Media3 文件的补丁（加缺失的扩展方法）。CI 里 `install.py` 在构建 AAR 之前：
 
 1. 把 `stubs/media3/` 的文件拷进 `media3/` checkout（按模块目录一一对应），
@@ -21,7 +21,9 @@
    `SecondaryTextTrackSelector`）同时拷进 `media3-ass/`——libass checkout 是独立
    构建的，而 `LibassSubtitleController` 垫片与打过补丁的 `LibassPlaybackSession`
    引用了它们（第 100 轮修复，否则 libass AAR 编译报 cannot find symbol）；
-2. 给 `Player`、`PlayerView`、`MpvPlayer`、`LibassPlaybackSession`、
+2. 给 `Player`、`PlayerView`、`MpvPlayer`、`MpvPlayerConfig`、`MpvSubtitleOptions`、
+   `MpvLibrary`、`MpvAudioFilter`、`MatroskaExtractor`、`PlayerSeekView`、
+   `SubtitleView`、`PreloadManagerListener`、`LibassPlaybackSession`、
    `DefaultExtractorsFactory` 打补丁。
 
 另外 4 个类因为模块依赖关系放不进 Media3 checkout，改放在 app 源码里
@@ -59,11 +61,12 @@
 | mpvplayer | `MpvConfigFileInspector` / `MpvDecoderMode` / `MpvSubtitleContentLoader` / `media/MpvDrmSupport` | mpv.conf 真实解析；DRM 一律判 MPV 不支持（走 Exo） |
 | app 内 | 见上 | 字幕内容 UNSUPPORTED；无转录；danmaku/libass UI 不激活 |
 
-## 补丁清单（5 个文件）
+## 补丁清单（13 个文件）
 
 - `libraries/common/.../Player.java`：默认方法 `getDiscMenuState()`（→EMPTY）、
   `getDecoderMode(int)`（→null）、`getSubtitleOffsets()`（→ZERO）、
-  `setSubtitleOffsets(...)`（no-op）；`Player.Listener.onDiscMenuStateChanged(...)`（no-op）。
+  `setSubtitleOffsets(...)`（no-op）；`Player.Listener.onDiscMenuStateChanged(...)`（no-op）；
+  常量 `EVENT_DISC_MENU_STATE_CHANGED = 33`（第 101 轮补，永不触发）。
 - `libraries/ui/.../PlayerView.java`：`setDiscMenuController/getDiscMenuController`、
   `getVideoTransform/setVideoTransform`（真实缩放 surface）、
   `getVideoAspectRatioOverride/setVideoAspectRatioOverride`（仅保存）、
@@ -73,7 +76,35 @@
   `setSubtitleContentEnabled`、`canRetry/retrySubtitleContent`（false/no-op）、
   `get/setSubtitleOffsets`（保存/返回）、`getSubtitleSelectionState`（EMPTY）、
   `setSubtitleContentLoader`、`setSecondaryTextTrackSelectionOverride/AutoSelectionEnabled`；
-  `Builder.setVideoDecoderMode(...)`。
+  `Builder.setVideoDecoderMode(...)`。第 101 轮再加：`setVerboseLoggingEnabled`、
+  `setDiscDataSourceFactory`（仅保存）、`resetSecondaryTextTrackSelection`（no-op）、
+  脚本会话 `setStartupScripts`/`loadScript`/`getScriptData`/`getInputBindings`/
+  `unloadScript`/`runScriptBinding`（false/null/no-op，脚本不执行）、
+  `setLogListener`/`setAudioFilterListener`（永不触发）、运动插值
+  `setMotionInterpolationFps`（存值，返回已完成 Future）/
+  `getMotionInterpolationFps`/`isMotionInterpolationSupported`（false）/
+  `isMotionInterpolationUpdatePending`（false）/
+  `getMotionInterpolationEffectiveTargetFps`/`add/removeMotionInterpolationListener`。
+- `libraries/mpvplayer/.../MpvPlayerConfig.java`（第 101 轮）：
+  `Builder.setDataSourceFactory(...)`、`setMotionInterpolationFps(...)`（仅保存，
+  播放器不消费）+ 对应 getter。
+- `libraries/mpvplayer/.../MpvSubtitleOptions.java`（第 101 轮）：
+  `Builder.setFontsDirectory/setVerticalOffset/setBitmapSubtitleBrightness/
+  setSecondarySubtitlePosition/setSecondaryVerticalOffset/setSecondaryAssStyleOverride/
+  setFontFamily/setDefaultStyle`（仅保存，不生效）+ 对应 getter。
+- `libraries/mpvplayer/.../MpvLibrary.java`（第 101 轮）：
+  `setLibraryLoader(BooleanSupplier)`（仅保存；TV 代码传 `MpvUtil::loadRuntime`，
+  `() -> boolean` 方法引用只能是函数式接口，不能是 `LibraryLoader` 类）。
+- `libraries/mpvplayer/.../MpvAudioFilter.java`（第 101 轮）：
+  `Builder.addDynamicNormalization(...)`（近似映射为 ffmpeg `dynaudnorm` 滤镜）。
+- `libraries/extractor/.../MatroskaExtractor.java`（第 101 轮）：
+  常量 `FLAG_DEFER_SEEK_FOR_CUES = 1 << 2`（定义后被忽略）。
+- `libraries/ui/.../PlayerSeekView.java`（第 101 轮）：
+  `setDurationSupplier(LongSupplier)`（真实生效：覆盖时间线时长）。
+- `libraries/ui/.../SubtitleView.java`（第 101 轮）：
+  `setBitmapSubtitleBrightness(...)`（接受但不应用）。
+- `libraries/exoplayer/.../PreloadManagerListener.java`（第 101 轮）：
+  默认方法 `onPreloadPaused(...)`（永不触发）。
 - `libraries/exoplayer_libass/.../LibassPlaybackSession.java`：
   `LibassConfiguration` 构造器、`createMediaComponents(..., SubtitleTranscript)` 重载、
   `setBottomPositionFraction` / `setSecondaryBottomPositionFraction` / `setFontScale`（no-op）。
@@ -91,6 +122,12 @@
 - ClearKey MP4 无 DRM 会话解密：不工作（走标准 DRM 路径的仍正常）。
 - 截尾（跳过片尾）、预加载定位：不生效。
 - CMG 流识别：不识别（按用户设置的引擎播放）。
+- 启动脚本（mpv 脚本会话）：不执行，TV 侧会把启动脚本标为错误状态。
+- 运动插值：不生效（帧率可设可读，但画面不插值）。
+- MPV 日志监听 / 音频滤镜监听：永不触发。
+- 字幕字体目录、垂直偏移、位图字幕亮度、字体族、默认样式：设置被接受但不生效。
+- 动态响度归一化：近似为 ffmpeg `dynaudnorm`，参数映射未经官方实现验证。
+- Matroska 延迟 cue 查找标志：定义后被提取器忽略。
 
 ## 维护注意
 

@@ -148,6 +148,32 @@ def patch_player(media3: Path) -> None:
     default void onDiscMenuStateChanged(DiscMenuState state) {}""",
         "Player.Listener onDiscMenuStateChanged",
     )
+    replace_once(
+        path,
+        "  /** {@link #getCurrentMediaEditions()} changed. */\n  @UnstableApi int EVENT_MEDIA_EDITIONS_CHANGED = 32;",
+        """  /** {@link #getCurrentMediaEditions()} changed. */
+  @UnstableApi int EVENT_MEDIA_EDITIONS_CHANGED = 32;
+
+  /**
+   * The disc-menu state changed.
+   *
+   * <p>FongMi extension (shim): never fired by the stock player; value 33 is the next
+   * free event index after {@link #EVENT_MEDIA_EDITIONS_CHANGED}.
+   */
+  @UnstableApi int EVENT_DISC_MENU_STATE_CHANGED = 33;""",
+        "Player.EVENT_DISC_MENU_STATE_CHANGED",
+    )
+    replace_once(
+        path,
+        """    EVENT_MEDIA_CHAPTERS_CHANGED,
+    EVENT_MEDIA_EDITIONS_CHANGED
+  })""",
+        """    EVENT_MEDIA_CHAPTERS_CHANGED,
+    EVENT_MEDIA_EDITIONS_CHANGED,
+    EVENT_DISC_MENU_STATE_CHANGED
+  })""",
+        "Player @Event IntDef entry",
+    )
 
 
 # ------------------------------------------------------------- PlayerView.java
@@ -266,6 +292,19 @@ def patch_mpv_player(media3: Path) -> None:
         "import java.util.List;\nimport java.util.function.Consumer;",
         "MpvPlayer import Consumer",
     )
+    # Round 101: DataSource (disc data source factory) and File (startup scripts).
+    replace_once(
+        path,
+        "import androidx.media3.common.TrackSelectionParameters;",
+        "import androidx.media3.common.TrackSelectionParameters;\nimport androidx.media3.datasource.DataSource;",
+        "MpvPlayer import DataSource",
+    )
+    replace_once(
+        path,
+        "import java.util.List;",
+        "import java.io.File;\nimport java.util.List;",
+        "MpvPlayer import File",
+    )
     replace_once(
         path,
         "public final class MpvPlayer extends SimpleBasePlayer {",
@@ -373,6 +412,147 @@ def patch_mpv_player(media3: Path) -> None:
 """,
         "MpvPlayer FongMi extensions",
     )
+    # Round 101: script/log/audio/motion-interpolation APIs the TV app calls.
+    # Anchored on the round-96 extension block (supportsPointer) so this runs
+    # after the first patch in the same install.
+    replace_once(
+        path,
+        """  @Override
+  public boolean supportsPointer() {
+    return false;
+  }""",
+        """  @Override
+  public boolean supportsPointer() {
+    return false;
+  }
+
+  // ---- FongMi extensions, part 2: script/log/audio/motion APIs (round 101) ----
+
+  /** Listener for mpv log messages (FongMi extension shim). */
+  public interface LogListener {
+    void onLogMessage(String prefix, int level, String text);
+  }
+
+  /** Callback invoked when an asynchronously loaded script finishes (FongMi extension shim). */
+  public interface ScriptLoadCallback {
+    void onLoaded(boolean success, long clientId);
+  }
+
+  /** Listener notified when an audio filter is applied (FongMi extension shim). */
+  public interface AudioFilterListener {
+    void onAudioFilterApplied(boolean success);
+  }
+
+  private boolean verboseLoggingEnabled;
+  @Nullable private DataSource.Factory discDataSourceFactory;
+  private int motionInterpolationFps;
+
+  /** Enables verbose mpv logging (shim: stored only). */
+  public void setVerboseLoggingEnabled(boolean enabled) {
+    this.verboseLoggingEnabled = enabled;
+  }
+
+  /** Sets the data source factory used for disc playback (shim: stored only). */
+  public void setDiscDataSourceFactory(@Nullable DataSource.Factory factory) {
+    this.discDataSourceFactory = factory;
+  }
+
+  /** Resets the secondary text track selection override (shim: no-op). */
+  public void resetSecondaryTextTrackSelection() {}
+
+  /**
+   * Sets the scripts loaded at startup.
+   *
+   * <p>FongMi extension (shim): always returns false (scripts are not applied); the
+   * TV app marks every startup script with an error status.
+   */
+  public boolean setStartupScripts(List<File> scripts) {
+    return false;
+  }
+
+  /**
+   * Loads a script asynchronously.
+   *
+   * <p>FongMi extension (shim): always returns false (scripts are not loaded).
+   */
+  public boolean loadScript(String path, @Nullable ScriptLoadCallback callback) {
+    return false;
+  }
+
+  /**
+   * Returns the JSON status data of a startup script.
+   *
+   * <p>FongMi extension (shim): always returns null.
+   */
+  public @Nullable String getScriptData(String statusKey) {
+    return null;
+  }
+
+  /**
+   * Returns the input bindings as JSON.
+   *
+   * <p>FongMi extension (shim): always returns null.
+   */
+  public @Nullable String getInputBindings() {
+    return null;
+  }
+
+  /** Unloads a previously loaded script (shim: no-op). */
+  public void unloadScript(long clientId) {}
+
+  /**
+   * Runs a script binding.
+   *
+   * <p>FongMi extension (shim): always returns false (bindings are not run).
+   */
+  public boolean runScriptBinding(String binding) {
+    return false;
+  }
+
+  /** Sets the log listener (shim: never called). */
+  public void setLogListener(int level, @Nullable LogListener listener) {}
+
+  /** Sets the audio-filter listener (shim: never called). */
+  public void setAudioFilterListener(@Nullable AudioFilterListener listener) {}
+
+  /**
+   * Sets the motion-interpolation frame rate.
+   *
+   * <p>FongMi extension (shim): the value is stored and reported back, but no
+   * interpolation is performed.
+   */
+  public ListenableFuture<Void> setMotionInterpolationFps(int fps) {
+    this.motionInterpolationFps = fps;
+    return Futures.immediateVoidFuture();
+  }
+
+  /** Returns the motion-interpolation frame rate set by {@link #setMotionInterpolationFps}. */
+  public int getMotionInterpolationFps() {
+    return motionInterpolationFps;
+  }
+
+  /** Returns whether motion interpolation is supported (shim: always false). */
+  public boolean isMotionInterpolationSupported() {
+    return false;
+  }
+
+  /** Returns whether a motion-interpolation update is pending (shim: always false). */
+  public boolean isMotionInterpolationUpdatePending() {
+    return false;
+  }
+
+  /** Returns the effective motion-interpolation target frame rate (shim: the set value). */
+  public float getMotionInterpolationEffectiveTargetFps() {
+    return (float) motionInterpolationFps;
+  }
+
+  /** Adds a motion-interpolation listener (shim: never called). */
+  public void addMotionInterpolationListener(Runnable listener) {}
+
+  /** Removes a motion-interpolation listener (shim: no-op). */
+  public void removeMotionInterpolationListener(Runnable listener) {}""",
+        "MpvPlayer round-101 extension APIs",
+    )
     replace_once(
         path,
         """    @CanIgnoreReturnValue
@@ -405,6 +585,466 @@ def patch_mpv_player(media3: Path) -> None:
       return player;
     }""",
         "MpvPlayer.Builder build applies decoder mode",
+    )
+
+
+# ------------------------------------------------- MpvPlayerConfig.java (round 101)
+def patch_mpv_player_config(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/MpvPlayerConfig.java"
+    )
+    replace_once(
+        path,
+        "import androidx.media3.common.DolbyVisionOutputPolicy;",
+        "import androidx.media3.common.DolbyVisionOutputPolicy;\nimport androidx.media3.datasource.DataSource;",
+        "MpvPlayerConfig import DataSource",
+    )
+    replace_once(
+        path,
+        "  private final boolean videoSharpnessSupported;\n",
+        "  private final boolean videoSharpnessSupported;\n"
+        "  @Nullable private final DataSource.Factory dataSourceFactory;\n"
+        "  private final int motionInterpolationFps;\n",
+        "MpvPlayerConfig fields",
+    )
+    replace_once(
+        path,
+        "    this.videoSharpnessSupported = builder.videoSharpnessSupported;\n",
+        "    this.videoSharpnessSupported = builder.videoSharpnessSupported;\n"
+        "    this.dataSourceFactory = builder.dataSourceFactory;\n"
+        "    this.motionInterpolationFps = builder.motionInterpolationFps;\n",
+        "MpvPlayerConfig constructor",
+    )
+    replace_once(
+        path,
+        """  @RestrictTo(LIBRARY_GROUP)
+  public boolean isVideoSharpnessSupported() {
+    return videoSharpnessSupported;
+  }
+""",
+        """  @RestrictTo(LIBRARY_GROUP)
+  public boolean isVideoSharpnessSupported() {
+    return videoSharpnessSupported;
+  }
+
+  @Nullable
+  @RestrictTo(LIBRARY_GROUP)
+  public DataSource.Factory getDataSourceFactory() {
+    return dataSourceFactory;
+  }
+
+  @RestrictTo(LIBRARY_GROUP)
+  public int getMotionInterpolationFps() {
+    return motionInterpolationFps;
+  }
+""",
+        "MpvPlayerConfig getters",
+    )
+    replace_once(
+        path,
+        "    private boolean videoSharpnessSupported = true;\n",
+        "    private boolean videoSharpnessSupported = true;\n"
+        "    @Nullable private DataSource.Factory dataSourceFactory;\n"
+        "    private int motionInterpolationFps;\n",
+        "MpvPlayerConfig.Builder fields",
+    )
+    replace_once(
+        path,
+        "    public MpvPlayerConfig build() {",
+        """    @CanIgnoreReturnValue
+    public Builder setDataSourceFactory(@Nullable DataSource.Factory dataSourceFactory) {
+      checkState(!buildCalled);
+      this.dataSourceFactory = dataSourceFactory;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setMotionInterpolationFps(int motionInterpolationFps) {
+      checkState(!buildCalled);
+      this.motionInterpolationFps = motionInterpolationFps;
+      return this;
+    }
+
+    public MpvPlayerConfig build() {""",
+        "MpvPlayerConfig.Builder setters",
+    )
+
+
+# ------------------------------------------------- MpvSubtitleOptions.java (round 101)
+def patch_mpv_subtitle_options(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/MpvSubtitleOptions.java"
+    )
+    replace_once(
+        path,
+        "import androidx.annotation.RestrictTo;",
+        "import androidx.annotation.Nullable;\nimport androidx.annotation.RestrictTo;",
+        "MpvSubtitleOptions import Nullable",
+    )
+    replace_once(
+        path,
+        "  private final boolean secondaryOverrideAssStyles;\n",
+        "  private final boolean secondaryOverrideAssStyles;\n"
+        "  @Nullable private final String fontsDirectory;\n"
+        "  private final float verticalOffset;\n"
+        "  private final float bitmapSubtitleBrightness;\n"
+        "  private final double secondaryVerticalOffset;\n"
+        "  @Nullable private final String fontFamily;\n",
+        "MpvSubtitleOptions fields",
+    )
+    replace_once(
+        path,
+        "    secondaryOverrideAssStyles = builder.secondaryOverrideAssStyles;\n",
+        "    secondaryOverrideAssStyles = builder.secondaryOverrideAssStyles;\n"
+        "    fontsDirectory = builder.fontsDirectory;\n"
+        "    verticalOffset = builder.verticalOffset;\n"
+        "    bitmapSubtitleBrightness = builder.bitmapSubtitleBrightness;\n"
+        "    secondaryVerticalOffset = builder.secondaryVerticalOffset;\n"
+        "    fontFamily = builder.fontFamily;\n",
+        "MpvSubtitleOptions constructor",
+    )
+    replace_once(
+        path,
+        """  public boolean shouldOverrideSecondaryAssStyles() {
+    return secondaryOverrideAssStyles;
+  }
+""",
+        """  public boolean shouldOverrideSecondaryAssStyles() {
+    return secondaryOverrideAssStyles;
+  }
+
+  @Nullable
+  public String getFontsDirectory() {
+    return fontsDirectory;
+  }
+
+  public float getVerticalOffset() {
+    return verticalOffset;
+  }
+
+  public float getBitmapSubtitleBrightness() {
+    return bitmapSubtitleBrightness;
+  }
+
+  public double getSecondaryVerticalOffset() {
+    return secondaryVerticalOffset;
+  }
+
+  @Nullable
+  public String getFontFamily() {
+    return fontFamily;
+  }
+""",
+        "MpvSubtitleOptions getters",
+    )
+    replace_once(
+        path,
+        "    private boolean secondaryOverrideAssStyles;\n",
+        "    private boolean secondaryOverrideAssStyles;\n"
+        "    @Nullable private String fontsDirectory;\n"
+        "    private float verticalOffset;\n"
+        "    private float bitmapSubtitleBrightness;\n"
+        "    private double secondaryVerticalOffset;\n"
+        "    @Nullable private String fontFamily;\n",
+        "MpvSubtitleOptions.Builder fields",
+    )
+    replace_once(
+        path,
+        "    public MpvSubtitleOptions build() {",
+        """    @CanIgnoreReturnValue
+    public Builder setFontsDirectory(@Nullable String fontsDirectory) {
+      checkState(!buildCalled);
+      this.fontsDirectory = fontsDirectory;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setVerticalOffset(float verticalOffset) {
+      checkState(!buildCalled);
+      this.verticalOffset = verticalOffset;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setBitmapSubtitleBrightness(float bitmapSubtitleBrightness) {
+      checkState(!buildCalled);
+      this.bitmapSubtitleBrightness = bitmapSubtitleBrightness;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setSecondarySubtitlePosition(double secondaryPosition) {
+      checkState(!buildCalled);
+      this.secondaryPosition = secondaryPosition;
+      secondarySubtitleConfigured = true;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setSecondaryVerticalOffset(double secondaryVerticalOffset) {
+      checkState(!buildCalled);
+      this.secondaryVerticalOffset = secondaryVerticalOffset;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setSecondaryAssStyleOverride(boolean secondaryOverrideAssStyles) {
+      checkState(!buildCalled);
+      this.secondaryOverrideAssStyles = secondaryOverrideAssStyles;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setFontFamily(@Nullable String fontFamily) {
+      checkState(!buildCalled);
+      this.fontFamily = fontFamily;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setDefaultStyle(
+        int foregroundColor,
+        int backgroundColor,
+        int edgeType,
+        int edgeColor,
+        float edgeSize,
+        float shadowOffset) {
+      checkState(!buildCalled);
+      style = STYLE_CUSTOM;
+      this.foregroundColor = foregroundColor;
+      this.backgroundColor = backgroundColor;
+      this.edgeType = edgeType;
+      this.edgeColor = edgeColor;
+      this.edgeSize = edgeSize;
+      this.shadowOffset = shadowOffset;
+      return this;
+    }
+
+    public MpvSubtitleOptions build() {""",
+        "MpvSubtitleOptions.Builder setters",
+    )
+
+
+# ------------------------------------------------- MpvLibrary.java (round 101)
+def patch_mpv_library(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/MpvLibrary.java"
+    )
+    replace_once(
+        path,
+        "import androidx.media3.common.MediaLibraryInfo;",
+        "import androidx.annotation.Nullable;\n"
+        "import androidx.media3.common.MediaLibraryInfo;\n"
+        "import androidx.media3.common.util.LibraryLoader;\n"
+        "import java.util.function.BooleanSupplier;",
+        "MpvLibrary imports",
+    )
+    replace_once(
+        path,
+        """  public static void setLibraries(String... libraries) {
+    LOADER.setLibraries(libraries);
+  }""",
+        """  public static void setLibraries(String... libraries) {
+    LOADER.setLibraries(libraries);
+  }
+
+  @Nullable private static BooleanSupplier libraryLoader;
+
+  /**
+   * Overrides how the mpv native libraries are loaded.
+   *
+   * <p>FongMi extension (shim): the loader is stored but the stock {@link LibraryLoader}
+   * is still used to load the libraries. The parameter is a {@link BooleanSupplier}
+   * because the TV app passes {@code MpvUtil::loadRuntime} (a {@code () -> boolean}
+   * method reference), which cannot be a {@link LibraryLoader} (a class, not an
+   * interface).
+   */
+  public static void setLibraryLoader(@Nullable BooleanSupplier loader) {
+    libraryLoader = loader;
+  }""",
+        "MpvLibrary setLibraryLoader",
+    )
+
+
+# ------------------------------------------------- MpvAudioFilter.java (round 101)
+def patch_mpv_audio_filter(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/audio/MpvAudioFilter.java"
+    )
+    replace_once(
+        path,
+        """    public MpvAudioFilter build() {""",
+        """    /**
+     * Adds dynamic normalization (ffmpeg {@code dynaudnorm} filter).
+     *
+     * <p>FongMi extension (shim approximation): frame length in seconds is converted
+     * to milliseconds for the filter's {@code f} option; {@code maxGain} maps to the
+     * filter's peak limit {@code p}.
+     */
+    @CanIgnoreReturnValue
+    public Builder addDynamicNormalization(String id, double frameLengthSeconds, double maxGain) {
+      checkState(!buildCalled);
+      String target = target("dynaudnorm", id);
+      String filter =
+          Util.formatInvariant(
+              "%s=f=%s:p=%s",
+              target,
+              decimal(frameLengthSeconds * 1000.0, 0),
+              decimal(maxGain, 1));
+      return addFilter(filter, filter);
+    }
+
+    public MpvAudioFilter build() {""",
+        "MpvAudioFilter.Builder addDynamicNormalization",
+    )
+
+
+# ------------------------------------------------- MatroskaExtractor.java (round 101)
+def patch_matroska_extractor(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/extractor/src/main/java/androidx/media3/extractor/mkv/MatroskaExtractor.java"
+    )
+    replace_once(
+        path,
+        "  public static final int FLAG_EMIT_RAW_SUBTITLE_DATA = 1 << 1; // 2",
+        """  public static final int FLAG_EMIT_RAW_SUBTITLE_DATA = 1 << 1; // 2
+
+  /**
+   * Flag to defer seeking for cues until the cues element is actually needed.
+   *
+   * <p>FongMi extension (shim): defined for API compatibility; the stock extractor
+   * ignores this flag.
+   */
+  public static final int FLAG_DEFER_SEEK_FOR_CUES = 1 << 2; // 4""",
+        "MatroskaExtractor FLAG_DEFER_SEEK_FOR_CUES",
+    )
+    replace_once(
+        path,
+        "      value = {FLAG_DISABLE_SEEK_FOR_CUES, FLAG_EMIT_RAW_SUBTITLE_DATA})",
+        "      value = {\n"
+        "        FLAG_DISABLE_SEEK_FOR_CUES,\n"
+        "        FLAG_EMIT_RAW_SUBTITLE_DATA,\n"
+        "        FLAG_DEFER_SEEK_FOR_CUES\n"
+        "      })",
+        "MatroskaExtractor @IntDef value list",
+    )
+
+
+# ------------------------------------------------- PlayerSeekView.java (round 101)
+def patch_player_seek_view(media3: Path) -> None:
+    path = (
+        media3 / "libraries/ui/src/main/java/androidx/media3/ui/PlayerSeekView.java"
+    )
+    replace_once(
+        path,
+        "import java.util.Locale;",
+        "import java.util.Locale;\nimport java.util.function.LongSupplier;",
+        "PlayerSeekView import LongSupplier",
+    )
+    replace_once(
+        path,
+        """  private long currentDuration;
+  private long currentWindowOffset;""",
+        """  private long currentDuration;
+  private long currentWindowOffset;
+  @Nullable private LongSupplier durationSupplier;""",
+        "PlayerSeekView durationSupplier field",
+    )
+    replace_once(
+        path,
+        """  /** Returns the bound {@link TimeBar}. */""",
+        """  /**
+   * Sets a supplier for the duration shown in the seek view, overriding the
+   * duration from the player timeline.
+   *
+   * <p>FongMi extension: the TV app passes its active playback duration
+   * ({@code PlaybackActivity::getActivePlaybackDuration}).
+   */
+  public void setDurationSupplier(@Nullable LongSupplier durationSupplier) {
+    this.durationSupplier = durationSupplier;
+    if (attached) {
+      updateTimeline();
+    }
+  }
+
+  /** Returns the bound {@link TimeBar}. */""",
+        "PlayerSeekView setDurationSupplier",
+    )
+    replace_once(
+        path,
+        """    } else if (player.isCommandAvailable(COMMAND_GET_CURRENT_MEDIA_ITEM)) {
+      long durationMs = player.getContentDuration();
+      if (durationMs != C.TIME_UNSET) {
+        durationUs = msToUs(durationMs);
+      }
+    }
+    updateDuration(Util.usToMs(durationUs), adGroupCount);""",
+        """    } else if (player.isCommandAvailable(COMMAND_GET_CURRENT_MEDIA_ITEM)) {
+      long durationMs = player.getContentDuration();
+      if (durationMs != C.TIME_UNSET) {
+        durationUs = msToUs(durationMs);
+      }
+    }
+    if (durationSupplier != null) {
+      long suppliedDurationMs = durationSupplier.getAsLong();
+      if (suppliedDurationMs != C.TIME_UNSET && suppliedDurationMs >= 0) {
+        durationUs = msToUs(suppliedDurationMs);
+      }
+    }
+    updateDuration(Util.usToMs(durationUs), adGroupCount);""",
+        "PlayerSeekView updateTimeline uses durationSupplier",
+    )
+
+
+# ------------------------------------------------- SubtitleView.java (round 101)
+def patch_subtitle_view(media3: Path) -> None:
+    path = media3 / "libraries/ui/src/main/java/androidx/media3/ui/SubtitleView.java"
+    replace_once(
+        path,
+        """  public void setBottomPosition(float bottomPosition) {
+    this.bottomPosition = bottomPosition;
+    updateOutput();
+  }""",
+        """  public void setBottomPosition(float bottomPosition) {
+    this.bottomPosition = bottomPosition;
+    updateOutput();
+  }
+
+  /**
+   * Sets the brightness multiplier applied to bitmap subtitles.
+   *
+   * <p>FongMi extension (shim): accepted but not applied.
+   */
+  public void setBitmapSubtitleBrightness(float bitmapSubtitleBrightness) {}""",
+        "SubtitleView setBitmapSubtitleBrightness",
+    )
+
+
+# ------------------------------------------------- PreloadManagerListener.java (round 101)
+def patch_preload_manager_listener(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/exoplayer/src/main/java/androidx/media3/exoplayer/source/preload/PreloadManagerListener.java"
+    )
+    replace_once(
+        path,
+        """  /** Called when an {@linkplain PreloadException error} occurs. */
+  default void onError(PreloadException exception) {}""",
+        """  /** Called when an {@linkplain PreloadException error} occurs. */
+  default void onError(PreloadException exception) {}
+
+  /**
+   * Called when preloading of the given {@link MediaItem} is paused.
+   *
+   * <p>FongMi extension (shim): never called by the stock preload manager.
+   */
+  default void onPreloadPaused(MediaItem mediaItem) {}""",
+        "PreloadManagerListener onPreloadPaused",
     )
 
 
@@ -546,6 +1186,14 @@ def main() -> int:
     patch_player(media3)
     patch_player_view(media3)
     patch_mpv_player(media3)
+    patch_mpv_player_config(media3)
+    patch_mpv_subtitle_options(media3)
+    patch_mpv_library(media3)
+    patch_mpv_audio_filter(media3)
+    patch_matroska_extractor(media3)
+    patch_player_seek_view(media3)
+    patch_subtitle_view(media3)
+    patch_preload_manager_listener(media3)
     patch_libass_session(media3_ass)
     patch_extractors_factory(media3)
     print("OK: all shims installed and patches applied")
