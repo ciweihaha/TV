@@ -171,14 +171,14 @@ jobs:
           assert old_loop in text, "CMakeLists foreach block not found, refusing to patch blindly"
           text = text.replace(old_loop, new_loop)
           old_link = '''target_link_libraries(ffmpegJNI
-                      PRIVATE android
-                      PRIVATE swresample
-                      PRIVATE avcodec
-                      PRIVATE avformat
-                      PRIVATE avutil'''
+                                PRIVATE android
+                                PRIVATE swresample
+                                PRIVATE avcodec
+                                PRIVATE avformat
+                                PRIVATE avutil'''
           new_link = '''target_link_libraries(ffmpegJNI
-                      PRIVATE android
-                      PRIVATE ffmpeg'''
+                                PRIVATE android
+                                PRIVATE ffmpeg'''
           assert old_link in text, "CMakeLists target_link_libraries block not found"
           text = text.replace(old_link, new_link)
           path.write_text(text, encoding="utf-8")
