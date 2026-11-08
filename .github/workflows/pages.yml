@@ -23,7 +23,8 @@ jobs:
         working-directory: website
     permissions:
       contents: read
-      pages: read
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -33,6 +34,9 @@ jobs:
           cache-dependency-path: website/package-lock.json
       - uses: actions/configure-pages@v6.0.0
         id: pages
+        with:
+          # Forks don't have Pages enabled; let the action enable it.
+          enablement: true
       - run: npm ci
       - run: npm run lint
       - run: npm run build
