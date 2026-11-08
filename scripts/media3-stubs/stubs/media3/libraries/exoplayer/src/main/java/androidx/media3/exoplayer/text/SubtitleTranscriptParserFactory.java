@@ -8,9 +8,10 @@ package androidx.media3.exoplayer.text;
 
 import androidx.annotation.Nullable;
 import androidx.media3.common.Format;
+import androidx.media3.common.util.Consumer;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.extractor.text.CuesWithTiming;
 import androidx.media3.extractor.text.SubtitleParser;
-import java.util.function.Consumer;
 
 @UnstableApi
 public final class SubtitleTranscriptParserFactory implements SubtitleParser.Factory {
