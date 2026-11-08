@@ -669,6 +669,96 @@ def patch_mpv_player_config(media3: Path) -> None:
     public MpvPlayerConfig build() {""",
         "MpvPlayerConfig.Builder setters",
     )
+    # Round 102: setDefaultFontDirectories(File, File) was hidden behind javac's
+    # 100-error cap in run 42534171249 and only surfaced in run 42536151812
+    # (MpvUtil.java:142). The fork-only API stores the two font directories;
+    # the stock player does not consume them (same pattern as the round-101
+    # setDataSourceFactory/setMotionInterpolationFps setters).
+    replace_once(
+        path,
+        "  @Nullable private final DataSource.Factory dataSourceFactory;\n"
+        "  private final int motionInterpolationFps;\n",
+        "  @Nullable private final DataSource.Factory dataSourceFactory;\n"
+        "  private final int motionInterpolationFps;\n"
+        "  @Nullable private final File defaultFontsDirectory;\n"
+        "  @Nullable private final File defaultSystemFontsDirectory;\n",
+        "MpvPlayerConfig default font directory fields",
+    )
+    replace_once(
+        path,
+        "    this.dataSourceFactory = builder.dataSourceFactory;\n"
+        "    this.motionInterpolationFps = builder.motionInterpolationFps;\n",
+        "    this.dataSourceFactory = builder.dataSourceFactory;\n"
+        "    this.motionInterpolationFps = builder.motionInterpolationFps;\n"
+        "    this.defaultFontsDirectory = builder.defaultFontsDirectory;\n"
+        "    this.defaultSystemFontsDirectory = builder.defaultSystemFontsDirectory;\n",
+        "MpvPlayerConfig default font directory constructor",
+    )
+    replace_once(
+        path,
+        """  @RestrictTo(LIBRARY_GROUP)
+  public int getMotionInterpolationFps() {
+    return motionInterpolationFps;
+  }
+""",
+        """  @RestrictTo(LIBRARY_GROUP)
+  public int getMotionInterpolationFps() {
+    return motionInterpolationFps;
+  }
+
+  @Nullable
+  @RestrictTo(LIBRARY_GROUP)
+  public File getDefaultFontsDirectory() {
+    return defaultFontsDirectory;
+  }
+
+  @Nullable
+  @RestrictTo(LIBRARY_GROUP)
+  public File getDefaultSystemFontsDirectory() {
+    return defaultSystemFontsDirectory;
+  }
+""",
+        "MpvPlayerConfig default font directory getters",
+    )
+    replace_once(
+        path,
+        "    @Nullable private DataSource.Factory dataSourceFactory;\n"
+        "    private int motionInterpolationFps;\n",
+        "    @Nullable private DataSource.Factory dataSourceFactory;\n"
+        "    private int motionInterpolationFps;\n"
+        "    @Nullable private File defaultFontsDirectory;\n"
+        "    @Nullable private File defaultSystemFontsDirectory;\n",
+        "MpvPlayerConfig.Builder default font directory fields",
+    )
+    replace_once(
+        path,
+        """    @CanIgnoreReturnValue
+    public Builder setMotionInterpolationFps(int motionInterpolationFps) {
+      checkState(!buildCalled);
+      this.motionInterpolationFps = motionInterpolationFps;
+      return this;
+    }
+
+    public MpvPlayerConfig build() {""",
+        """    @CanIgnoreReturnValue
+    public Builder setMotionInterpolationFps(int motionInterpolationFps) {
+      checkState(!buildCalled);
+      this.motionInterpolationFps = motionInterpolationFps;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setDefaultFontDirectories(
+        @Nullable File defaultFontsDirectory, @Nullable File defaultSystemFontsDirectory) {
+      checkState(!buildCalled);
+      this.defaultFontsDirectory = defaultFontsDirectory;
+      this.defaultSystemFontsDirectory = defaultSystemFontsDirectory;
+      return this;
+    }
+
+    public MpvPlayerConfig build() {""",
+        "MpvPlayerConfig.Builder setDefaultFontDirectories",
+    )
 
 
 # ------------------------------------------------- MpvSubtitleOptions.java (round 101)

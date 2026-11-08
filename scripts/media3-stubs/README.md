@@ -87,7 +87,8 @@
   `getMotionInterpolationEffectiveTargetFps`/`add/removeMotionInterpolationListener`。
 - `libraries/mpvplayer/.../MpvPlayerConfig.java`（第 101 轮）：
   `Builder.setDataSourceFactory(...)`、`setMotionInterpolationFps(...)`（仅保存，
-  播放器不消费）+ 对应 getter。
+  播放器不消费）+ 对应 getter；第 102 轮补 `Builder.setDefaultFontDirectories(File, File)`
+  （仅保存，TV 传两次同一外部字体目录）。
 - `libraries/mpvplayer/.../MpvSubtitleOptions.java`（第 101 轮）：
   `Builder.setFontsDirectory/setVerticalOffset/setBitmapSubtitleBrightness/
   setSecondarySubtitlePosition/setSecondaryVerticalOffset/setSecondaryAssStyleOverride/
