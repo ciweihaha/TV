@@ -16,7 +16,11 @@
 真实 Media3 文件的补丁（加缺失的扩展方法）。CI 里 `install.py` 在构建 AAR 之前：
 
 1. 把 `stubs/media3/` 的文件拷进 `media3/` checkout（按模块目录一一对应），
-   把 `stubs/media3-ass/` 的拷进 `media3-ass/` checkout；
+   把 `stubs/media3-ass/` 的拷进 `media3-ass/` checkout；另外 4 个垫片
+   （`SubtitleSelectionState`、`SecondaryTextOutput`、`SubtitleTranscript`、
+   `SecondaryTextTrackSelector`）同时拷进 `media3-ass/`——libass checkout 是独立
+   构建的，而 `LibassSubtitleController` 垫片与打过补丁的 `LibassPlaybackSession`
+   引用了它们（第 100 轮修复，否则 libass AAR 编译报 cannot find symbol）；
 2. 给 `Player`、`PlayerView`、`MpvPlayer`、`LibassPlaybackSession`、
    `DefaultExtractorsFactory` 打补丁。
 

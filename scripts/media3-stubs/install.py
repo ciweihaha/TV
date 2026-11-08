@@ -51,6 +51,29 @@ def copy_stubs(src_root: Path, dst_root: Path) -> int:
     return copied
 
 
+# Shims that live in stubs/media3/ but are also needed by the media3-ass
+# checkout: the LibassSubtitleController shim and the patched
+# LibassPlaybackSession reference them, and the libass checkout is built
+# separately (its own composite build), so they must be present there too.
+# Verified by auditing every media3-ass shim import against the 9dae39e9
+# file tree: exactly these four are missing there (transitive closure).
+MEDIA3_ASS_EXTRA_SHIMS = [
+    "libraries/common/src/main/java/androidx/media3/common/text/SubtitleSelectionState.java",
+    "libraries/exoplayer/src/main/java/androidx/media3/exoplayer/text/SecondaryTextOutput.java",
+    "libraries/exoplayer/src/main/java/androidx/media3/exoplayer/text/SubtitleTranscript.java",
+    "libraries/exoplayer/src/main/java/androidx/media3/exoplayer/trackselection/SecondaryTextTrackSelector.java",
+]
+
+
+def copy_extra_shims_for_ass(media3_ass: Path) -> None:
+    for rel in MEDIA3_ASS_EXTRA_SHIMS:
+        src = HERE / "stubs" / "media3" / rel
+        dst = media3_ass / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        print(f"copied extra shim for media3-ass: {rel}")
+
+
 # ---------------------------------------------------------------- Player.java
 def patch_player(media3: Path) -> None:
     path = media3 / "libraries/common/src/main/java/androidx/media3/common/Player.java"
@@ -519,6 +542,7 @@ def main() -> int:
             raise SystemExit(f"not a media checkout (no libraries/): {d}")
     copy_stubs(HERE / "stubs" / "media3", media3)
     copy_stubs(HERE / "stubs" / "media3-ass", media3_ass)
+    copy_extra_shims_for_ass(media3_ass)
     patch_player(media3)
     patch_player_view(media3)
     patch_mpv_player(media3)
