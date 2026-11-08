@@ -20,7 +20,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7.0.1
 
@@ -40,7 +41,133 @@ jobs:
           # "platforms;android-37.0" (minor-version id) and it is distributed
           # through the beta channel (channel 1 = stable + beta).
           yes | sdkmanager --licenses
-          sdkmanager --channel=1 "platforms;android-37.0" "build-tools;37.0.0" "platform-tools" "ndk;29.0.14206865" "cmake;4.1.2"
+          # cmake 3.22.1 is for the FongMi/media native build below;
+          # cmake 4.1.2 is what the TV app's own native modules use.
+          sdkmanager --channel=1 "platforms;android-37.0" "build-tools;37.0.0" "platform-tools" "ndk;29.0.14206865" "cmake;3.22.1" "cmake;4.1.2"
+
+      # Native build tools for the Media3 FFmpeg/libass C builds.
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3.10 python3.10-dev python3.10-venv autoconf automake autopoint gettext gperf libtool ninja-build pkg-config
+
+      # The app's player (ExoPlayer + MPV + danmaku + libass + FFmpeg) comes
+      # from FongMi's custom Media3 fork, which is not published to Maven.
+      # Upstream ships it as prebuilt AARs in app/libs (gitignored lib-*.aar),
+      # so a clean checkout cannot compile: the data-binding step fails on
+      # `exo_duration` and javac fails on every androidx.media3 import.
+      # Build those AARs from source here, pinned to the commits the
+      # 5.6.8-era build was validated against (Media3 1.11.0 based).
+      - name: Checkout FongMi Media3 source
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: FongMi/media
+          ref: 3c2cbe8ac742c2fe15eff52f03eeb3b1b648848d
+          path: media3
+          fetch-depth: 1
+
+      # libass native deps live on GitLab, which is often unreachable from
+      # GitHub runners; use the GitHub mirrors (same as the downstream fork).
+      - name: Use GitHub mirrors for libass submodules
+        run: |
+          git config --global url."https://github.com/fontconfig/fontconfig".insteadOf https://gitlab.freedesktop.org/fontconfig/fontconfig
+          git config --global url."https://github.com/freetype/freetype".insteadOf https://gitlab.freedesktop.org/freetype/freetype
+
+      - name: Checkout FongMi Media3 libass source
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: FongMi/media
+          ref: 9dae39e9689ee305c83f94bd11cf3bcecb9d6171
+          path: media3-ass
+          fetch-depth: 1
+          submodules: recursive
+
+      # The Media3 checkout carries split FFmpeg libs (libavcodec.so etc.),
+      # but the app's VerifyMpvNativeTask requires the unified libffmpeg.so
+      # + libffmpegJNI.so, and the public libmpv.so lacks mpv's discnav
+      # command. Take all three from the official 5.8.7 APKs, which were
+      # built from this same Media3 lineage.
+      - name: Restore unified FFmpeg libs and official libmpv.so
+        run: |
+          set -euo pipefail
+          APK_DIR="$RUNNER_TEMP/fongmi-official-587"
+          mkdir -p "$APK_DIR"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 600 \
+            "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-arm64_v8a.apk" \
+            --output "$APK_DIR/mobile-arm64_v8a.apk"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 600 \
+            "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-armeabi_v7a.apk" \
+            --output "$APK_DIR/mobile-armeabi_v7a.apk"
+          sha256sum "$APK_DIR"/*.apk
+          for pair in "arm64-v8a:mobile-arm64_v8a.apk" "armeabi-v7a:mobile-armeabi_v7a.apk"; do
+            abi="${pair%%:*}"; apk="${pair##*:}"
+            ffdir="media3/libraries/decoder_ffmpeg/src/main/jniLibs/$abi"
+            mpvdir="media3/libraries/mpvplayer/src/main/jniLibs/$abi"
+            rm -f "$ffdir"/libavcodec.so "$ffdir"/libavdevice.so "$ffdir"/libavfilter.so "$ffdir"/libavformat.so "$ffdir"/libavutil.so "$ffdir"/libswresample.so "$ffdir"/libswscale.so
+            unzip -o -j "$APK_DIR/$apk" "lib/$abi/libffmpeg.so" "lib/$abi/libffmpegJNI.so" -d "$ffdir"
+            if unzip -l "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" | grep -q libffmpegDoviJNI.so; then
+              unzip -o -j "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" -d "$ffdir"
+            fi
+            unzip -o -j "$APK_DIR/$apk" "lib/$abi/libmpv.so" -d "$mpvdir"
+            echo "== $abi =="; ls -la "$ffdir" "$mpvdir"
+          done
+
+      - name: Build FongMi Media3 AARs
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
+        run: |
+          set -euo pipefail
+          chmod +x media3/gradlew media3-ass/gradlew
+          MEDIA_TASKS=()
+          while IFS= read -r AAR || [ -n "$AAR" ]; do
+            AAR="${AAR%$'\r'}"
+            [ -n "$AAR" ] || continue
+            MODULE="${AAR%-release.aar}"
+            MEDIA_TASKS+=(":${MODULE}:assembleRelease")
+          done < media3/move.txt
+          ./media3/gradlew \
+            -p media3 \
+            "${MEDIA_TASKS[@]}" \
+            --stacktrace \
+            --no-daemon
+          COPIED=0
+          while IFS= read -r AAR || [ -n "$AAR" ]; do
+            AAR="${AAR%$'\r'}"
+            [ -n "$AAR" ] || continue
+            # Media3 redirects every module's build directory to
+            # media3/buildout, so search the checkout rather than assuming
+            # libraries/*/build.
+            SOURCE="$(find media3 -type f -path "*/outputs/aar/$AAR" -print -quit)"
+            if [ -z "$SOURCE" ]; then
+              echo "::error::Missing Media3 AAR: $AAR"
+              exit 1
+            fi
+            cp "$SOURCE" app/libs/"$AAR"
+            COPIED=$((COPIED + 1))
+          done < media3/move.txt
+          EXPECTED="$(grep -cve '^[[:space:]]*$' media3/move.txt)"
+          [ "$COPIED" -eq "$EXPECTED" ] || {
+            echo "::error::Copied $COPIED Media3 AARs, expected $EXPECTED"
+            exit 1
+          }
+          echo "== Media3 AARs copied to app/libs =="
+          find app/libs -maxdepth 1 -type f -name 'lib-*-release.aar' -print | sort
+
+      # libass (ASS subtitle rendering) was removed from FongMi/media's
+      # release line; build it from the older checkout that still has it.
+      - name: Build FongMi libass AAR
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
+        run: |
+          set -euo pipefail
+          bash media3-ass/libraries/exoplayer_libass/src/main/jni/prepare_libass.sh
+          ./media3-ass/gradlew -p media3-ass :lib-exoplayer-libass:assembleRelease --stacktrace --no-daemon
+          SOURCE_AAR="$(find media3-ass -type f -path '*/outputs/aar/lib-exoplayer-libass-release.aar' -print -quit)"
+          test -n "$SOURCE_AAR"
+          cp "$SOURCE_AAR" app/libs/lib-exoplayer-libass-release.aar
+          ls -la app/libs/
 
       # app/build.gradle reads local.properties at configuration time and both
       # debug and release build types use the release signing config, so a
