@@ -120,9 +120,70 @@ jobs:
             if unzip -l "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" | grep -q libffmpegDoviJNI.so; then
               unzip -o -j "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" -d "$ffdir"
             fi
-            unzip -o -j "$APK_DIR/$mpvapk" "lib/$abi/libmpv.so" -d "$mpvdir"
+            unzip -o -j "$APK_DIR/$mpvapk" "lib/$abi/libmpv.so" "lib/$abi/libplayer.so" -d "$mpvdir"
             echo "== $abi =="; ls -la "$ffdir" "$mpvdir"
           done
+
+      # decoder_ffmpeg 的 CMake 构建 libffmpegJNI.so 时默认链接分片库
+      # （libavutil.so 等），但官方构建链接的是统一的 libffmpeg.so，
+      # 分片库进了 AAR 还会被 app 的 VerifyMpvNativeTask 拒绝。
+      # 把 CMakeLists 改成链接统一库（第 10 步已把 libffmpeg.so 放进 jniLibs）。
+      - name: Patch decoder-ffmpeg CMake to link unified libffmpeg.so
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("media3/libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt")
+          text = path.read_text(encoding="utf-8")
+          old_loop = '''foreach(ffmpeg_lib avutil swresample avcodec avformat)
+              set(ffmpeg_lib_filename lib${ffmpeg_lib}.so)
+              set(ffmpeg_lib_file_path ${ffmpeg_binaries}/${ffmpeg_lib_filename})
+              if(NOT EXISTS "${ffmpeg_lib_file_path}")
+                  message(FATAL_ERROR
+                          "Missing FFmpeg library for ${ANDROID_ABI}: ${ffmpeg_lib_file_path}")
+              endif()
+              add_library(
+                      ${ffmpeg_lib}
+                      SHARED
+                      IMPORTED)
+              set_target_properties(
+                      ${ffmpeg_lib} PROPERTIES
+                      IMPORTED_LOCATION
+                      ${ffmpeg_lib_file_path})
+          endforeach()'''
+          new_loop = '''# FongMi official builds link the JNI wrapper against the unified
+          # libffmpeg.so (the split libav*.so files are link-only inputs for the
+          # stock build and the app rejects them in the AAR). The unified
+          # library is staged into jniLibs by the workflow before this build.
+          set(ffmpeg_lib_file_path ${ffmpeg_binaries}/libffmpeg.so)
+          if(NOT EXISTS "${ffmpeg_lib_file_path}")
+              message(FATAL_ERROR
+                      "Missing FFmpeg library for ${ANDROID_ABI}: ${ffmpeg_lib_file_path}")
+          endif()
+          add_library(
+                  ffmpeg
+                  SHARED
+                  IMPORTED)
+          set_target_properties(
+                  ffmpeg PROPERTIES
+                  IMPORTED_LOCATION
+                  ${ffmpeg_lib_file_path})'''
+          assert old_loop in text, "CMakeLists foreach block not found, refusing to patch blindly"
+          text = text.replace(old_loop, new_loop)
+          old_link = '''target_link_libraries(ffmpegJNI
+                      PRIVATE android
+                      PRIVATE swresample
+                      PRIVATE avcodec
+                      PRIVATE avformat
+                      PRIVATE avutil'''
+          new_link = '''target_link_libraries(ffmpegJNI
+                      PRIVATE android
+                      PRIVATE ffmpeg'''
+          assert old_link in text, "CMakeLists target_link_libraries block not found"
+          text = text.replace(old_link, new_link)
+          path.write_text(text, encoding="utf-8")
+          print("patched", path)
+          PY
 
       - name: Build FongMi Media3 AARs
         env:
