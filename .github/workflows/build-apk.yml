@@ -190,6 +190,11 @@ jobs:
           print("patched", path)
           PY
 
+      - name: Install FongMi private-API shims and patches
+        run: |
+          set -euo pipefail
+          python3 scripts/media3-stubs/install.py --media3 media3 --media3-ass media3-ass
+
       - name: Build FongMi Media3 AARs
         env:
           GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
