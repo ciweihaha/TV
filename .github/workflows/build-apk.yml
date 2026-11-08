@@ -63,6 +63,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.4.1
         with:
           gradle-home-cache-cleanup: true
+      # gradlew is stored without the executable bit in this repo (mode 100644),
+      # so set it here instead of relying on the checkout mode.
+      - run: chmod +x gradlew
       - run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APKs
