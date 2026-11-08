@@ -116,7 +116,12 @@ jobs:
             ffdir="media3/libraries/decoder_ffmpeg/src/main/jniLibs/$abi"
             mpvdir="media3/libraries/mpvplayer/src/main/jniLibs/$abi"
             rm -f "$ffdir"/libavcodec.so "$ffdir"/libavdevice.so "$ffdir"/libavfilter.so "$ffdir"/libavformat.so "$ffdir"/libavutil.so "$ffdir"/libswresample.so "$ffdir"/libswscale.so
-            unzip -o -j "$APK_DIR/$apk" "lib/$abi/libffmpeg.so" "lib/$abi/libffmpegJNI.so" -d "$ffdir"
+            # NB: do NOT extract the official libffmpegJNI.so here: the CMake
+            # build below compiles it from source (linked against the unified
+            # libffmpeg.so), and AGP mergeNativeLibs fails on the duplicate.
+            # libffmpegDoviJNI.so is official-only (nothing builds it), so
+            # take it from the APK when present.
+            unzip -o -j "$APK_DIR/$apk" "lib/$abi/libffmpeg.so" -d "$ffdir"
             if unzip -l "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" | grep -q libffmpegDoviJNI.so; then
               unzip -o -j "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" -d "$ffdir"
             fi
