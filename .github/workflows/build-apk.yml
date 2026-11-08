@@ -85,8 +85,10 @@ jobs:
       # The Media3 checkout carries split FFmpeg libs (libavcodec.so etc.),
       # but the app's VerifyMpvNativeTask requires the unified libffmpeg.so
       # + libffmpegJNI.so, and the public libmpv.so lacks mpv's discnav
-      # command. Take all three from the official 5.8.7 APKs, which were
-      # built from this same Media3 lineage.
+      # command. Take the FFmpeg libs from the official 5.8.7 APKs and
+      # libmpv.so from the official runtime-mpv module APKs (the main APK
+      # no longer bundles libmpv.so in 5.8.7: MPV ships as a runtime module),
+      # all built from this same Media3 lineage.
       - name: Restore unified FFmpeg libs and official libmpv.so
         run: |
           set -euo pipefail
@@ -100,9 +102,17 @@ jobs:
             --connect-timeout 20 --max-time 600 \
             "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-armeabi_v7a.apk" \
             --output "$APK_DIR/mobile-armeabi_v7a.apk"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 600 \
+            "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-arm64-v8a.apk" \
+            --output "$APK_DIR/runtime-mpv-1.1.0-arm64-v8a.apk"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 600 \
+            "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-armeabi-v7a.apk" \
+            --output "$APK_DIR/runtime-mpv-1.1.0-armeabi-v7a.apk"
           sha256sum "$APK_DIR"/*.apk
-          for pair in "arm64-v8a:mobile-arm64_v8a.apk" "armeabi-v7a:mobile-armeabi_v7a.apk"; do
-            abi="${pair%%:*}"; apk="${pair##*:}"
+          for pair in "arm64-v8a:mobile-arm64_v8a.apk:runtime-mpv-1.1.0-arm64-v8a.apk" "armeabi-v7a:mobile-armeabi_v7a.apk:runtime-mpv-1.1.0-armeabi-v7a.apk"; do
+            abi="${pair%%:*}"; rest="${pair#*:}"; apk="${rest%%:*}"; mpvapk="${rest##*:}"
             ffdir="media3/libraries/decoder_ffmpeg/src/main/jniLibs/$abi"
             mpvdir="media3/libraries/mpvplayer/src/main/jniLibs/$abi"
             rm -f "$ffdir"/libavcodec.so "$ffdir"/libavdevice.so "$ffdir"/libavfilter.so "$ffdir"/libavformat.so "$ffdir"/libavutil.so "$ffdir"/libswresample.so "$ffdir"/libswscale.so
@@ -110,7 +120,7 @@ jobs:
             if unzip -l "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" | grep -q libffmpegDoviJNI.so; then
               unzip -o -j "$APK_DIR/$apk" "lib/$abi/libffmpegDoviJNI.so" -d "$ffdir"
             fi
-            unzip -o -j "$APK_DIR/$apk" "lib/$abi/libmpv.so" -d "$mpvdir"
+            unzip -o -j "$APK_DIR/$mpvapk" "lib/$abi/libmpv.so" -d "$mpvdir"
             echo "== $abi =="; ls -la "$ffdir" "$mpvdir"
           done
 
