@@ -45,7 +45,7 @@
 | common/audio | `AudioChannelMode` / `AudioChannelMix` | 真实矩阵数学，供 mpv pan 滤镜用 |
 | common/audio | `AudioEffectParameters` | 真实值对象 |
 | common/audio | `AudioEffectProcessor` | 不激活，音频直通 |
-| common/text | `SubtitleContent` / `SubtitleOffsets` / `SubtitleSelectionState` | 真实值对象；内容一律 UNSUPPORTED/EMPTY（无副轨） |
+| common/text | `SubtitleContent` / `SubtitleOffsets` / `SubtitleSelectionState` | 真实值对象；字幕内容第 114 轮起由 MpvPlayer 填充（外挂文件），选择状态按当前 Tracks 计算 |
 | common/util | `LocalClearKeyLicense` | 真实解析 ClearKey JSON |
 | common/util | `TrackSelectionUtil` | 真实实现（基于 stock Player API 选轨/循环） |
 | datasource | `IsoUri` / `ProgressiveIsoCache` | fragment 编码 edition；缓存直通 |
@@ -61,7 +61,7 @@
 | exoplayer/trackselection | `SecondaryTextTrackSelector` | 委托给解码器选择器 |
 | exoplayer_libass | `LibassConfiguration` / `LibassFontConfig` / `LibassFontFile` / `LibassSubtitleController` | 配置真实携带；fonts.conf 真实生成；字体族名纯 Java 解析；控制器报无副字幕 |
 | mpvplayer | `MpvConfigFileInspector` / `MpvDecoderMode` / `MpvSubtitleContentLoader` / `media/MpvDrmSupport` | mpv.conf 真实解析；DRM 一律判 MPV 不支持（走 Exo） |
-| app 内 | 见上 | 字幕内容 UNSUPPORTED；无转录；danmaku/libass UI 不激活 |
+| app 内 | 见上 | 字幕内容：第 114 轮起 `DefaultSubtitleContentLoader` 真实下载并解析（SSA/ASS、WebVTT、SubRip、TX3G、TTML、图片字幕）；无转录；danmaku/libass UI 不激活 |
 
 ## 补丁清单（15 个文件）
 
@@ -79,12 +79,16 @@
   `animateVideoTransform` 须换算成像素再设 translation（第 103 轮直接传分数，
   平移基本不动）；取消动画后对齐到已存变换，避免下次双指缩放起算状态错乱。
 - `libraries/mpvplayer/.../MpvPlayer.java`：实现 `DiscMenuController`（全 false），
-  加 `get/setVideoDecoderMode`、`getSubtitleContentForSelection`（UNSUPPORTED）、
-  `setSubtitleContentEnabled`、`canRetry/retrySubtitleContent`（false/no-op）、
-  `get/setSubtitleOffsets`（保存/返回）、`getSubtitleSelectionState`（EMPTY）、
+  加 `get/setVideoDecoderMode`、`getSubtitleContentForSelection`（第 114 轮起真实现：
+  按 mpv track id 读 `track-list` 的 `external-filename`，回退到当前 MediaItem 字幕配置
+  按语言+标签匹配，后台线程经 `MpvSubtitleContentLoader` 加载并缓存，LOADING/COMPLETE/ERROR）、
+  `setSubtitleContentEnabled`、`canRetry/retrySubtitleContent`（第 114 轮起真实现）、
+  `get/setSubtitleOffsets`（保存/返回）、`getSubtitleSelectionState`（第 114 轮起按当前
+  Tracks 计算主/副字幕选择）、
   `setSubtitleContentLoader`、`setSecondaryTextTrackSelectionOverride/AutoSelectionEnabled`；
   `Builder.setVideoDecoderMode(...)`。第 101 轮再加：`setVerboseLoggingEnabled`、
-  `setDiscDataSourceFactory`（仅保存）、`resetSecondaryTextTrackSelection`（no-op）、
+  `setDiscDataSourceFactory`（仅保存）、`resetSecondaryTextTrackSelection`
+  （第 114 轮起真清掉已存副轨覆盖）、
   `setLogListener`/`setAudioFilterListener`（永不触发）、运动插值
   `setMotionInterpolationFps`（存值，返回已完成 Future）/
   `getMotionInterpolationFps`/`isMotionInterpolationSupported`（false）/
@@ -143,7 +147,10 @@
 
 - 光盘菜单 / BD-J：不可用（ISO 当普通文件播）。
 - 解码器模式切换（AUTO/HARDWARE/SOFTWARE/FFMPEG）：UI 可选但不生效。
-- 双字幕（副字幕轨）、字幕转录、字幕内容列表：不工作。
+- 双字幕（副字幕轨）：第 114 轮起 `getSubtitleSelectionState` 按当前 Tracks 计算主/副选择；
+  字幕转录（直播字幕流）仍不工作。
+- 字幕内容列表：第 114 轮起工作（外挂字幕文件：下载+解析进对话框；内嵌字幕无文件可取，
+  仍报 UNSUPPORTED）。
 - 视频效果（色彩/细节调整）：不生效（直通）。
 - 音频均衡器/声道混合：Exo 侧不生效；MPV 侧混音矩阵真实生效。
 - ClearKey MP4 无 DRM 会话解密：不工作（走标准 DRM 路径的仍正常）。

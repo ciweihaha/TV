@@ -408,6 +408,62 @@ def patch_mpv_player(media3: Path) -> None:
         "import java.util.ArrayList;\nimport java.util.HashMap;\nimport java.util.List;\nimport java.util.Map;",
         "MpvPlayer imports ArrayList/HashMap/Map",
     )
+    # Round 114: subtitle-content dialog (Uri, Tracks, MimeTypes, JSON track-list,
+    # IOException, Collections/HashSet/Set).
+    replace_once(
+        path,
+        "import android.os.Handler;",
+        "import android.net.Uri;\nimport android.os.Handler;",
+        "MpvPlayer import Uri",
+    )
+    replace_once(
+        path,
+        "import androidx.media3.common.DiscMenuController;\n"
+        "import androidx.media3.common.TrackSelectionOverride;",
+        "import androidx.media3.common.DiscMenuController;\n"
+        "import androidx.media3.common.MimeTypes;\n"
+        "import androidx.media3.common.TrackSelectionOverride;",
+        "MpvPlayer import MimeTypes",
+    )
+    replace_once(
+        path,
+        "import androidx.media3.common.TrackSelectionParameters;\n"
+        "import androidx.media3.datasource.DataSource;",
+        "import androidx.media3.common.TrackSelectionParameters;\n"
+        "import androidx.media3.common.Tracks;\n"
+        "import androidx.media3.datasource.DataSource;",
+        "MpvPlayer import Tracks",
+    )
+    replace_once(
+        path,
+        "import androidx.media3.common.MimeTypes;\n"
+        "import androidx.media3.common.TrackSelectionOverride;",
+        "import androidx.media3.common.MimeTypes;\n"
+        "import androidx.media3.common.TrackGroup;\n"
+        "import androidx.media3.common.TrackSelectionOverride;",
+        "MpvPlayer import TrackGroup",
+    )
+    replace_once(
+        path,
+        "import is.xyz.mpv.MPVLib;",
+        "import is.xyz.mpv.MPVLib;\n"
+        "import org.json.JSONArray;\n"
+        "import org.json.JSONException;\n"
+        "import org.json.JSONObject;",
+        "MpvPlayer imports org.json",
+    )
+    replace_once(
+        path,
+        "import java.io.File;",
+        "import java.io.File;\nimport java.io.IOException;",
+        "MpvPlayer import IOException",
+    )
+    replace_once(
+        path,
+        "import java.util.ArrayList;\nimport java.util.HashMap;\nimport java.util.List;\nimport java.util.Map;",
+        "import java.util.ArrayList;\nimport java.util.Collections;\nimport java.util.HashMap;\nimport java.util.HashSet;\nimport java.util.List;\nimport java.util.Map;\nimport java.util.Set;",
+        "MpvPlayer imports Collections/HashSet/Set",
+    )
     replace_once(
         path,
         "public final class MpvPlayer extends SimpleBasePlayer {",
@@ -559,6 +615,13 @@ def patch_mpv_player(media3: Path) -> None:
   @Nullable private LogListener scriptLogListener;
   @Nullable private MPVLib.LogObserver scriptLogObserver;
 
+  // Round 114: subtitle content (dialog) cache.
+  private final Map<TrackSelectionOverride, SubtitleContent> subtitleContentCache =
+      new HashMap<>();
+  private final Map<TrackSelectionOverride, SubtitleContent> subtitleContentErrors =
+      new HashMap<>();
+  private final Set<TrackSelectionOverride> subtitleContentLoading = new HashSet<>();
+
   /** Enables verbose mpv logging (shim: stored only). */
   public void setVerboseLoggingEnabled(boolean enabled) {
     this.verboseLoggingEnabled = enabled;
@@ -569,8 +632,16 @@ def patch_mpv_player(media3: Path) -> None:
     this.discDataSourceFactory = factory;
   }
 
-  /** Resets the secondary text track selection override (shim: no-op). */
-  public void resetSecondaryTextTrackSelection() {}
+  /**
+   * Resets the secondary text track selection override.
+   *
+   * <p>FongMi extension (round 114): clears the stored override, so {@link
+   * #getSubtitleSelectionState} stops reporting a secondary selection (the TV
+   * engine calls this when dual subtitles are turned off).
+   */
+  public void resetSecondaryTextTrackSelection() {
+    secondaryTextTrackSelectionOverride = null;
+  }
 
   /**
    * Sets the scripts loaded at startup.
@@ -817,6 +888,230 @@ def patch_mpv_player(media3: Path) -> None:
     loadPendingStartupScripts();
     loadCurrent(item, playbackState.getPositionMs());""",
         "MpvPlayer prepareCurrentItem loads pending startup scripts",
+    )
+    # Round 114: subtitle-content dialog — real getSubtitleContentForSelection,
+    # getSubtitleSelectionState, canRetry/retrySubtitleContent.
+    replace_once(
+        path,
+        """  public SubtitleContent getSubtitleContentForSelection(TrackSelectionOverride selection) {
+    return SubtitleContent.UNSUPPORTED;
+  }""",
+        """  /**
+   * Returns the parsed content of a subtitle track for the subtitle-content dialog.
+   *
+   * <p>FongMi extension (round 114): resolves the track's subtitle file (mpv
+   * {@code track-list} {@code external-filename} by mpv track id, falling back to the
+   * current MediaItem's subtitle configurations matched by language + label) and loads
+   * it on a background thread through the {@link MpvSubtitleContentLoader} set by the
+   * TV app. Returns the cached content on later calls; {@link SubtitleContent#LOADING}
+   * while the load runs and an {@link SubtitleContent.State#ERROR} value on failure
+   * (retry with {@link #retrySubtitleContent}). Embedded tracks have no file and
+   * report {@link SubtitleContent#UNSUPPORTED}.
+   */
+  public SubtitleContent getSubtitleContentForSelection(TrackSelectionOverride selection) {
+    if (selection == null || selection.trackIndices.isEmpty() || !subtitleContentEnabled) {
+      return SubtitleContent.UNSUPPORTED;
+    }
+    synchronized (subtitleContentCache) {
+      SubtitleContent cached = subtitleContentCache.get(selection);
+      if (cached != null) {
+        return cached;
+      }
+      SubtitleContent error = subtitleContentErrors.get(selection);
+      if (error != null) {
+        return error;
+      }
+      if (subtitleContentLoading.contains(selection)) {
+        return SubtitleContent.LOADING;
+      }
+      MpvSubtitleContentLoader loader = subtitleContentLoader;
+      if (loader == null) {
+        return SubtitleContent.UNSUPPORTED;
+      }
+      Format format = selection.mediaTrackGroup.getFormat(selection.trackIndices.get(0));
+      Uri uri = findSubtitleUri(format);
+      MediaItem item = getCurrentMediaItem();
+      if (uri == null || item == null) {
+        return SubtitleContent.UNSUPPORTED;
+      }
+      subtitleContentLoading.add(selection);
+      startSubtitleContentLoad(selection, loader, item, uri, format);
+      return SubtitleContent.LOADING;
+    }
+  }
+
+  /** Loads one subtitle file on a daemon thread and caches the result. */
+  private void startSubtitleContentLoad(
+      TrackSelectionOverride selection,
+      MpvSubtitleContentLoader loader,
+      MediaItem item,
+      Uri uri,
+      Format format) {
+    Thread thread =
+        new Thread(
+            () -> {
+              SubtitleContent result;
+              try {
+                result = loader.load(item, uri, format);
+                if (result == null) {
+                  result = SubtitleContent.UNSUPPORTED;
+                }
+              } catch (IOException | RuntimeException e) {
+                result =
+                    new SubtitleContent(SubtitleContent.State.ERROR, Collections.emptyList());
+              }
+              synchronized (subtitleContentCache) {
+                subtitleContentLoading.remove(selection);
+                if (result.state == SubtitleContent.State.ERROR) {
+                  subtitleContentErrors.put(selection, result);
+                } else {
+                  subtitleContentErrors.remove(selection);
+                  subtitleContentCache.put(selection, result);
+                }
+              }
+            });
+    thread.setDaemon(true);
+    thread.start();
+  }
+
+  /**
+   * Finds the subtitle file URI for a track: first mpv's {@code track-list}
+   * {@code external-filename} (matched by mpv track id, which the fork stores as
+   * {@link Format#id}), then the current MediaItem's subtitle configurations
+   * matched by language and label. Returns null for embedded tracks.
+   */
+  private @Nullable Uri findSubtitleUri(Format format) {
+    String trackList = playbackProperties.getPropertyString("track-list");
+    if (trackList != null) {
+      try {
+        JSONArray tracks = new JSONArray(trackList);
+        for (int i = 0; i < tracks.length(); i++) {
+          JSONObject track = tracks.getJSONObject(i);
+          if (!"sub".equals(track.optString("type"))) {
+            continue;
+          }
+          boolean matches;
+          if (format.id != null) {
+            matches = format.id.equals(String.valueOf(track.optInt("id", C.INDEX_UNSET)));
+          } else {
+            matches =
+                sameText(format.language, track.optString("lang", null))
+                    && sameText(format.label, track.optString("title", null));
+          }
+          if (!matches) {
+            continue;
+          }
+          String filename = track.optString("external-filename", null);
+          if (filename != null && !filename.isEmpty()) {
+            return Uri.parse(filename);
+          }
+        }
+      } catch (JSONException e) {
+        // Fall through to the MediaItem match.
+      }
+    }
+    MediaItem item = getCurrentMediaItem();
+    if (item == null || item.localConfiguration == null) {
+      return null;
+    }
+    MediaItem.SubtitleConfiguration languageMatch = null;
+    for (MediaItem.SubtitleConfiguration config :
+        item.localConfiguration.subtitleConfigurations) {
+      if (!sameText(format.language, config.language)) {
+        continue;
+      }
+      if (sameText(format.label, config.label)) {
+        return config.uri;
+      }
+      if (languageMatch == null) {
+        languageMatch = config;
+      }
+    }
+    return languageMatch == null ? null : languageMatch.uri;
+  }
+
+  private static boolean sameText(@Nullable String a, @Nullable String b) {
+    return a == null ? b == null : a.equals(b);
+  }""",
+        "MpvPlayer getSubtitleContentForSelection",
+    )
+    replace_once(
+        path,
+        """  public SubtitleSelectionState getSubtitleSelectionState() {
+    return SubtitleSelectionState.EMPTY;
+  }""",
+        """  /** Returns which subtitle tracks are selected as primary / secondary. */
+  public SubtitleSelectionState getSubtitleSelectionState() {
+    Tracks tracks = getCurrentTracks();
+    TrackSelectionOverride primary = null;
+    List<TrackSelectionOverride> candidates = new ArrayList<>();
+    for (Tracks.Group group : tracks.getGroups()) {
+      TrackGroup trackGroup = group.getMediaTrackGroup();
+      if (trackGroup.length == 0
+          || MimeTypes.getTrackType(trackGroup.getFormat(0).sampleMimeType)
+              != C.TRACK_TYPE_TEXT) {
+        continue;
+      }
+      for (int i = 0; i < trackGroup.length; i++) {
+        candidates.add(new TrackSelectionOverride(trackGroup, i));
+      }
+      if (primary == null && group.isSelected()) {
+        for (int i = 0; i < trackGroup.length; i++) {
+          if (group.isTrackSelected(i)) {
+            primary = new TrackSelectionOverride(trackGroup, i);
+            break;
+          }
+        }
+      }
+    }
+    TrackSelectionOverride secondary = secondaryTextTrackSelectionOverride;
+    return new SubtitleSelectionState(
+        primary, secondary, candidates, secondary, /* secondaryPromotedToPrimary= */ false);
+  }""",
+        "MpvPlayer getSubtitleSelectionState",
+    )
+    replace_once(
+        path,
+        """  public boolean canRetrySubtitleContent(Format format) {
+    return false;
+  }""",
+        """  public boolean canRetrySubtitleContent(Format format) {
+    if (format == null) {
+      return false;
+    }
+    synchronized (subtitleContentCache) {
+      for (TrackSelectionOverride selection : subtitleContentErrors.keySet()) {
+        if (sameSubtitleFormat(selection, format)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }""",
+        "MpvPlayer canRetrySubtitleContent",
+    )
+    replace_once(
+        path,
+        """  public void retrySubtitleContent(Format format) {}""",
+        """  public void retrySubtitleContent(Format format) {
+    if (format == null) {
+      return;
+    }
+    synchronized (subtitleContentCache) {
+      subtitleContentErrors.keySet().removeIf(selection -> sameSubtitleFormat(selection, format));
+    }
+  }
+
+  private static boolean sameSubtitleFormat(TrackSelectionOverride selection, Format format) {
+    if (selection.trackIndices.isEmpty()) {
+      return false;
+    }
+    Format other = selection.mediaTrackGroup.getFormat(selection.trackIndices.get(0));
+    return sameText(other.language, format.language)
+        && sameText(other.label, format.label)
+        && sameText(other.sampleMimeType, format.sampleMimeType);
+  }""",
+        "MpvPlayer retrySubtitleContent",
     )
 
 
