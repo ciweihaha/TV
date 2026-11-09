@@ -90,7 +90,9 @@
 - `libraries/mpvplayer/.../MpvPlayerConfig.java`（第 101 轮）：
   `Builder.setDataSourceFactory(...)`、`setMotionInterpolationFps(...)`（仅保存，
   播放器不消费）+ 对应 getter；第 102 轮补 `Builder.setDefaultFontDirectories(File, File)`
-  （仅保存，TV 传两次同一外部字体目录）。
+  （仅保存，TV 传两次同一外部字体目录）。第 109 轮：`addAndroidSubtitleOptions`
+  在字幕选项无字体目录时回退到默认字体目录发 `sub-fonts-dir`（无字体覆盖时
+  mpv 也能找到用户字体）。
 - `libraries/mpvplayer/.../MpvSubtitleOptions.java`（第 101 轮）：
   `Builder.setFontsDirectory/setVerticalOffset/setBitmapSubtitleBrightness/
   setSecondarySubtitlePosition/setSecondaryVerticalOffset/setSecondaryAssStyleOverride/

@@ -820,6 +820,32 @@ def patch_mpv_player_config(media3: Path) -> None:
     public MpvPlayerConfig build() {""",
         "MpvPlayerConfig.Builder setDefaultFontDirectories",
     )
+    replace_once(
+        path,
+        """    public Builder addAndroidSubtitleOptions(Context context, MpvSubtitleOptions options) {
+      checkState(!buildCalled);
+      return MpvPlayerOptionDefaults.addSubtitleOptions(
+          this, checkNotNull(context), checkNotNull(options));
+    }""",
+        """    public Builder addAndroidSubtitleOptions(Context context, MpvSubtitleOptions options) {
+      checkState(!buildCalled);
+      // FongMi extension (round 109): fall back to the default fonts directory
+      // (set by setDefaultFontDirectories, i.e. the app's font folder) when the
+      // subtitle options carry no explicit fonts directory, so mpv can find
+      // user fonts for ASS subtitles even without a font override selected.
+      // Emitted before the subtitle options so an explicit fonts directory
+      // (round 108) wins.
+      if (options != null
+          && options.getFontsDirectory() == null
+          && defaultFontsDirectory != null) {
+        addSubtitleStringOption(
+            "sub-fonts-dir", defaultFontsDirectory.getAbsolutePath());
+      }
+      return MpvPlayerOptionDefaults.addSubtitleOptions(
+          this, checkNotNull(context), checkNotNull(options));
+    }""",
+        "MpvPlayerConfig.Builder default fonts directory fallback",
+    )
 
 
 # ------------------------------------------------- MpvSubtitleOptions.java (round 101)
