@@ -392,6 +392,22 @@ def patch_mpv_player(media3: Path) -> None:
         "import java.io.File;\nimport java.util.List;",
         "MpvPlayer import File",
     )
+    # Round 112: MPVLib (log observer) and collections for script bookkeeping.
+    replace_once(
+        path,
+        "import com.google.errorprone.annotations.CanIgnoreReturnValue;\n"
+        "import java.lang.annotation.Documented;",
+        "import com.google.errorprone.annotations.CanIgnoreReturnValue;\n"
+        "import is.xyz.mpv.MPVLib;\n"
+        "import java.lang.annotation.Documented;",
+        "MpvPlayer import MPVLib",
+    )
+    replace_once(
+        path,
+        "import java.util.List;",
+        "import java.util.ArrayList;\nimport java.util.HashMap;\nimport java.util.List;\nimport java.util.Map;",
+        "MpvPlayer imports ArrayList/HashMap/Map",
+    )
     replace_once(
         path,
         "public final class MpvPlayer extends SimpleBasePlayer {",
@@ -534,6 +550,15 @@ def patch_mpv_player(media3: Path) -> None:
   @Nullable private DataSource.Factory discDataSourceFactory;
   private int motionInterpolationFps;
 
+  // Round 112: mpv script state. mpv has no unload-script command, so a
+  // loaded script is tracked only by the token handed back to the TV app.
+  private final List<File> pendingStartupScripts = new ArrayList<>();
+  private final Map<Long, String> loadedScripts = new HashMap<>();
+  private long nextScriptClientId = 1;
+  private int scriptLogLevel;
+  @Nullable private LogListener scriptLogListener;
+  @Nullable private MPVLib.LogObserver scriptLogObserver;
+
   /** Enables verbose mpv logging (shim: stored only). */
   public void setVerboseLoggingEnabled(boolean enabled) {
     this.verboseLoggingEnabled = enabled;
@@ -550,54 +575,158 @@ def patch_mpv_player(media3: Path) -> None:
   /**
    * Sets the scripts loaded at startup.
    *
-   * <p>FongMi extension (shim): always returns false (scripts are not applied); the
-   * TV app marks every startup script with an error status.
+   * <p>FongMi extension (round 112): the scripts are loaded into mpv with the
+   * {@code load-script} command. mpv is initialized lazily on first prepare,
+   * so scripts given before that are queued and loaded by
+   * {@link #prepareCurrentItem} right after initialization, before the file
+   * loads. Returns false only if a script cannot be queued or loaded.
    */
   public boolean setStartupScripts(List<File> scripts) {
-    return false;
+    List<File> toLoad;
+    synchronized (pendingStartupScripts) {
+      pendingStartupScripts.clear();
+      if (scripts != null) {
+        pendingStartupScripts.addAll(scripts);
+      }
+      if (!nativeLifecycle.isInitialized()) {
+        return true;
+      }
+      toLoad = new ArrayList<>(pendingStartupScripts);
+      pendingStartupScripts.clear();
+    }
+    return loadScripts(toLoad);
+  }
+
+  /** Loads the startup scripts queued before mpv initialization. */
+  private void loadPendingStartupScripts() {
+    List<File> scripts;
+    synchronized (pendingStartupScripts) {
+      if (pendingStartupScripts.isEmpty()) {
+        return;
+      }
+      scripts = new ArrayList<>(pendingStartupScripts);
+      pendingStartupScripts.clear();
+    }
+    loadScripts(scripts);
+  }
+
+  private boolean loadScripts(List<File> scripts) {
+    boolean ok = true;
+    for (File script : scripts) {
+      if (script == null || !loadScript(script.getAbsolutePath(), null)) {
+        ok = false;
+      }
+    }
+    return ok;
   }
 
   /**
    * Loads a script asynchronously.
    *
-   * <p>FongMi extension (shim): always returns false (scripts are not loaded).
+   * <p>FongMi extension (round 112): issues mpv's {@code load-script} command.
+   * The callback reports whether the command was accepted, not the script's
+   * own load status; the TV app polls that through {@link #getScriptData}.
+   * The client id is a local token: mpv offers no unload-script command, so
+   * {@link #unloadScript} only forgets the token.
    */
   public boolean loadScript(String path, @Nullable ScriptLoadCallback callback) {
-    return false;
+    if (path == null || path.isEmpty() || !nativeLifecycle.isInitialized()) {
+      if (callback != null) {
+        callback.onLoaded(false, 0);
+      }
+      return false;
+    }
+    boolean accepted = commandDispatcher.loadScript(path);
+    long clientId = 0;
+    if (accepted) {
+      synchronized (loadedScripts) {
+        clientId = nextScriptClientId++;
+        loadedScripts.put(clientId, path);
+      }
+    }
+    if (callback != null) {
+      callback.onLoaded(accepted, clientId);
+    }
+    return accepted;
   }
 
   /**
    * Returns the JSON status data of a startup script.
    *
-   * <p>FongMi extension (shim): always returns null.
+   * <p>FongMi extension (round 112): reads mpv's {@code user-data/<statusKey>}
+   * property, which the TV app's Lua runner scripts publish with
+   * {@code mp.set_property_native}. Returns null before mpv is initialized or
+   * when the script has not published anything yet.
    */
   public @Nullable String getScriptData(String statusKey) {
-    return null;
+    if (statusKey == null || statusKey.isEmpty()) {
+      return null;
+    }
+    return playbackProperties.getPropertyString("user-data/" + statusKey);
   }
 
   /**
    * Returns the input bindings as JSON.
    *
-   * <p>FongMi extension (shim): always returns null.
+   * <p>FongMi extension (round 112): reads mpv's {@code input-bindings}
+   * property.
    */
   public @Nullable String getInputBindings() {
-    return null;
+    return playbackProperties.getPropertyString("input-bindings");
   }
 
-  /** Unloads a previously loaded script (shim: no-op). */
-  public void unloadScript(long clientId) {}
+  /**
+   * Unloads a previously loaded script.
+   *
+   * <p>FongMi extension: mpv has no unload-script command, so this only
+   * forgets the token. A stale script instance is harmless: the TV app
+   * ignores status data from older generations, and a reloaded runner
+   * publishes under the new generation.
+   */
+  public void unloadScript(long clientId) {
+    synchronized (loadedScripts) {
+      loadedScripts.remove(clientId);
+    }
+  }
 
   /**
    * Runs a script binding.
    *
-   * <p>FongMi extension (shim): always returns false (bindings are not run).
+   * <p>FongMi extension (round 112): issues mpv's {@code script-binding}
+   * command.
    */
   public boolean runScriptBinding(String binding) {
-    return false;
+    if (binding == null || binding.isEmpty() || !nativeLifecycle.isInitialized()) {
+      return false;
+    }
+    return commandDispatcher.runScriptBinding(binding);
   }
 
-  /** Sets the log listener (shim: never called). */
-  public void setLogListener(int level, @Nullable LogListener listener) {}
+  /**
+   * Sets the log listener.
+   *
+   * <p>FongMi extension (round 112): registers an mpv log observer and
+   * forwards messages at or above the requested severity (mpv levels are
+   * fatal=10, error=20, warn=30, ...; lower is more severe).
+   */
+  public void setLogListener(int level, @Nullable LogListener listener) {
+    if (scriptLogObserver != null) {
+      MPVLib.removeLogObserver(scriptLogObserver);
+      scriptLogObserver = null;
+    }
+    scriptLogLevel = level;
+    scriptLogListener = listener;
+    if (listener != null) {
+      scriptLogObserver =
+          (prefix, messageLevel, text) -> {
+            LogListener target = scriptLogListener;
+            if (target != null && messageLevel <= scriptLogLevel) {
+              target.onLogMessage(prefix, messageLevel, text);
+            }
+          };
+      MPVLib.addLogObserver(scriptLogObserver);
+    }
+  }
 
   /** Sets the audio-filter listener (shim: never called). */
   public void setAudioFilterListener(@Nullable AudioFilterListener listener) {}
@@ -673,6 +802,93 @@ def patch_mpv_player(media3: Path) -> None:
     }""",
         "MpvPlayer.Builder build applies decoder mode",
     )
+    # Round 112: mpv initializes lazily on first prepare, so startup scripts
+    # queued by setStartupScripts are loaded here, right after init and
+    # before the file loads.
+    replace_once(
+        path,
+        """    if (!nativeLifecycle.ensureInitialized()) {
+      return COMPLETED;
+    }
+    loadCurrent(item, playbackState.getPositionMs());""",
+        """    if (!nativeLifecycle.ensureInitialized()) {
+      return COMPLETED;
+    }
+    loadPendingStartupScripts();
+    loadCurrent(item, playbackState.getPositionMs());""",
+        "MpvPlayer prepareCurrentItem loads pending startup scripts",
+    )
+
+
+# ------------------------------------------------- MpvCommandDispatcher.java (round 112)
+def patch_mpv_command_dispatcher(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/nativebridge/MpvCommandDispatcher.java"
+    )
+    replace_once(
+        path,
+        """  public boolean toggleGeneralStats() {
+    return client.command(new String[] {CMD_SCRIPT_BINDING, STATS_GENERAL_PAGE_TOGGLE});
+  }""",
+        """  public boolean toggleGeneralStats() {
+    return client.command(new String[] {CMD_SCRIPT_BINDING, STATS_GENERAL_PAGE_TOGGLE});
+  }
+
+  /**
+   * Loads a Lua script into the running mpv instance.
+   *
+   * <p>FongMi extension (round 112): mpv's {@code load-script} command.
+   * (MpvConstants has no entry for it, so the literal is used.)
+   */
+  public boolean loadScript(String path) {
+    return !TextUtils.isEmpty(path)
+        && client.command(new String[] {"load-script", path});
+  }
+
+  /**
+   * Invokes a script-provided key binding.
+   *
+   * <p>FongMi extension (round 112): mpv's {@code script-binding} command.
+   */
+  public boolean runScriptBinding(String binding) {
+    return !TextUtils.isEmpty(binding)
+        && client.command(new String[] {CMD_SCRIPT_BINDING, binding});
+  }""",
+        "MpvCommandDispatcher loadScript/runScriptBinding",
+    )
+
+
+# ------------------------------------------------- MpvPlaybackProperties.java (round 112)
+def patch_mpv_playback_properties(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/nativebridge/MpvPlaybackProperties.java"
+    )
+    replace_once(
+        path,
+        """  public @Nullable String getHardwareDecode() {
+    return properties.getString(PROP_HWDEC);
+  }""",
+        """  public @Nullable String getHardwareDecode() {
+    return properties.getString(PROP_HWDEC);
+  }
+
+  /**
+   * Returns an mpv property as a string, or null when mpv is not initialized
+   * or the property is unavailable.
+   *
+   * <p>FongMi extension (round 112): used for script status data
+   * ({@code user-data/...}) and the {@code input-bindings} list.
+   */
+  public @Nullable String getPropertyString(String property) {
+    return properties.getString(property);
+  }""",
+        "MpvPlaybackProperties getPropertyString",
+    )
+
+
+# ------------------------------------------------- MpvPlayerConfig.java (round 101)
 
 
 # ------------------------------------------------- MpvPlayerConfig.java (round 101)
@@ -1444,6 +1660,8 @@ def main() -> int:
     patch_player(media3)
     patch_player_view(media3)
     patch_mpv_player(media3)
+    patch_mpv_command_dispatcher(media3)
+    patch_mpv_playback_properties(media3)
     patch_mpv_player_config(media3)
     patch_mpv_subtitle_options(media3)
     patch_mpv_subtitle_option_defaults(media3)

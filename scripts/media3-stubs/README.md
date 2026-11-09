@@ -12,7 +12,7 @@
 
 ## 做法
 
-本目录提供这 45 个类的最小兼容实现（API 按 TV 代码的实际用法反推），以及对 13 个
+本目录提供这 45 个类的最小兼容实现（API 按 TV 代码的实际用法反推），以及对 15 个
 真实 Media3 文件的补丁（加缺失的扩展方法）。CI 里 `install.py` 在构建 AAR 之前：
 
 1. 把 `stubs/media3/` 的文件拷进 `media3/` checkout（按模块目录一一对应），
@@ -21,7 +21,8 @@
    `SecondaryTextTrackSelector`）同时拷进 `media3-ass/`——libass checkout 是独立
    构建的，而 `LibassSubtitleController` 垫片与打过补丁的 `LibassPlaybackSession`
    引用了它们（第 100 轮修复，否则 libass AAR 编译报 cannot find symbol）；
-2. 给 `Player`、`PlayerView`、`MpvPlayer`、`MpvPlayerConfig`、`MpvSubtitleOptions`、
+2. 给 `Player`、`PlayerView`、`MpvPlayer`、`MpvCommandDispatcher`、
+   `MpvPlaybackProperties`、`MpvPlayerConfig`、`MpvSubtitleOptions`、
    `MpvLibrary`、`MpvAudioFilter`、`MatroskaExtractor`、`PlayerSeekView`、
    `SubtitleView`、`PreloadManagerListener`、`LibassPlaybackSession`、
    `DefaultExtractorsFactory` 打补丁。
@@ -61,7 +62,7 @@
 | mpvplayer | `MpvConfigFileInspector` / `MpvDecoderMode` / `MpvSubtitleContentLoader` / `media/MpvDrmSupport` | mpv.conf 真实解析；DRM 一律判 MPV 不支持（走 Exo） |
 | app 内 | 见上 | 字幕内容 UNSUPPORTED；无转录；danmaku/libass UI 不激活 |
 
-## 补丁清单（13 个文件）
+## 补丁清单（15 个文件）
 
 - `libraries/common/.../Player.java`：默认方法 `getDiscMenuState()`（→EMPTY）、
   `getDecoderMode(int)`（→null）、`getSubtitleOffsets()`（→ZERO）、
@@ -83,13 +84,24 @@
   `setSubtitleContentLoader`、`setSecondaryTextTrackSelectionOverride/AutoSelectionEnabled`；
   `Builder.setVideoDecoderMode(...)`。第 101 轮再加：`setVerboseLoggingEnabled`、
   `setDiscDataSourceFactory`（仅保存）、`resetSecondaryTextTrackSelection`（no-op）、
-  脚本会话 `setStartupScripts`/`loadScript`/`getScriptData`/`getInputBindings`/
-  `unloadScript`/`runScriptBinding`（false/null/no-op，脚本不执行）、
   `setLogListener`/`setAudioFilterListener`（永不触发）、运动插值
   `setMotionInterpolationFps`（存值，返回已完成 Future）/
   `getMotionInterpolationFps`/`isMotionInterpolationSupported`（false）/
   `isMotionInterpolationUpdatePending`（false）/
   `getMotionInterpolationEffectiveTargetFps`/`add/removeMotionInterpolationListener`。
+  第 112 轮把脚本会话接成真实现：`setStartupScripts`（mpv 初始化前排队，
+  首次 prepare 时在播片前用 `load-script` 加载）/`loadScript`（`load-script`
+  命令，回调报接纳结果，clientId 是本地 token）/`getScriptData`（读 mpv
+  `user-data/<key>` 属性，Lua runner 用 `mp.set_property_native` 发布状态）/
+  `getInputBindings`（读 mpv `input-bindings` 属性）/`runScriptBinding`
+  （`script-binding` 命令）/`unloadScript`（仅忘掉 token——mpv 没有
+  unload-script 命令，旧脚本靠 TV 的 generation 检查忽略）/`setLogListener`
+  （注册 MPVLib 日志观察者，按严重度转发）。
+- `libraries/mpvplayer/.../nativebridge/MpvCommandDispatcher.java`（第 112 轮）：
+  `loadScript(...)`（`load-script` 命令）、`runScriptBinding(...)`
+  （`script-binding` 命令）。
+- `libraries/mpvplayer/.../nativebridge/MpvPlaybackProperties.java`（第 112 轮）：
+  `getPropertyString(...)`（转调 `MpvPropertyAccessor.getString`，mpv 未初始化时返回 null）。
 - `libraries/mpvplayer/.../MpvPlayerConfig.java`（第 101 轮）：
   `Builder.setDataSourceFactory(...)`、`setMotionInterpolationFps(...)`（仅保存，
   播放器不消费）+ 对应 getter；第 102 轮补 `Builder.setDefaultFontDirectories(File, File)`
@@ -136,9 +148,13 @@
 - ClearKey MP4 无 DRM 会话解密：不工作（走标准 DRM 路径的仍正常）。
 - 截尾（跳过片尾）、预加载定位：不生效。
 - CMG 流识别：不识别（按用户设置的引擎播放）。
-- 启动脚本（mpv 脚本会话）：不执行，TV 侧会把启动脚本标为错误状态。
+- 启动脚本（mpv 脚本会话）：第 112 轮起真实接入 mpv（`load-script` /
+  `script-binding` / `user-data/...` 状态属性 / 日志观察者）；`unloadScript`
+  仍只是忘掉 token（mpv 没有 unload 命令），旧脚本实例靠 TV 的 generation
+  检查忽略；`loadScript` 的回调只报命令接纳结果，脚本自身的加载状态由 TV
+  轮询 `getScriptData` 确认。
 - 运动插值：不生效（帧率可设可读，但画面不插值）。
-- MPV 日志监听 / 音频滤镜监听：永不触发。
+- MPV 音频滤镜监听：永不触发（`setAudioFilterListener` 仍是空实现）。
 - 字幕字体目录、垂直偏移、位图字幕亮度、字体族：第 108 轮起经 `MpvSubtitleOptionDefaults`
   补丁接入 mpv 选项（`sub-fonts-dir` / `sub-font` / `sub-offset-y` /
   `secondary-sub-offset-y` / `image-subs-brightness`），不再是存值丢弃。
