@@ -280,6 +280,10 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with:
           name: tv-debug-apks
-          path: app/build/outputs/apk/debug/**/*.apk
+          # NOTE (round 104): assembleDebug builds two product flavors, so AGP
+          # puts the APKs under apk/<flavor>/debug/ (leanback, mobile), not
+          # apk/debug/. The old glob matched nothing and the step failed even
+          # though the build itself succeeded (run 42539123353).
+          path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 7
