@@ -50,7 +50,7 @@
 | common/util | `TrackSelectionUtil` | 真实实现（基于 stock Player API 选轨/循环） |
 | datasource | `IsoUri` / `ProgressiveIsoCache` | fragment 编码 edition；缓存直通 |
 | decoder_ffmpeg | `FfmpegMotionRenderersFactory` | stock 渲染器；无运动插值/解码器切换 |
-| effect | `ColorToneAdjustEffect` / `DetailAdjustEffect` / `VideoAdjustment` | 真实值对象；效果为直通 shader（不改变画面） |
+| effect | `ColorToneAdjustEffect` / `DetailAdjustEffect` / `VideoAdjustment` | 真实实现（第 119 轮）：色调走 `ToneAdjustShaderProgram`（亮度/对比度/饱和度/伽马/色相旋转/色温增益 GLSL），细节走 `DetailAdjustShaderProgram`（3x3 反锐化掩模 + 阈值门 + 暗部提升）；`VideoAdjustment` 真实值对象；HDR 时直通 |
 | exoplayer | `DecoderMode` / `DecoderManager` | 记住选择；不重建渲染器 |
 | exoplayer/audio | `AudioEqualizerController` | 真实实现（第 116 轮）：平台 `Equalizer` 挂到播放器音频 session，按最近中心频率映射频段，电平钳制到平台范围；换 session 重建；无 session 时暂缓、创建失败报 false |
 | exoplayer_hls | `CmgConfiguration` | 恒返回 null（不识别 CMG 流） |
