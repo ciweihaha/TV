@@ -238,6 +238,28 @@ jobs:
           "$GRADLE_HOME/gradle-9.1.0/bin/gradle" --version
           echo "GRADLE_BIN=$GRADLE_HOME/gradle-9.1.0/bin/gradle" >> "$GITHUB_ENV"
 
+      - name: Prefer Google Maven mirror for dependency downloads
+        run: |
+          set -euo pipefail
+          # Round 125: repo.maven.apache.org redirects some artifacts (e.g.
+          # kotlin-compiler-embeddable) to github.com release downloads, which
+          # return HTTP 504 during the 2026-11-09 outage. The Google Maven
+          # Central mirror serves the same artifacts directly (verified 200).
+          # beforeProject runs before each project's build script, so the
+          # mirror is tried first in every project, including included builds
+          # (build-logic-settings declares its repos in its build file and its
+          # settings file has no dependencyResolutionManagement).
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/maven-mirror.init.gradle" <<'EOF'
+          // Round 125: prefer the Google Maven Central mirror over Maven Central.
+          beforeProject { project ->
+            project.repositories {
+              maven { url = "https://maven-central.storage-download.googleapis.com/maven2" }
+            }
+          }
+          EOF
+          cat "$HOME/.gradle/init.d/maven-mirror.init.gradle"
+
       - name: Build FongMi Media3 AARs
         env:
           GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
