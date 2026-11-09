@@ -16,10 +16,12 @@
  * stays inactive — the real transcript design lives in FongMi's private modules and
  * cannot be reconstructed from the public checkout.
  *
- * Note: {@code offsetMs} (the subtitle delay) is accepted but not applied yet — entries
- * are file times, same as the MPV engine's getSubtitleContentForSelection (round 114).
- * The current-line highlight may therefore be off by the subtitle delay; shifting both
- * engines consistently needs a real-device check of the highlight logic.
+ * Round 121: {@code offsetMs} (the subtitle delay) is applied to the dialog entries —
+ * {@link #getContent} shifts every entry by the offset so the current-line highlight
+ * matches the delayed on-screen subtitles, and the cache remembers which offset each
+ * entry set was built with. The MPV engine's getSubtitleContentForSelection (round 114)
+ * still returns file times; shifting both engines consistently needs a real-device check
+ * of the highlight logic.
  */
 package androidx.media3.exoplayer.text;
 
@@ -35,6 +37,7 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.mpvplayer.MpvSubtitleContentLoader;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,6 +60,8 @@ public final class SubtitleTranscriptSession {
   private final Set<String> loading = new HashSet<>();
   /** Media id the cache belongs to; the cache is dropped when the item changes. */
   private @Nullable String cachedMediaId;
+  /** Subtitle delay (ms) the cached content for a key was shifted by (round 121). */
+  private final Map<String, Long> offsetByKey = new HashMap<>();
 
   public SubtitleTranscriptSession() {}
 
@@ -98,11 +103,18 @@ public final class SubtitleTranscriptSession {
       if (!item.mediaId.equals(cachedMediaId)) {
         cache.clear();
         loading.clear();
+        offsetByKey.clear();
         cachedMediaId = item.mediaId;
       }
       SubtitleContent cached = cache.get(key);
-      if (cached != null) {
+      Long cachedOffset = offsetByKey.get(key);
+      if (cached != null && cachedOffset != null && cachedOffset.longValue() == offsetMs) {
         return cached;
+      }
+      if (cached != null) {
+        // Built with a different subtitle delay: drop and reload shifted.
+        cache.remove(key);
+        offsetByKey.remove(key);
       }
       if (loading.contains(key)) {
         return SubtitleContent.LOADING;
@@ -110,7 +122,9 @@ public final class SubtitleTranscriptSession {
       loading.add(key);
     }
     Thread thread =
-        new Thread(() -> loadInBackground(item, uri, format, key), "subtitle-content-loader");
+        new Thread(
+            () -> loadInBackground(item, uri, format, key, offsetMs),
+            "subtitle-content-loader");
     thread.setDaemon(true);
     thread.start();
     return SubtitleContent.LOADING;
@@ -145,6 +159,7 @@ public final class SubtitleTranscriptSession {
     synchronized (cache) {
       // A load in flight is left alone; it will populate the cache when it finishes.
       cache.remove(key);
+      offsetByKey.remove(key);
     }
   }
 
@@ -152,11 +167,13 @@ public final class SubtitleTranscriptSession {
     synchronized (cache) {
       cache.clear();
       loading.clear();
+      offsetByKey.clear();
       cachedMediaId = null;
     }
   }
 
-  private void loadInBackground(MediaItem item, Uri uri, Format format, String key) {
+  private void loadInBackground(
+      MediaItem item, Uri uri, Format format, String key, long offsetMs) {
     SubtitleContent result;
     try {
       result = loader.load(item, uri, format);
@@ -167,10 +184,33 @@ public final class SubtitleTranscriptSession {
       Log.w(TAG, "Failed to load subtitle content: " + uri, e);
       result = new SubtitleContent(SubtitleContent.State.ERROR, List.of());
     }
+    if (offsetMs != 0 && !result.entries.isEmpty()) {
+      result = shiftEntries(result, offsetMs);
+    }
     synchronized (cache) {
       loading.remove(key);
       cache.put(key, result);
+      offsetByKey.put(key, offsetMs);
     }
+  }
+
+  /**
+   * Shifts every entry of a subtitle content by the subtitle delay (round 121), so the
+   * dialog's current-line highlight matches the delayed on-screen subtitles. Times are
+   * clamped at zero; the state is unchanged.
+   */
+  private static SubtitleContent shiftEntries(SubtitleContent content, long offsetMs) {
+    long shiftUs = offsetMs * 1000;
+    List<SubtitleContent.Entry> shifted = new ArrayList<>(content.entries.size());
+    for (SubtitleContent.Entry entry : content.entries) {
+      shifted.add(
+          new SubtitleContent.Entry(
+              Math.max(0, entry.startTimeUs + shiftUs),
+              Math.max(0, entry.endTimeUs + shiftUs),
+              entry.text,
+              entry.image));
+    }
+    return new SubtitleContent(content.state, shifted);
   }
 
   private @Nullable MediaItem currentMediaItem() {

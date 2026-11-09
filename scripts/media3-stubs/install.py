@@ -176,6 +176,72 @@ def patch_player(media3: Path) -> None:
     )
 
 
+# ---------------------------------------------------------- ExoPlayerImpl.java (round 121)
+def patch_exoplayer_impl(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/exoplayer/src/main/java/androidx/media3/exoplayer/ExoPlayerImpl.java"
+    )
+    replace_once(
+        path,
+        "import androidx.media3.common.text.CueGroup;",
+        "import androidx.media3.common.text.CueGroup;\nimport androidx.media3.common.text.SubtitleOffsets;",
+        "ExoPlayerImpl import SubtitleOffsets",
+    )
+    replace_once(
+        path,
+        "  private long textOffsetMs;",
+        "  private long textOffsetMs;\n  private SubtitleOffsets subtitleOffsets = SubtitleOffsets.ZERO;",
+        "ExoPlayerImpl subtitleOffsets field",
+    )
+    replace_once(
+        path,
+        """  @Override
+  public long getTextOffsetMs() {
+    verifyApplicationThread();
+    return textOffsetMs;
+  }
+""",
+        """  @Override
+  public long getTextOffsetMs() {
+    verifyApplicationThread();
+    return textOffsetMs;
+  }
+
+  // ---- FongMi extensions (shims, see scripts/media3-stubs/README.md) ----
+
+  /**
+   * Returns the primary/secondary subtitle offsets.
+   *
+   * <p>FongMi extension (round 121): the stored offsets round-trip; the primary offset is
+   * applied to on-screen subtitles through the stock text-offset mechanism
+   * ({@link #setTextOffsetMs}); the secondary offset is dialog-only for now because stock
+   * Media3 has a single text offset shared by all text renderers.
+   */
+  @Override
+  public SubtitleOffsets getSubtitleOffsets() {
+    verifyApplicationThread();
+    return subtitleOffsets;
+  }
+
+  /**
+   * Sets the primary/secondary subtitle offsets (round 121, see {@link #getSubtitleOffsets}).
+   */
+  @Override
+  public void setSubtitleOffsets(SubtitleOffsets offsets) {
+    verifyApplicationThread();
+    SubtitleOffsets newOffsets = offsets == null ? SubtitleOffsets.ZERO : offsets;
+    if (subtitleOffsets.equals(newOffsets)) {
+      return;
+    }
+    subtitleOffsets = newOffsets;
+    setTextOffsetMs(newOffsets.primaryMs);
+  }
+""",
+        "ExoPlayerImpl subtitle offsets",
+    )
+
+
 # ------------------------------------------------------------- PlayerView.java
 def patch_player_view(media3: Path) -> None:
     path = media3 / "libraries/ui/src/main/java/androidx/media3/ui/PlayerView.java"
@@ -1991,6 +2057,7 @@ def main() -> int:
     copy_stubs(HERE / "stubs" / "media3-ass", media3_ass)
     copy_extra_shims_for_ass(media3_ass)
     patch_player(media3)
+    patch_exoplayer_impl(media3)
     patch_player_view(media3)
     patch_mpv_player(media3)
     patch_mpv_command_dispatcher(media3)
