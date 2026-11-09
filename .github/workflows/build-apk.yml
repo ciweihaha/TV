@@ -49,8 +49,8 @@ jobs:
           # through the beta channel (channel 1 = stable + beta).
           yes | sdkmanager --licenses
           # cmake 3.22.1 is for the FongMi/media native build below;
-          # cmake 4.1.2 is what the TV app's own native modules use.
-          sdkmanager --channel=1 "platforms;android-37.0" "build-tools;37.0.0" "platform-tools" "ndk;29.0.14206865" "cmake;3.22.1" "cmake;4.1.2"
+          # cmake 4.3.4 is what the TV app's own native modules use.
+          sdkmanager --channel=1 "platforms;android-37.0" "build-tools;37.0.0" "platform-tools" "ndk;29.0.14206865" "cmake;3.22.1" "cmake;4.3.4"
 
       # Native build tools for the Media3 FFmpeg/libass C builds.
       - name: Install native build tools
