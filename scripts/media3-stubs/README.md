@@ -61,7 +61,7 @@
 | exoplayer/trackselection | `SecondaryTextTrackSelector` | 委托给解码器选择器 |
 | exoplayer_libass | `LibassConfiguration` / `LibassFontConfig` / `LibassFontFile` / `LibassSubtitleController` | 配置真实携带；fonts.conf 真实生成；字体族名纯 Java 解析；控制器报无副字幕 |
 | mpvplayer | `MpvConfigFileInspector` / `MpvDecoderMode` / `MpvSubtitleContentLoader` / `media/MpvDrmSupport` | mpv.conf 真实解析；DRM 一律判 MPV 不支持（走 Exo） |
-| app 内 | 见上 | 字幕内容：第 114 轮起 `DefaultSubtitleContentLoader` 真实下载并解析（SSA/ASS、WebVTT、SubRip、TX3G、TTML、图片字幕）；第 115 轮起 `SubtitleTranscriptSession.getContent` 真实实现（Exo 引擎对话框：按轨道 id / 语言+标签解析外挂字幕文件，后台加载、按轨道缓存、失败可重试）；第 121 轮起 getContent 按字幕延时平移条目时间（缓存记下每条目集的偏移，延时改了重载）；转录即播轨道仍未激活；danmaku/libass UI 不激活 |
+| app 内 | 见上 | 字幕内容：第 114 轮起 `DefaultSubtitleContentLoader` 真实下载并解析（SSA/ASS、WebVTT、SubRip、TX3G、TTML、图片字幕）；第 115 轮起 `SubtitleTranscriptSession.getContent` 真实实现（Exo 引擎对话框：按轨道 id / 语言+标签解析外挂字幕文件，后台加载、按轨道缓存、失败可重试）；第 121 轮起 getContent 按字幕延时平移条目时间（缓存记下每条目集的偏移，延时改了重载）；第 122 轮起 MPV 对话框内容返回时同样按延时平移；转录即播轨道仍未激活；danmaku/libass UI 不激活 |
 
 ## 补丁清单（16 个文件）
 
@@ -85,9 +85,11 @@
 - `libraries/mpvplayer/.../MpvPlayer.java`：实现 `DiscMenuController`（全 false），
   加 `get/setVideoDecoderMode`、`getSubtitleContentForSelection`（第 114 轮起真实现：
   按 mpv track id 读 `track-list` 的 `external-filename`，回退到当前 MediaItem 字幕配置
-  按语言+标签匹配，后台线程经 `MpvSubtitleContentLoader` 加载并缓存，LOADING/COMPLETE/ERROR）、
+  按语言+标签匹配，后台线程经 `MpvSubtitleContentLoader` 加载并缓存，LOADING/COMPLETE/ERROR；
+  第 122 轮起返回时按该轨的字幕延时平移条目时间，缓存仍存文件时间）、
   `setSubtitleContentEnabled`、`canRetry/retrySubtitleContent`（第 114 轮起真实现）、
-  `get/setSubtitleOffsets`（保存/返回）、`getSubtitleSelectionState`（第 114 轮起按当前
+  `get/setSubtitleOffsets`（第 122 轮起 set 经 stock 的 `setTextOffsetMs` 驱动 mpv
+  `sub-delay`；副延时只用于对话框）、`getSubtitleSelectionState`（第 114 轮起按当前
   Tracks 计算主/副字幕选择）、
   `setSubtitleContentLoader`、`setSecondaryTextTrackSelectionOverride/AutoSelectionEnabled`；
   `Builder.setVideoDecoderMode(...)`。第 101 轮再加：`setVerboseLoggingEnabled`、

@@ -19,9 +19,9 @@
  * Round 121: {@code offsetMs} (the subtitle delay) is applied to the dialog entries —
  * {@link #getContent} shifts every entry by the offset so the current-line highlight
  * matches the delayed on-screen subtitles, and the cache remembers which offset each
- * entry set was built with. The MPV engine's getSubtitleContentForSelection (round 114)
- * still returns file times; shifting both engines consistently needs a real-device check
- * of the highlight logic.
+ * entry set was built with. Round 122 does the same for the MPV engine's
+ * getSubtitleContentForSelection (shift at return time, cache keeps file times).
+ * Highlight alignment on a real device is still unverified.
  */
 package androidx.media3.exoplayer.text;
 

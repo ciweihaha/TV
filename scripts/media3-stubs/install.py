@@ -628,7 +628,18 @@ def patch_mpv_player(media3: Path) -> None:
   }
 
   public void setSubtitleOffsets(SubtitleOffsets offsets) {
-    if (offsets != null) subtitleOffsets = offsets;
+    if (offsets == null) {
+      return;
+    }
+    if (subtitleOffsets.equals(offsets)) {
+      return;
+    }
+    subtitleOffsets = offsets;
+    // Round 122: drive mpv's sub-delay through the stock text-offset path
+    // (SimpleBasePlayer routes setTextOffsetMs to handleSetTextOffsetMs, which
+    // sets MpvPlaybackProperties.setTextDelayMs -> mpv sub-delay). The
+    // secondary offset is dialog-only: stock has a single text offset.
+    setTextOffsetMs(offsets.primaryMs);
   }
 
   public SubtitleSelectionState getSubtitleSelectionState() {
@@ -1019,7 +1030,11 @@ def patch_mpv_player(media3: Path) -> None:
     synchronized (subtitleContentCache) {
       SubtitleContent cached = subtitleContentCache.get(selection);
       if (cached != null) {
-        return cached;
+        // Round 122: shift the cached (file-time) entries by the subtitle delay
+        // for this track, so the dialog's current-line highlight matches the
+        // delayed on-screen subtitles. The cache keeps file times; a changed
+        // delay is picked up on the dialog's next poll.
+        return shiftSubtitleContent(cached, offsetMsForSelection(selection));
       }
       SubtitleContent error = subtitleContentErrors.get(selection);
       if (error != null) {
@@ -1076,6 +1091,35 @@ def patch_mpv_player(media3: Path) -> None:
             });
     thread.setDaemon(true);
     thread.start();
+  }
+
+  /** Returns the subtitle delay (ms) that applies to a track selection. */
+  private long offsetMsForSelection(TrackSelectionOverride selection) {
+    return getSubtitleSelectionState().isActiveSecondary(selection)
+        ? subtitleOffsets.secondaryMs
+        : subtitleOffsets.primaryMs;
+  }
+
+  /**
+   * Shifts every entry of a subtitle content by the subtitle delay (round 122), so the
+   * dialog's current-line highlight matches the delayed on-screen subtitles. Times are
+   * clamped at zero; the state is unchanged. A zero offset returns the content as-is.
+   */
+  private static SubtitleContent shiftSubtitleContent(SubtitleContent content, long offsetMs) {
+    if (offsetMs == 0 || content.entries.isEmpty()) {
+      return content;
+    }
+    long shiftUs = offsetMs * 1000;
+    List<SubtitleContent.Entry> shifted = new ArrayList<>(content.entries.size());
+    for (SubtitleContent.Entry entry : content.entries) {
+      shifted.add(
+          new SubtitleContent.Entry(
+              Math.max(0, entry.startTimeUs + shiftUs),
+              Math.max(0, entry.endTimeUs + shiftUs),
+              entry.text,
+              entry.image));
+    }
+    return new SubtitleContent(content.state, shifted);
   }
 
   /**
