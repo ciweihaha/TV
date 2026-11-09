@@ -978,6 +978,58 @@ def patch_mpv_subtitle_options(media3: Path) -> None:
     )
 
 
+# ------------------------------------------------- MpvSubtitleOptionDefaults.java (round 108)
+def patch_mpv_subtitle_option_defaults(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/options/MpvSubtitleOptionDefaults.java"
+    )
+    replace_once(
+        path,
+        '  private static final String OPT_SUBTITLE_ASS_OVERRIDE = "sub-ass-override";',
+        '  private static final String OPT_SUBTITLE_ASS_OVERRIDE = "sub-ass-override";\n'
+        '  private static final String OPT_SUBTITLE_FONT = "sub-font";\n'
+        '  private static final String OPT_SUBTITLE_FONTS_DIR = "sub-fonts-dir";\n'
+        '  private static final String OPT_SUBTITLE_OFFSET_Y = "sub-offset-y";\n'
+        '  private static final String OPT_SECONDARY_SUBTITLE_OFFSET_Y =\n'
+        '      "secondary-sub-offset-y";\n'
+        '  private static final String OPT_IMAGE_SUBTITLE_BRIGHTNESS =\n'
+        '      "image-subs-brightness";',
+        "MpvSubtitleOptionDefaults option name constants",
+    )
+    replace_once(
+        path,
+        """    if (options.isSecondarySubtitleConfigured()) {
+      addSecondarySubtitleOptions(builder, options);
+    }
+    return builder;
+  }""",
+        """    if (options.isSecondarySubtitleConfigured()) {
+      addSecondarySubtitleOptions(builder, options);
+    }
+    // FongMi extensions (round 108): wire the MpvSubtitleOptions fields the TV
+    // app sets (round 101) through to mpv. The option names come from the TV
+    // app's own managed-option lists (MpvUtil FONT_OPTIONS /
+    // IMAGE_SUBTITLE_OPTIONS / getManagedOptionNames), so the fork's mpv build
+    // accepts them. Defaults are identity values (0 offset, brightness 1.0),
+    // so emitting them unconditionally is harmless.
+    if (options.getFontsDirectory() != null) {
+      addSubtitleString(builder, OPT_SUBTITLE_FONTS_DIR, options.getFontsDirectory());
+    }
+    if (options.getFontFamily() != null) {
+      addSubtitleString(builder, OPT_SUBTITLE_FONT, options.getFontFamily());
+    }
+    addSubtitleDouble(builder, OPT_SUBTITLE_OFFSET_Y, options.getVerticalOffset());
+    addSubtitleDouble(
+        builder, OPT_SECONDARY_SUBTITLE_OFFSET_Y, options.getSecondaryVerticalOffset());
+    addSubtitleDouble(
+        builder, OPT_IMAGE_SUBTITLE_BRIGHTNESS, options.getBitmapSubtitleBrightness());
+    return builder;
+  }""",
+        "MpvSubtitleOptionDefaults FongMi subtitle options",
+    )
+
+
 # ------------------------------------------------- MpvLibrary.java (round 101)
 def patch_mpv_library(media3: Path) -> None:
     path = (
@@ -1339,6 +1391,7 @@ def main() -> int:
     patch_mpv_player(media3)
     patch_mpv_player_config(media3)
     patch_mpv_subtitle_options(media3)
+    patch_mpv_subtitle_option_defaults(media3)
     patch_mpv_library(media3)
     patch_mpv_audio_filter(media3)
     patch_matroska_extractor(media3)

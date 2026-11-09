@@ -95,6 +95,10 @@
   `Builder.setFontsDirectory/setVerticalOffset/setBitmapSubtitleBrightness/
   setSecondarySubtitlePosition/setSecondaryVerticalOffset/setSecondaryAssStyleOverride/
   setFontFamily/setDefaultStyle`（仅保存，不生效）+ 对应 getter。
+  第 108 轮：`MpvSubtitleOptionDefaults.addSubtitleOptions` 补丁把其中 5 个接到
+  mpv 选项——`sub-fonts-dir` / `sub-font` / `sub-offset-y` /
+  `secondary-sub-offset-y` / `image-subs-brightness`（选项名取自 TV 的
+  MpvUtil managed 列表）。
 - `libraries/mpvplayer/.../MpvLibrary.java`（第 101 轮）：
   `setLibraryLoader(BooleanSupplier)`（仅保存；TV 代码传 `MpvUtil::loadRuntime`，
   `() -> boolean` 方法引用只能是函数式接口，不能是 `LibraryLoader` 类）。
@@ -128,7 +132,9 @@
 - 启动脚本（mpv 脚本会话）：不执行，TV 侧会把启动脚本标为错误状态。
 - 运动插值：不生效（帧率可设可读，但画面不插值）。
 - MPV 日志监听 / 音频滤镜监听：永不触发。
-- 字幕字体目录、垂直偏移、位图字幕亮度、字体族、默认样式：设置被接受但不生效。
+- 字幕字体目录、垂直偏移、位图字幕亮度、字体族：第 108 轮起经 `MpvSubtitleOptionDefaults`
+  补丁接入 mpv 选项（`sub-fonts-dir` / `sub-font` / `sub-offset-y` /
+  `secondary-sub-offset-y` / `image-subs-brightness`），不再是存值丢弃。
 - 动态响度归一化：近似为 ffmpeg `dynaudnorm`，参数映射未经官方实现验证。
 - Matroska 延迟 cue 查找标志：定义后被提取器忽略。
 
