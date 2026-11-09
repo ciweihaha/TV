@@ -97,26 +97,39 @@ jobs:
       # no longer bundles libmpv.so in 5.8.7: MPV ships as a runtime module),
       # all built from this same Media3 lineage.
       - name: Restore unified FFmpeg libs and official libmpv.so
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           APK_DIR="$RUNNER_TEMP/fongmi-official-587"
           mkdir -p "$APK_DIR"
-          curl --fail --location --retry 3 --retry-all-errors \
-            --connect-timeout 20 --max-time 600 \
-            "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-arm64_v8a.apk" \
-            --output "$APK_DIR/mobile-arm64_v8a.apk"
-          curl --fail --location --retry 3 --retry-all-errors \
-            --connect-timeout 20 --max-time 600 \
-            "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-armeabi_v7a.apk" \
-            --output "$APK_DIR/mobile-armeabi_v7a.apk"
-          curl --fail --location --retry 3 --retry-all-errors \
-            --connect-timeout 20 --max-time 600 \
-            "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-arm64-v8a.apk" \
-            --output "$APK_DIR/runtime-mpv-1.1.0-arm64-v8a.apk"
-          curl --fail --location --retry 3 --retry-all-errors \
-            --connect-timeout 20 --max-time 600 \
-            "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-armeabi-v7a.apk" \
-            --output "$APK_DIR/runtime-mpv-1.1.0-armeabi-v7a.apk"
+          # Round 123: github.com/.../releases/download/... intermittently
+          # returns HTTP 504 (2026-11-09: two consecutive CI failures on this
+          # step, and the same 504 reproduces from outside the runner). The
+          # GitHub API asset endpoint serves the same bytes via a signed
+          # storage URL, so fall back to it when the direct download fails.
+          # Asset ids are pinned to the frozen 5.8.7 release / module tag
+          # (api.github.com/repos/FongMi/Release/releases/tags/{5.8.7,module}).
+          download_asset() {
+            local url="$1" asset_id="$2" out="$3"
+            if curl --fail --location --retry 3 --retry-all-errors \
+                --connect-timeout 20 --max-time 600 "$url" --output "$out"; then
+              return 0
+            fi
+            echo "Direct download failed for $out, trying the GitHub API asset endpoint..."
+            local auth=()
+            if [ -n "${GITHUB_TOKEN:-}" ]; then auth=(-H "Authorization: Bearer $GITHUB_TOKEN"); fi
+            curl --fail --location --retry 3 --retry-all-errors \
+              --connect-timeout 20 --max-time 600 \
+              -H "Accept: application/octet-stream" \
+              "${auth[@]}" \
+              "https://api.github.com/repos/FongMi/Release/releases/assets/$asset_id" \
+              --output "$out"
+          }
+          download_asset "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-arm64_v8a.apk" 699104821 "$APK_DIR/mobile-arm64_v8a.apk"
+          download_asset "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-armeabi_v7a.apk" 699104815 "$APK_DIR/mobile-armeabi_v7a.apk"
+          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-arm64-v8a.apk" 692807881 "$APK_DIR/runtime-mpv-1.1.0-arm64-v8a.apk"
+          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-armeabi-v7a.apk" 692807995 "$APK_DIR/runtime-mpv-1.1.0-armeabi-v7a.apk"
           sha256sum "$APK_DIR"/*.apk
           for pair in "arm64-v8a:mobile-arm64_v8a.apk:runtime-mpv-1.1.0-arm64-v8a.apk" "armeabi-v7a:mobile-armeabi_v7a.apk:runtime-mpv-1.1.0-armeabi-v7a.apk"; do
             abi="${pair%%:*}"; rest="${pair#*:}"; apk="${rest%%:*}"; mpvapk="${rest##*:}"
