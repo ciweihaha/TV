@@ -268,10 +268,17 @@ def patch_player_view(media3: Path) -> None:
     return videoAspectRatioOverride;
   }
 
-  /** Stores a video aspect-ratio override (not applied by the shim). */
+  /**
+   * Sets a video aspect-ratio override and applies it to the content frame (round 120).
+   * Values <= 0 clear the override and restore the video's natural aspect ratio.
+   */
   @UnstableApi
   public void setVideoAspectRatioOverride(float videoAspectRatioOverride) {
+    if (this.videoAspectRatioOverride == videoAspectRatioOverride) {
+      return;
+    }
     this.videoAspectRatioOverride = videoAspectRatioOverride;
+    updateAspectRatio();
   }
 
   /** Sets the backend player used for rendering (delegates to {@link #setPlayer}). */
@@ -279,7 +286,6 @@ def patch_player_view(media3: Path) -> None:
   public void setBackendPlayer(@Nullable Player player) {
     setPlayer(player);
   }
-
   /** Forwards a touch event to the active disc menu (no-op in the shim). */
   @UnstableApi
   public boolean dispatchDiscMenuTouchEvent(MotionEvent event) {
@@ -353,6 +359,38 @@ def patch_player_view(media3: Path) -> None:
   }
 """,
         "PlayerView FongMi extensions",
+    )
+    replace_once(
+        path,
+        """  private void updateAspectRatio() {
+    VideoSize videoSize = player != null ? player.getVideoSize() : VideoSize.UNKNOWN;
+    int width = videoSize.width;
+    int height = videoSize.height;
+    float videoAspectRatio =
+        (height == 0 || width == 0) ? 0 : (width * videoSize.pixelWidthHeightRatio) / height;
+    onContentAspectRatioChanged(
+        contentFrame, surfaceViewIgnoresVideoAspectRatio ? 0 : videoAspectRatio);
+  }
+""",
+        """  private void updateAspectRatio() {
+    VideoSize videoSize = player != null ? player.getVideoSize() : VideoSize.UNKNOWN;
+    int width = videoSize.width;
+    int height = videoSize.height;
+    // FongMi extension (round 120): an explicit aspect-ratio override wins over the
+    // video's natural ratio; 0 (or negative) means no override.
+    float videoAspectRatio;
+    if (videoAspectRatioOverride > 0) {
+      videoAspectRatio = videoAspectRatioOverride;
+    } else if (height == 0 || width == 0) {
+      videoAspectRatio = 0;
+    } else {
+      videoAspectRatio = (width * videoSize.pixelWidthHeightRatio) / height;
+    }
+    onContentAspectRatioChanged(
+        contentFrame, surfaceViewIgnoresVideoAspectRatio ? 0 : videoAspectRatio);
+  }
+""",
+        "PlayerView aspect-ratio override",
     )
 
 

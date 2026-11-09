@@ -71,7 +71,7 @@
   常量 `EVENT_DISC_MENU_STATE_CHANGED = 33`（第 101 轮补，永不触发）。
 - `libraries/ui/.../PlayerView.java`：`setDiscMenuController/getDiscMenuController`、
   `getVideoTransform/setVideoTransform`（真实缩放 surface）、
-  `getVideoAspectRatioOverride/setVideoAspectRatioOverride`（仅保存）、
+  `getVideoAspectRatioOverride/setVideoAspectRatioOverride`（第 120 轮起真实应用：override > 0 时 content frame 用 override 比例，否则用视频自然比例）、
   `setBackendPlayer(...)`（转调 `setPlayer`）、`dispatchDiscMenuTouchEvent(...)`（false）。
   第 103 轮再加：`animateVideoTransform(...)`（ViewPropertyAnimator 动画到目标变换）、
   `finishVideoTransformAnimation()`（取消动画）、`getVideoBounds()`（surface 视图边界）。
