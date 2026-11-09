@@ -73,6 +73,9 @@
   `setBackendPlayer(...)`（转调 `setPlayer`）、`dispatchDiscMenuTouchEvent(...)`（false）。
   第 103 轮再加：`animateVideoTransform(...)`（ViewPropertyAnimator 动画到目标变换）、
   `finishVideoTransformAnimation()`（取消动画）、`getVideoBounds()`（surface 视图边界）。
+  第 110 轮修：pan 分量是分数（像素偏移 ÷ 内容尺寸 × 缩放），`setVideoTransform` /
+  `animateVideoTransform` 须换算成像素再设 translation（第 103 轮直接传分数，
+  平移基本不动）；取消动画后对齐到已存变换，避免下次双指缩放起算状态错乱。
 - `libraries/mpvplayer/.../MpvPlayer.java`：实现 `DiscMenuController`（全 false），
   加 `get/setVideoDecoderMode`、`getSubtitleContentForSelection`（UNSUPPORTED）、
   `setSubtitleContentEnabled`、`canRetry/retrySubtitleContent`（false/no-op）、

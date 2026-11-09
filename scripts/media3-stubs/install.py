@@ -238,13 +238,28 @@ def patch_player_view(media3: Path) -> None:
         videoTransform == null
             ? new VideoTransform(1.0f, 1.0f, 0.0f, 0.0f)
             : videoTransform;
+    applyVideoTransform();
+  }
+
+  /**
+   * Applies the stored {@link #videoTransform} to the video surface view.
+   *
+   * <p>Note the pan components are fractions (see TouchInput: panX is the pixel
+   * offset divided by content width times scale), so they are converted to
+   * pixels here; passing them raw to setTranslationX (round 103) moved the
+   * surface by a fraction of a pixel, i.e. panning did nothing (round 110).
+   */
+  private void applyVideoTransform() {
     View surfaceView = getVideoSurfaceView();
-    if (surfaceView != null) {
-      surfaceView.setScaleX(this.videoTransform.scaleX);
-      surfaceView.setScaleY(this.videoTransform.scaleY);
-      surfaceView.setTranslationX(this.videoTransform.panX);
-      surfaceView.setTranslationY(this.videoTransform.panY);
+    if (surfaceView == null) {
+      return;
     }
+    float width = surfaceView.getWidth();
+    float height = surfaceView.getHeight();
+    surfaceView.setScaleX(videoTransform.scaleX);
+    surfaceView.setScaleY(videoTransform.scaleY);
+    surfaceView.setTranslationX(videoTransform.panX * width * videoTransform.scaleX);
+    surfaceView.setTranslationY(videoTransform.panY * height * videoTransform.scaleY);
   }
 
   /** Returns the video aspect-ratio override (0 = none). */
@@ -276,7 +291,8 @@ def patch_player_view(media3: Path) -> None:
    *
    * <p>FongMi extension (round 103): animates the video surface view with a
    * ViewPropertyAnimator; the stored transform is updated to the target
-   * immediately.
+   * immediately. Round 110: pan fractions are converted to pixels (see
+   * {@link #applyVideoTransform}).
    */
   @UnstableApi
   public void animateVideoTransform(VideoTransform target, int durationMs) {
@@ -286,24 +302,34 @@ def patch_player_view(media3: Path) -> None:
     this.videoTransform = target;
     View surfaceView = getVideoSurfaceView();
     if (surfaceView != null) {
+      float width = surfaceView.getWidth();
+      float height = surfaceView.getHeight();
       surfaceView
           .animate()
           .scaleX(target.scaleX)
           .scaleY(target.scaleY)
-          .translationX(target.panX)
-          .translationY(target.panY)
+          .translationX(target.panX * width * target.scaleX)
+          .translationY(target.panY * height * target.scaleY)
           .setDuration(durationMs)
           .start();
     }
   }
 
-  /** Cancels a running video-transform animation (FongMi extension, round 103). */
+  /**
+   * Cancels a running video-transform animation (FongMi extension, round 103).
+   *
+   * <p>Round 110: after cancelling, the surface is snapped to the stored
+   * transform — otherwise the surface stays at an intermediate animated value
+   * while {@link #getVideoTransform()} already reports the target, and the
+   * next pinch gesture starts its math from the wrong state.
+   */
   @UnstableApi
   public void finishVideoTransformAnimation() {
     View surfaceView = getVideoSurfaceView();
     if (surfaceView != null) {
       surfaceView.animate().cancel();
     }
+    applyVideoTransform();
   }
 
   /**
