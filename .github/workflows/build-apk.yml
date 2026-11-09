@@ -215,6 +215,29 @@ jobs:
           set -euo pipefail
           python3 scripts/media3-stubs/install.py --media3 media3 --media3-ass media3-ass
 
+      - name: Pre-download Gradle 9.1.0 distribution
+        run: |
+          set -euo pipefail
+          # Round 124: both Media3 checkouts pin Gradle 9.1.0, and their
+          # wrappers download it with the wrapper's own short-timeout
+          # downloader, which timed out twice in run 42567835310
+          # (services.gradle.org read timeout after ~10 s; GRADLE_OPTS does
+          # not apply to the wrapper download). Fetch it with curl (retries
+          # + resume + stall detection) and invoke the extracted binary
+          # directly instead of the wrappers.
+          GRADLE_ZIP="$RUNNER_TEMP/gradle-9.1.0-all.zip"
+          GRADLE_HOME="$RUNNER_TEMP/gradle-9.1.0"
+          if [ ! -x "$GRADLE_HOME/gradle-9.1.0/bin/gradle" ]; then
+            curl --fail --location --retry 5 --retry-all-errors --retry-delay 10 \
+              --connect-timeout 20 --max-time 900 \
+              --speed-limit 10000 --speed-time 30 -C - \
+              "https://services.gradle.org/distributions/gradle-9.1.0-all.zip" \
+              --output "$GRADLE_ZIP"
+            unzip -q -o "$GRADLE_ZIP" -d "$GRADLE_HOME"
+          fi
+          "$GRADLE_HOME/gradle-9.1.0/bin/gradle" --version
+          echo "GRADLE_BIN=$GRADLE_HOME/gradle-9.1.0/bin/gradle" >> "$GITHUB_ENV"
+
       - name: Build FongMi Media3 AARs
         env:
           GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
@@ -228,7 +251,7 @@ jobs:
             MODULE="${AAR%-release.aar}"
             MEDIA_TASKS+=(":${MODULE}:assembleRelease")
           done < media3/move.txt
-          ./media3/gradlew \
+          "$GRADLE_BIN" \
             -p media3 \
             "${MEDIA_TASKS[@]}" \
             --stacktrace \
@@ -264,7 +287,7 @@ jobs:
         run: |
           set -euo pipefail
           bash media3-ass/libraries/exoplayer_libass/src/main/jni/prepare_libass.sh
-          ./media3-ass/gradlew -p media3-ass :lib-exoplayer-libass:assembleRelease --stacktrace --no-daemon
+          "$GRADLE_BIN" -p media3-ass :lib-exoplayer-libass:assembleRelease --stacktrace --no-daemon
           SOURCE_AAR="$(find media3-ass -type f -path '*/outputs/aar/lib-exoplayer-libass-release.aar' -print -quit)"
           test -n "$SOURCE_AAR"
           cp "$SOURCE_AAR" app/libs/lib-exoplayer-libass-release.aar
