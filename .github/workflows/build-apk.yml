@@ -18,6 +18,13 @@ on:
 permissions:
   contents: read
 
+# Serialize builds (round 105): two runs must not interleave — a newer push
+# queues behind the running build instead of racing it for the same artifact
+# name. cancel-in-progress is false: never kill an in-flight build.
+concurrency:
+  group: build-apk-fongmi
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -270,7 +277,9 @@ jobs:
       - name: Build debug APK
         uses: gradle/actions/setup-gradle@v6.4.1
         with:
-          gradle-home-cache-cleanup: true
+          # NOTE (round 105): gradle-home-cache-cleanup was renamed to
+          # cache-cleanup; the old name logs a deprecation warning every run.
+          cache-cleanup: true
       # gradlew is stored without the executable bit in this repo (mode 100644),
       # so set it here instead of relying on the checkout mode.
       - run: chmod +x gradlew
