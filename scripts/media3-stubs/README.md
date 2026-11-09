@@ -52,7 +52,7 @@
 | decoder_ffmpeg | `FfmpegMotionRenderersFactory` | stock 渲染器；无运动插值/解码器切换 |
 | effect | `ColorToneAdjustEffect` / `DetailAdjustEffect` / `VideoAdjustment` | 真实值对象；效果为直通 shader（不改变画面） |
 | exoplayer | `DecoderMode` / `DecoderManager` | 记住选择；不重建渲染器 |
-| exoplayer/audio | `AudioEqualizerController` | 恒返回成功，不调均衡器 |
+| exoplayer/audio | `AudioEqualizerController` | 真实实现（第 116 轮）：平台 `Equalizer` 挂到播放器音频 session，按最近中心频率映射频段，电平钳制到平台范围；换 session 重建；无 session 时暂缓、创建失败报 false |
 | exoplayer_hls | `CmgConfiguration` | 恒返回 null（不识别 CMG 流） |
 | exoplayer/iso | `BdjRuntime` / `IsoDiscPreparation` / `IsoNavigationPlayerController` | BDJ 不可用；ISO 按后缀识别；ISO 当普通文件播，无菜单 |
 | exoplayer/source | `ContentTypeResolvingMediaSource` | 委托包装 |
