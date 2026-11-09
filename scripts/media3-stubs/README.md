@@ -109,6 +109,8 @@
   `() -> boolean` 方法引用只能是函数式接口，不能是 `LibraryLoader` 类）。
 - `libraries/mpvplayer/.../MpvAudioFilter.java`（第 101 轮）：
   `Builder.addDynamicNormalization(...)`（近似映射为 ffmpeg `dynaudnorm` 滤镜）。
+  第 111 轮修正映射：第 101 轮把 maxGain 写进 `p`（目标峰值，范围 0–1），
+  `p=4.0` 超范围会被 ffmpeg 拒绝；正确是 `m`（最大增益因子，1–100）。
 - `libraries/extractor/.../MatroskaExtractor.java`（第 101 轮）：
   常量 `FLAG_DEFER_SEEK_FOR_CUES = 1 << 2`（定义后被忽略）。
 - `libraries/ui/.../PlayerSeekView.java`（第 101 轮）：
@@ -140,7 +142,8 @@
 - 字幕字体目录、垂直偏移、位图字幕亮度、字体族：第 108 轮起经 `MpvSubtitleOptionDefaults`
   补丁接入 mpv 选项（`sub-fonts-dir` / `sub-font` / `sub-offset-y` /
   `secondary-sub-offset-y` / `image-subs-brightness`），不再是存值丢弃。
-- 动态响度归一化：近似为 ffmpeg `dynaudnorm`，参数映射未经官方实现验证。
+- 动态响度归一化：映射为 ffmpeg `dynaudnorm`（`f`=帧长毫秒，`m`=最大增益因子；
+  第 111 轮已按 ffmpeg 文档核对，第 101 轮误把增益写进 `p` 已修正）。
 - Matroska 延迟 cue 查找标志：定义后被提取器忽略。
 
 ## 维护注意

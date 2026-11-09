@@ -1137,8 +1137,11 @@ def patch_mpv_audio_filter(media3: Path) -> None:
      * Adds dynamic normalization (ffmpeg {@code dynaudnorm} filter).
      *
      * <p>FongMi extension (shim approximation): frame length in seconds is converted
-     * to milliseconds for the filter's {@code f} option; {@code maxGain} maps to the
-     * filter's peak limit {@code p}.
+     * to milliseconds for the filter's {@code f} option; {@code maxGain} maps to
+     * the filter's {@code m} (maximum gain factor, 1.0-100.0). Round 101 used
+     * {@code p} for the gain, which is wrong: {@code p} is the target peak
+     * value (0.0-1.0, default 0.95), so {@code p=4.0} is out of range and
+     * ffmpeg rejects the filter.
      */
     @CanIgnoreReturnValue
     public Builder addDynamicNormalization(String id, double frameLengthSeconds, double maxGain) {
@@ -1146,7 +1149,7 @@ def patch_mpv_audio_filter(media3: Path) -> None:
       String target = target("dynaudnorm", id);
       String filter =
           Util.formatInvariant(
-              "%s=f=%s:p=%s",
+              "%s=f=%s:m=%s",
               target,
               decimal(frameLengthSeconds * 1000.0, 0),
               decimal(maxGain, 1));
