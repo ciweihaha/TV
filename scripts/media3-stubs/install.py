@@ -638,7 +638,7 @@ def patch_mpv_player(media3: Path) -> None:
     // Round 122: drive mpv's sub-delay through the stock text-offset path
     // (SimpleBasePlayer routes setTextOffsetMs to handleSetTextOffsetMs, which
     // sets MpvPlaybackProperties.setTextDelayMs -> mpv sub-delay). The
-    // secondary offset is dialog-only: stock has a single text offset.
+    // secondary offset is applied in handleSetTextOffsetMs (round 129).
     setTextOffsetMs(offsets.primaryMs);
   }
 
@@ -685,6 +685,33 @@ def patch_mpv_player(media3: Path) -> None:
   }
 """,
         "MpvPlayer FongMi extensions",
+    )
+    # Round 129: apply the secondary subtitle delay alongside the stock text
+    # offset (runs on the player looper via handleCompletedCommand; the
+    # stored FongMi offsets were updated before setTextOffsetMs was called).
+    replace_once(
+        path,
+        """  @Override
+  protected ListenableFuture<?> handleSetTextOffsetMs(long textOffsetMs) {
+    return handleCompletedCommand(
+        () -> {
+          playerInfo.setTextOffsetMs(textOffsetMs);
+          playbackProperties.setTextDelayMs(playerInfo.getTextOffsetMs());
+        });
+  }""",
+        """  @Override
+  protected ListenableFuture<?> handleSetTextOffsetMs(long textOffsetMs) {
+    return handleCompletedCommand(
+        () -> {
+          playerInfo.setTextOffsetMs(textOffsetMs);
+          playbackProperties.setTextDelayMs(playerInfo.getTextOffsetMs());
+          // Round 129: the secondary subtitle delay is not part of the stock
+          // text offset; apply it from the stored FongMi offsets so the
+          // secondary track follows its own delay on screen.
+          playbackProperties.setSecondaryTextDelayMs(subtitleOffsets.secondaryMs);
+        });
+  }""",
+        "MpvPlayer handleSetTextOffsetMs secondary delay",
     )
     # Round 101: script/log/audio/motion-interpolation APIs the TV app calls.
     # Anchored on the round-96 extension block (supportsPointer) so this runs
@@ -1303,10 +1330,51 @@ def patch_mpv_command_dispatcher(media3: Path) -> None:
 
 
 # ------------------------------------------------- MpvPlaybackProperties.java (round 112)
+# ------------------------------------------------- MpvConstants.java (round 129)
+def patch_mpv_constants(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/nativebridge/MpvConstants.java"
+    )
+    replace_once(
+        path,
+        '  static final String PROP_SUB_DELAY = "sub-delay";',
+        '  static final String PROP_SUB_DELAY = "sub-delay";\n'
+        '  static final String PROP_SECONDARY_SUB_DELAY = "secondary-sub-delay";',
+        "MpvConstants PROP_SECONDARY_SUB_DELAY",
+    )
+
+
 def patch_mpv_playback_properties(media3: Path) -> None:
     path = (
         media3
         / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/nativebridge/MpvPlaybackProperties.java"
+    )
+    replace_once(
+        path,
+        "import static androidx.media3.mpvplayer.nativebridge.MpvConstants.PROP_SUB_DELAY;",
+        "import static androidx.media3.mpvplayer.nativebridge.MpvConstants.PROP_SUB_DELAY;\n"
+        "import static androidx.media3.mpvplayer.nativebridge.MpvConstants.PROP_SECONDARY_SUB_DELAY;",
+        "MpvPlaybackProperties import PROP_SECONDARY_SUB_DELAY",
+    )
+    replace_once(
+        path,
+        """  public void setTextDelayMs(long textOffsetMs) {
+    properties.setDoubleProperty(PROP_SUB_DELAY, textOffsetMs / 1000.0);
+  }""",
+        """  public void setTextDelayMs(long textOffsetMs) {
+    properties.setDoubleProperty(PROP_SUB_DELAY, textOffsetMs / 1000.0);
+  }
+
+  /**
+   * Sets mpv's secondary subtitle delay (round 129): the delay of the
+   * secondary subtitle track in milliseconds, applied to mpv's
+   * {@code secondary-sub-delay} property.
+   */
+  public void setSecondaryTextDelayMs(long textOffsetMs) {
+    properties.setDoubleProperty(PROP_SECONDARY_SUB_DELAY, textOffsetMs / 1000.0);
+  }""",
+        "MpvPlaybackProperties setSecondaryTextDelayMs",
     )
     replace_once(
         path,
@@ -2105,6 +2173,7 @@ def main() -> int:
     patch_player_view(media3)
     patch_mpv_player(media3)
     patch_mpv_command_dispatcher(media3)
+    patch_mpv_constants(media3)
     patch_mpv_playback_properties(media3)
     patch_mpv_player_config(media3)
     patch_mpv_subtitle_options(media3)
