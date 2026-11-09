@@ -9,6 +9,7 @@ on:
       - "nodejs/**"
       - "quickjs/**"
       - "gradle/**"
+      - "scripts/**"
       - "build.gradle"
       - "settings.gradle"
       - "gradle.properties"
