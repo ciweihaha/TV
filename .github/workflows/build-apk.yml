@@ -227,14 +227,36 @@ jobs:
           # directly instead of the wrappers.
           # Round 126: the app wrapper pins Gradle 9.9.0-bin and hit the
           # same timeout in run 42569584589, so pre-download it the same way.
+          # Round 127: services.gradle.org itself returned HTTP 504 from the
+          # runner in run 42570731659 (6 attempts, exit 22) even for the
+          # pre-download curl. The Tencent Cloud mirror
+          # (mirrors.cloud.tencent.com/gradle/) hosts byte-identical files
+          # (sha256 verified against the official checksum for 9.1.0-all),
+          # so fall back to it when the primary fails.
+          download_gradle() {
+            local file="$1" out="$2"
+            local urls=(
+              "https://services.gradle.org/distributions/$file"
+              "https://mirrors.cloud.tencent.com/gradle/$file"
+            )
+            for url in "${urls[@]}"; do
+              echo "Trying $url ..."
+              if curl --fail --location --retry 3 --retry-all-errors --retry-delay 10 \
+                  --connect-timeout 20 --max-time 900 \
+                  --speed-limit 10000 --speed-time 30 -C - \
+                  "$url" --output "$out"; then
+                return 0
+              fi
+              echo "Download failed from $url"
+              rm -f "$out"
+            done
+            echo "::error::Could not download $file from any mirror"
+            return 1
+          }
           GRADLE_ZIP="$RUNNER_TEMP/gradle-9.1.0-all.zip"
           GRADLE_HOME="$RUNNER_TEMP/gradle-9.1.0"
           if [ ! -x "$GRADLE_HOME/gradle-9.1.0/bin/gradle" ]; then
-            curl --fail --location --retry 5 --retry-all-errors --retry-delay 10 \
-              --connect-timeout 20 --max-time 900 \
-              --speed-limit 10000 --speed-time 30 -C - \
-              "https://services.gradle.org/distributions/gradle-9.1.0-all.zip" \
-              --output "$GRADLE_ZIP"
+            download_gradle "gradle-9.1.0-all.zip" "$GRADLE_ZIP"
             unzip -q -o "$GRADLE_ZIP" -d "$GRADLE_HOME"
           fi
           "$GRADLE_HOME/gradle-9.1.0/bin/gradle" --version
@@ -242,11 +264,7 @@ jobs:
           APP_GRADLE_ZIP="$RUNNER_TEMP/gradle-9.9.0-bin.zip"
           APP_GRADLE_HOME="$RUNNER_TEMP/gradle-9.9.0"
           if [ ! -x "$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" ]; then
-            curl --fail --location --retry 5 --retry-all-errors --retry-delay 10 \
-              --connect-timeout 20 --max-time 900 \
-              --speed-limit 10000 --speed-time 30 -C - \
-              "https://services.gradle.org/distributions/gradle-9.9.0-bin.zip" \
-              --output "$APP_GRADLE_ZIP"
+            download_gradle "gradle-9.9.0-bin.zip" "$APP_GRADLE_ZIP"
             unzip -q -o "$APP_GRADLE_ZIP" -d "$APP_GRADLE_HOME"
           fi
           "$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" --version
