@@ -635,6 +635,9 @@ def patch_mpv_player(media3: Path) -> None:
       return;
     }
     subtitleOffsets = offsets;
+    // Round 130: mirror the secondary offset into playerInfo so the
+    // per-file options composer re-applies it on every file load.
+    playerInfo.setSecondaryTextOffsetMs(offsets.secondaryMs);
     // Round 122: drive mpv's sub-delay through the stock text-offset path
     // (SimpleBasePlayer routes setTextOffsetMs to handleSetTextOffsetMs, which
     // sets MpvPlaybackProperties.setTextDelayMs -> mpv sub-delay). The
@@ -1345,6 +1348,68 @@ def patch_mpv_constants(media3: Path) -> None:
     )
 
 
+# ------------------------------------------------- MpvPlayerInfo.java (round 130)
+def patch_mpv_player_info(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/core/MpvPlayerInfo.java"
+    )
+    replace_once(
+        path,
+        "  private long textOffsetMs;",
+        "  private long textOffsetMs;\n  private long secondaryTextOffsetMs;",
+        "MpvPlayerInfo secondaryTextOffsetMs field",
+    )
+    replace_once(
+        path,
+        """  public void setTextOffsetMs(long textOffsetMs) {
+    this.textOffsetMs = textOffsetMs;
+  }""",
+        """  public void setTextOffsetMs(long textOffsetMs) {
+    this.textOffsetMs = textOffsetMs;
+  }
+
+  /** Secondary subtitle delay in milliseconds (round 130, FongMi extension). */
+  public long getSecondaryTextOffsetMs() {
+    return secondaryTextOffsetMs;
+  }
+
+  public void setSecondaryTextOffsetMs(long secondaryTextOffsetMs) {
+    this.secondaryTextOffsetMs = secondaryTextOffsetMs;
+  }""",
+        "MpvPlayerInfo secondaryTextOffsetMs accessors",
+    )
+
+
+# ------------------------------------------------- MpvPerFileOptionsComposer.java (round 130)
+def patch_mpv_per_file_options_composer(media3: Path) -> None:
+    path = (
+        media3
+        / "libraries/mpvplayer/src/main/java/androidx/media3/mpvplayer/MpvPerFileOptionsComposer.java"
+    )
+    replace_once(
+        path,
+        """    playbackProperties.addPerFileOptions(
+        perFileOptions,
+        playerInfo.shouldPlay(),
+        playerInfo.getPlaybackParameters(),
+        playerInfo.getAudioOffsetMs(),
+        playerInfo.getTextOffsetMs(),
+        playerInfo.getVolume(),
+        audioFocusManager.getVolumeMultiplier());""",
+        """    playbackProperties.addPerFileOptions(
+        perFileOptions,
+        playerInfo.shouldPlay(),
+        playerInfo.getPlaybackParameters(),
+        playerInfo.getAudioOffsetMs(),
+        playerInfo.getTextOffsetMs(),
+        playerInfo.getSecondaryTextOffsetMs(),
+        playerInfo.getVolume(),
+        audioFocusManager.getVolumeMultiplier());""",
+        "MpvPerFileOptionsComposer secondary text offset",
+    )
+
+
 def patch_mpv_playback_properties(media3: Path) -> None:
     path = (
         media3
@@ -1375,6 +1440,95 @@ def patch_mpv_playback_properties(media3: Path) -> None:
     properties.setDoubleProperty(PROP_SECONDARY_SUB_DELAY, textOffsetMs / 1000.0);
   }""",
         "MpvPlaybackProperties setSecondaryTextDelayMs",
+    )
+    # Round 130: thread the secondary subtitle delay through the per-file
+    # options (replace the stock methods in place; the stock 7-parameter
+    # signatures are otherwise dead once the composer passes the extra value).
+    replace_once(
+        path,
+        """  public void addPerFileOptions(
+      MpvPerFileOptions options,
+      boolean playWhenReady,
+      PlaybackParameters playbackParameters,
+      long audioOffsetMs,
+      long textOffsetMs,
+      float volume,
+      float volumeMultiplier) {
+    writePlaybackOptions(
+        options::add,
+        options::add,
+        playWhenReady,
+        playbackParameters,
+        audioOffsetMs,
+        textOffsetMs,
+        volume,
+        volumeMultiplier);
+  }""",
+        """  public void addPerFileOptions(
+      MpvPerFileOptions options,
+      boolean playWhenReady,
+      PlaybackParameters playbackParameters,
+      long audioOffsetMs,
+      long textOffsetMs,
+      long secondaryTextOffsetMs,
+      float volume,
+      float volumeMultiplier) {
+    writePlaybackOptions(
+        options::add,
+        options::add,
+        playWhenReady,
+        playbackParameters,
+        audioOffsetMs,
+        textOffsetMs,
+        secondaryTextOffsetMs,
+        volume,
+        volumeMultiplier);
+  }""",
+        "MpvPlaybackProperties addPerFileOptions secondary offset",
+    )
+    replace_once(
+        path,
+        """  private static void writePlaybackOptions(
+      StringOptionWriter strings,
+      DoubleOptionWriter doubles,
+      boolean playWhenReady,
+      PlaybackParameters playbackParameters,
+      long audioOffsetMs,
+      long textOffsetMs,
+      float volume,
+      float volumeMultiplier) {
+    strings.set(PROP_PAUSE, playWhenReady ? VALUE_NO : VALUE_YES);
+    strings.set(PROP_LOOP_FILE, VALUE_NO);
+    doubles.set(PROP_SPEED, playbackParameters.speed);
+    doubles.set(PROP_PITCH, playbackParameters.pitch);
+    doubles.set(PROP_AUDIO_DELAY, audioOffsetMs / 1000.0);
+    doubles.set(PROP_SUB_DELAY, textOffsetMs / 1000.0);
+    doubles.set(PROP_VOLUME, volume * 100.0 * volumeMultiplier);
+  }""",
+        """  private static void writePlaybackOptions(
+      StringOptionWriter strings,
+      DoubleOptionWriter doubles,
+      boolean playWhenReady,
+      PlaybackParameters playbackParameters,
+      long audioOffsetMs,
+      long textOffsetMs,
+      long secondaryTextOffsetMs,
+      float volume,
+      float volumeMultiplier) {
+    strings.set(PROP_PAUSE, playWhenReady ? VALUE_NO : VALUE_YES);
+    strings.set(PROP_LOOP_FILE, VALUE_NO);
+    doubles.set(PROP_SPEED, playbackParameters.speed);
+    doubles.set(PROP_PITCH, playbackParameters.pitch);
+    doubles.set(PROP_AUDIO_DELAY, audioOffsetMs / 1000.0);
+    doubles.set(PROP_SUB_DELAY, textOffsetMs / 1000.0);
+    // Round 130: re-apply the secondary subtitle delay on every file load;
+    // mpv resets the delay options per file (that is why the stock code
+    // re-applies sub-delay here), and secondary-sub-delay would otherwise
+    // fall back to 0 on the next file.
+    doubles.set(PROP_SECONDARY_SUB_DELAY, secondaryTextOffsetMs / 1000.0);
+    doubles.set(PROP_VOLUME, volume * 100.0 * volumeMultiplier);
+  }""",
+        "MpvPlaybackProperties writePlaybackOptions secondary delay",
     )
     replace_once(
         path,
@@ -2175,6 +2329,8 @@ def main() -> int:
     patch_mpv_command_dispatcher(media3)
     patch_mpv_constants(media3)
     patch_mpv_playback_properties(media3)
+    patch_mpv_player_info(media3)
+    patch_mpv_per_file_options_composer(media3)
     patch_mpv_player_config(media3)
     patch_mpv_subtitle_options(media3)
     patch_mpv_subtitle_option_defaults(media3)

@@ -63,7 +63,7 @@
 | mpvplayer | `MpvConfigFileInspector` / `MpvDecoderMode` / `MpvSubtitleContentLoader` / `media/MpvDrmSupport` | mpv.conf 真实解析；DRM 一律判 MPV 不支持（走 Exo） |
 | app 内 | 见上 | 字幕内容：第 114 轮起 `DefaultSubtitleContentLoader` 真实下载并解析（SSA/ASS、WebVTT、SubRip、TX3G、TTML、图片字幕）；第 115 轮起 `SubtitleTranscriptSession.getContent` 真实实现（Exo 引擎对话框：按轨道 id / 语言+标签解析外挂字幕文件，后台加载、按轨道缓存、失败可重试）；第 121 轮起 getContent 按字幕延时平移条目时间（缓存记下每条目集的偏移，延时改了重载）；第 122 轮起 MPV 对话框内容返回时同样按延时平移；转录即播轨道仍未激活；danmaku/libass UI 不激活 |
 
-## 补丁清单（17 个文件）
+## 补丁清单（19 个文件）
 
 - `libraries/common/.../Player.java`：默认方法 `getDiscMenuState()`（→EMPTY）、
   `getDecoderMode(int)`（→null）、`getSubtitleOffsets()`（→ZERO）、
@@ -91,7 +91,8 @@
   `get/setSubtitleOffsets`（第 122 轮起 set 经 stock 的 `setTextOffsetMs` 驱动 mpv
   `sub-delay`；第 129 轮起副延时也作用于屏幕——`handleSetTextOffsetMs`（播放器
   looper）同时调用 `playbackProperties.setSecondaryTextDelayMs`，驱动 mpv
-  `secondary-sub-delay`）、`getSubtitleSelectionState`（第 114 轮起按当前
+  `secondary-sub-delay`；第 130 轮起 set 时把副延时同步写进 `playerInfo`，
+  供 per-file options 每换片重设）、`getSubtitleSelectionState`（第 114 轮起按当前
   Tracks 计算主/副字幕选择）、
   `setSubtitleContentLoader`、`setSecondaryTextTrackSelectionOverride/AutoSelectionEnabled`；
   `Builder.setVideoDecoderMode(...)`。第 101 轮再加：`setVerboseLoggingEnabled`、
@@ -118,6 +119,12 @@
 - `libraries/mpvplayer/.../nativebridge/MpvPlaybackProperties.java`（第 112 轮）：
   `getPropertyString(...)`（转调 `MpvPropertyAccessor.getString`，mpv 未初始化时返回 null）。
   第 129 轮：`setSecondaryTextDelayMs(...)`（`secondary-sub-delay` = 延时毫秒 ÷ 1000）。
+  第 130 轮：`addPerFileOptions` / `writePlaybackOptions` 各多一个 `secondaryTextOffsetMs`
+  参数，每换片把副延时也写进 per-file options（与主 `sub-delay` 同款处理）。
+- `libraries/mpvplayer/.../core/MpvPlayerInfo.java`（第 130 轮）：
+  新增 `secondaryTextOffsetMs` 字段 + getter/setter（与 stock 的 `textOffsetMs` 并列存放）。
+- `libraries/mpvplayer/.../MpvPerFileOptionsComposer.java`（第 130 轮）：
+  `add()` 里把 `playerInfo.getSecondaryTextOffsetMs()` 传给 `playbackProperties.addPerFileOptions`。
 - `libraries/mpvplayer/.../MpvPlayerConfig.java`（第 101 轮）：
   `Builder.setDataSourceFactory(...)`、`setMotionInterpolationFps(...)`（仅保存，
   播放器不消费）+ 对应 getter；第 102 轮补 `Builder.setDefaultFontDirectories(File, File)`
