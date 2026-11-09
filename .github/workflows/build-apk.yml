@@ -277,16 +277,30 @@ jobs:
           # kotlin-compiler-embeddable) to github.com release downloads, which
           # return HTTP 504 during the 2026-11-09 outage. The Google Maven
           # Central mirror serves the same artifacts directly (verified 200).
-          # beforeProject runs before each project's build script, so the
-          # mirror is tried first in every project, including included builds
-          # (build-logic-settings declares its repos in its build file and its
-          # settings file has no dependencyResolutionManagement).
+          # Round 128: the mirror must be added differently per build. The
+          # round-125 beforeProject/project-repositories hook broke the TV
+          # app build: its settings set FAIL_ON_PROJECT_REPOS, so project
+          # repositories are rejected at configuration time. Media3 builds
+          # allow project repositories, so they keep the beforeProject hook
+          # (mirror tried first); the TV app gets the mirror appended to its
+          # settings repositories instead (Gradle falls back to it after the
+          # settings' own repositories).
           mkdir -p "$HOME/.gradle/init.d"
           cat > "$HOME/.gradle/init.d/maven-mirror.init.gradle" <<'EOF'
-          // Round 125: prefer the Google Maven Central mirror over Maven Central.
-          beforeProject { project ->
+          // Round 125/128: prefer the Google Maven Central mirror over Maven Central.
+          gradle.beforeProject { project ->
+            if (project.gradle.rootProject.name == 'TV') {
+              return
+            }
             project.repositories {
               maven { url = "https://maven-central.storage-download.googleapis.com/maven2" }
+            }
+          }
+          settingsEvaluated { settings ->
+            settings.dependencyResolutionManagement {
+              repositories {
+                maven { url = "https://maven-central.storage-download.googleapis.com/maven2" }
+              }
             }
           }
           EOF
