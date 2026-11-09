@@ -57,11 +57,11 @@
 | exoplayer/iso | `BdjRuntime` / `IsoDiscPreparation` / `IsoNavigationPlayerController` | BDJ 不可用；ISO 按后缀识别；ISO 当普通文件播，无菜单 |
 | exoplayer/source | `ContentTypeResolvingMediaSource` | 委托包装 |
 | exoplayer/source | `DefaultPositionMediaSource` / `EndTrimMediaSource` | 真实实现（第 113 轮）：`ForwardingTimeline` 改窗口默认位置 / 截断窗口与 period 时长；直播、未知时长、多 period 不截断 |
-| exoplayer/text | `SecondaryTextOutput` / `SubtitleTranscript` / `SubtitleTranscriptParserFactory` | 无转录字幕 |
+| exoplayer/text | `SecondaryTextOutput` / `SubtitleTranscript` / `SubtitleTranscriptParserFactory` | 无转录字幕（转录即播轨道仍未激活） |
 | exoplayer/trackselection | `SecondaryTextTrackSelector` | 委托给解码器选择器 |
 | exoplayer_libass | `LibassConfiguration` / `LibassFontConfig` / `LibassFontFile` / `LibassSubtitleController` | 配置真实携带；fonts.conf 真实生成；字体族名纯 Java 解析；控制器报无副字幕 |
 | mpvplayer | `MpvConfigFileInspector` / `MpvDecoderMode` / `MpvSubtitleContentLoader` / `media/MpvDrmSupport` | mpv.conf 真实解析；DRM 一律判 MPV 不支持（走 Exo） |
-| app 内 | 见上 | 字幕内容：第 114 轮起 `DefaultSubtitleContentLoader` 真实下载并解析（SSA/ASS、WebVTT、SubRip、TX3G、TTML、图片字幕）；无转录；danmaku/libass UI 不激活 |
+| app 内 | 见上 | 字幕内容：第 114 轮起 `DefaultSubtitleContentLoader` 真实下载并解析（SSA/ASS、WebVTT、SubRip、TX3G、TTML、图片字幕）；第 115 轮起 `SubtitleTranscriptSession.getContent` 真实实现（Exo 引擎对话框：按轨道 id / 语言+标签解析外挂字幕文件，后台加载、按轨道缓存、失败可重试）；转录即播轨道仍未激活；danmaku/libass UI 不激活 |
 
 ## 补丁清单（15 个文件）
 
