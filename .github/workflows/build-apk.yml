@@ -215,7 +215,7 @@ jobs:
           set -euo pipefail
           python3 scripts/media3-stubs/install.py --media3 media3 --media3-ass media3-ass
 
-      - name: Pre-download Gradle 9.1.0 distribution
+      - name: Pre-download Gradle distributions
         run: |
           set -euo pipefail
           # Round 124: both Media3 checkouts pin Gradle 9.1.0, and their
@@ -225,6 +225,8 @@ jobs:
           # not apply to the wrapper download). Fetch it with curl (retries
           # + resume + stall detection) and invoke the extracted binary
           # directly instead of the wrappers.
+          # Round 126: the app wrapper pins Gradle 9.9.0-bin and hit the
+          # same timeout in run 42569584589, so pre-download it the same way.
           GRADLE_ZIP="$RUNNER_TEMP/gradle-9.1.0-all.zip"
           GRADLE_HOME="$RUNNER_TEMP/gradle-9.1.0"
           if [ ! -x "$GRADLE_HOME/gradle-9.1.0/bin/gradle" ]; then
@@ -237,6 +239,18 @@ jobs:
           fi
           "$GRADLE_HOME/gradle-9.1.0/bin/gradle" --version
           echo "GRADLE_BIN=$GRADLE_HOME/gradle-9.1.0/bin/gradle" >> "$GITHUB_ENV"
+          APP_GRADLE_ZIP="$RUNNER_TEMP/gradle-9.9.0-bin.zip"
+          APP_GRADLE_HOME="$RUNNER_TEMP/gradle-9.9.0"
+          if [ ! -x "$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" ]; then
+            curl --fail --location --retry 5 --retry-all-errors --retry-delay 10 \
+              --connect-timeout 20 --max-time 900 \
+              --speed-limit 10000 --speed-time 30 -C - \
+              "https://services.gradle.org/distributions/gradle-9.9.0-bin.zip" \
+              --output "$APP_GRADLE_ZIP"
+            unzip -q -o "$APP_GRADLE_ZIP" -d "$APP_GRADLE_HOME"
+          fi
+          "$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" --version
+          echo "GRADLE_BIN_APP=$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" >> "$GITHUB_ENV"
 
       - name: Prefer Google Maven mirror for dependency downloads
         run: |
@@ -344,7 +358,7 @@ jobs:
       # gradlew is stored without the executable bit in this repo (mode 100644),
       # so set it here instead of relying on the checkout mode.
       - run: chmod +x gradlew
-      - run: ./gradlew assembleDebug --stacktrace
+      - run: '"$GRADLE_BIN_APP" assembleDebug --stacktrace'
 
       - name: Upload APKs
         uses: actions/upload-artifact@v7.0.2
