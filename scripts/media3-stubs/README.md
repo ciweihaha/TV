@@ -40,7 +40,7 @@
 |---|---|---|
 | common | `DecoderMode`（enum） | 真实枚举，AUTO/HARDWARE/SOFTWARE/FFMPEG |
 | common | `DiscMenuController` / `DiscMenuState` | 接口+状态快照；返回 EMPTY/不可用 |
-| common | `VideoTransform` | 真实值对象；PlayerView 补丁会实际缩放 surface |
+| common | `VideoTransform` | 真实值对象；含 `DEFAULT`（单位变换）；PlayerView 补丁会实际缩放 surface |
 | common/audio | `AudioChannelMode` / `AudioChannelMix` | 真实矩阵数学，供 mpv pan 滤镜用 |
 | common/audio | `AudioEffectParameters` | 真实值对象 |
 | common/audio | `AudioEffectProcessor` | 不激活，音频直通 |
@@ -71,6 +71,8 @@
   `getVideoTransform/setVideoTransform`（真实缩放 surface）、
   `getVideoAspectRatioOverride/setVideoAspectRatioOverride`（仅保存）、
   `setBackendPlayer(...)`（转调 `setPlayer`）、`dispatchDiscMenuTouchEvent(...)`（false）。
+  第 103 轮再加：`animateVideoTransform(...)`（ViewPropertyAnimator 动画到目标变换）、
+  `finishVideoTransformAnimation()`（取消动画）、`getVideoBounds()`（surface 视图边界）。
 - `libraries/mpvplayer/.../MpvPlayer.java`：实现 `DiscMenuController`（全 false），
   加 `get/setVideoDecoderMode`、`getSubtitleContentForSelection`（UNSUPPORTED）、
   `setSubtitleContentEnabled`、`canRetry/retrySubtitleContent`（false/no-op）、

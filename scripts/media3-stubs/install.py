@@ -189,6 +189,12 @@ def patch_player_view(media3: Path) -> None:
     )
     replace_once(
         path,
+        "import android.graphics.Rect;",
+        "import android.graphics.Rect;\nimport android.graphics.RectF;",
+        "PlayerView import RectF",
+    )
+    replace_once(
+        path,
         """  @UnstableApi
   @Nullable
   public View getVideoSurfaceView() {
@@ -263,6 +269,61 @@ def patch_player_view(media3: Path) -> None:
   @UnstableApi
   public boolean dispatchDiscMenuTouchEvent(MotionEvent event) {
     return false;
+  }
+
+  /**
+   * Animates the video transform to the target over the given duration (ms).
+   *
+   * <p>FongMi extension (round 103): animates the video surface view with a
+   * ViewPropertyAnimator; the stored transform is updated to the target
+   * immediately.
+   */
+  @UnstableApi
+  public void animateVideoTransform(VideoTransform target, int durationMs) {
+    if (target == null) {
+      target = VideoTransform.DEFAULT;
+    }
+    this.videoTransform = target;
+    View surfaceView = getVideoSurfaceView();
+    if (surfaceView != null) {
+      surfaceView
+          .animate()
+          .scaleX(target.scaleX)
+          .scaleY(target.scaleY)
+          .translationX(target.panX)
+          .translationY(target.panY)
+          .setDuration(durationMs)
+          .start();
+    }
+  }
+
+  /** Cancels a running video-transform animation (FongMi extension, round 103). */
+  @UnstableApi
+  public void finishVideoTransformAnimation() {
+    View surfaceView = getVideoSurfaceView();
+    if (surfaceView != null) {
+      surfaceView.animate().cancel();
+    }
+  }
+
+  /**
+   * Returns the bounds of the video content within this view.
+   *
+   * <p>FongMi extension (round 103): the surface view's bounds relative to this
+   * view; empty when there is no surface view (callers fall back to the full
+   * view size).
+   */
+  @UnstableApi
+  public RectF getVideoBounds() {
+    View surfaceView = getVideoSurfaceView();
+    if (surfaceView == null) {
+      return new RectF();
+    }
+    return new RectF(
+        surfaceView.getLeft(),
+        surfaceView.getTop(),
+        surfaceView.getRight(),
+        surfaceView.getBottom());
   }
 """,
         "PlayerView FongMi extensions",

@@ -12,6 +12,9 @@ public final class VideoTransform {
 
   public static final float MAX_SCALE = 8.0f;
 
+  /** The identity transform (scale 1, no pan). */
+  public static final VideoTransform DEFAULT = new VideoTransform(1.0f, 1.0f, 0.0f, 0.0f);
+
   public final float scaleX;
   public final float scaleY;
   public final float panX;
