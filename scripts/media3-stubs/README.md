@@ -55,7 +55,8 @@
 | exoplayer/audio | `AudioEqualizerController` | 恒返回成功，不调均衡器 |
 | exoplayer_hls | `CmgConfiguration` | 恒返回 null（不识别 CMG 流） |
 | exoplayer/iso | `BdjRuntime` / `IsoDiscPreparation` / `IsoNavigationPlayerController` | BDJ 不可用；ISO 按后缀识别；ISO 当普通文件播，无菜单 |
-| exoplayer/source | `ContentTypeResolvingMediaSource` / `DefaultPositionMediaSource` / `EndTrimMediaSource` | 委托包装；不截尾、不定位 |
+| exoplayer/source | `ContentTypeResolvingMediaSource` | 委托包装 |
+| exoplayer/source | `DefaultPositionMediaSource` / `EndTrimMediaSource` | 真实实现（第 113 轮）：`ForwardingTimeline` 改窗口默认位置 / 截断窗口与 period 时长；直播、未知时长、多 period 不截断 |
 | exoplayer/text | `SecondaryTextOutput` / `SubtitleTranscript` / `SubtitleTranscriptParserFactory` | 无转录字幕 |
 | exoplayer/trackselection | `SecondaryTextTrackSelector` | 委托给解码器选择器 |
 | exoplayer_libass | `LibassConfiguration` / `LibassFontConfig` / `LibassFontFile` / `LibassSubtitleController` | 配置真实携带；fonts.conf 真实生成；字体族名纯 Java 解析；控制器报无副字幕 |
@@ -146,7 +147,9 @@
 - 视频效果（色彩/细节调整）：不生效（直通）。
 - 音频均衡器/声道混合：Exo 侧不生效；MPV 侧混音矩阵真实生效。
 - ClearKey MP4 无 DRM 会话解密：不工作（走标准 DRM 路径的仍正常）。
-- 截尾（跳过片尾）、预加载定位：不生效。
+- 截尾（跳过片尾）、预加载定位：第 113 轮起真实实现（`ForwardingTimeline` 截断
+  窗口/period 时长、改窗口默认位置）；仅时间线裁剪、未包 `ClippingMediaPeriod`
+  （播到截断点即按 period 结束处理），直播/未知时长/多 period 源不截断。
 - CMG 流识别：不识别（按用户设置的引擎播放）。
 - 启动脚本（mpv 脚本会话）：第 112 轮起真实接入 mpv（`load-script` /
   `script-binding` / `user-data/...` 状态属性 / 日志观察者）；`unloadScript`
