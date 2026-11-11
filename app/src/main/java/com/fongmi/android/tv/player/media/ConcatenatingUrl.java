@@ -13,14 +13,22 @@ public final class ConcatenatingUrl {
 
     public static List<Segment> parse(String url) {
         if (!matches(url)) return List.of();
-        List<Segment> segments = new ArrayList<>();
-        long durationMs = 0;
-        for (String entry : url.split("\\*\\*\\*", -1)) {
-            Segment segment = parseSegment(entry, durationMs);
-            durationMs += segment.durationMs();
-            segments.add(segment);
+        try {
+            List<Segment> segments = new ArrayList<>();
+            long durationMs = 0;
+            for (String entry : url.split("\\*\\*\\*", -1)) {
+                Segment segment = parseSegment(entry, durationMs);
+                durationMs += segment.durationMs();
+                segments.add(segment);
+            }
+            return List.copyOf(segments);
+        } catch (IllegalArgumentException e) {
+            // 分段里有一段残缺（缺 |||、时长不是数字、时长 <= 0 或溢出）时按“不是拼接地址”处理：
+            // 调用方（ExoMediaSourceFactory、MpvPlayerEngine）把空列表当成单条地址原样播放，
+            // 而不是让 NumberFormatException 从 createMediaSource/setMediaItem 里冲出来导致播放闪退；
+            // Long.parseLong 抛的 NumberFormatException 是 IllegalArgumentException 的子类，这里一并接住
+            return List.of();
         }
-        return List.copyOf(segments);
     }
 
     private static Segment parseSegment(String entry, long durationMs) {
