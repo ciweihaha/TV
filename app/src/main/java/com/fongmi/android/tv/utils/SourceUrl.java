@@ -29,8 +29,15 @@ public record SourceUrl(String id, String target) {
     }
 
     public static boolean same(String first, String second) {
-        if (match(first) && match(second)) return from(first).equals(from(second));
-        return TorrentUrl.match(first) && TorrentUrl.match(second) && TorrentUrl.from(first).equals(TorrentUrl.from(second));
+        try {
+            if (match(first) && match(second)) return from(first).equals(from(second));
+            return TorrentUrl.match(first) && TorrentUrl.match(second) && TorrentUrl.from(first).equals(TorrentUrl.from(second));
+        } catch (IllegalArgumentException e) {
+            // 残缺的 source:// 或 magnet://file 链接（缺 id/target/index，或 index 不是数字）按“不是同一集”处理：
+            // TorrentUrl.from() 里 Integer.parseInt(null) 会抛 NumberFormatException（是 IllegalArgumentException 的子类），
+            // 若在此处抛出，播放中更新历史（VodHistoryPolicy.matchesEpisode）与选集过滤（Source）都会直接闪退/报错
+            return false;
+        }
     }
 
     public static String restore(String saved, String id) {
