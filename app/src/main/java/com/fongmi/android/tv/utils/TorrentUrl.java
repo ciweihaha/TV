@@ -35,11 +35,23 @@ public record TorrentUrl(String id, String name, int index) {
         String name = uri.getQueryParameter("name");
         String index = uri.getQueryParameter("index");
         if (name == null || index == null) return null;
-        return new TorrentUrl(id, name, Integer.parseInt(index));
+        try {
+            return new TorrentUrl(id, name, Integer.parseInt(index));
+        } catch (NumberFormatException e) {
+            // 旧版 magnet 链接的 index 不是数字时按“不是有效旧链接”处理，调用方继续走其他恢复路径
+            return null;
+        }
     }
 
     public static String original(String url) {
-        return match(url) ? from(url).id() : url;
+        if (!match(url)) return url;
+        try {
+            return from(url).id();
+        } catch (IllegalArgumentException e) {
+            // 残缺的 magnet://file 链接（缺 id/name/index，或 index 不是数字）按原样返回：
+            // 调用方只拿它做 equals 比对或继续传给解析器，原样返回即“比对不上”，不会闪退
+            return url;
+        }
     }
 
     public static String restore(String saved, String id) {

@@ -25,7 +25,14 @@ public record SourceUrl(String id, String target) {
     }
 
     public static String original(String url) {
-        return match(url) ? from(url).id() : TorrentUrl.original(url);
+        if (!match(url)) return TorrentUrl.original(url);
+        try {
+            return from(url).id();
+        } catch (IllegalArgumentException e) {
+            // 残缺的 source://episode 链接（缺 id/target）按原样返回：调用方（选集替换、历史恢复、
+            // 播放 id 归一）只拿它做 equals 比对，原样返回即“比对不上”，不会闪退；第 133 轮只守住了 same()
+            return url;
+        }
     }
 
     public static boolean same(String first, String second) {
@@ -41,7 +48,14 @@ public record SourceUrl(String id, String target) {
     }
 
     public static String restore(String saved, String id) {
-        if (match(saved)) return from(saved).id().equals(id) ? saved : null;
+        if (match(saved)) {
+            try {
+                return from(saved).id().equals(id) ? saved : null;
+            } catch (IllegalArgumentException e) {
+                // 残缺的 source://episode 链接无法还原成有效选集，按“还原失败”处理（调用方继续走其他恢复路径）
+                return null;
+            }
+        }
         return TorrentUrl.restore(saved, id);
     }
 
