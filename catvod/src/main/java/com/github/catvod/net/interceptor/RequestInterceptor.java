@@ -37,9 +37,9 @@ public class RequestInterceptor implements Interceptor {
     }
 
     private void checkAuth(HttpUrl url, Request.Builder builder) {
-        String host = url.host();
+        String origin = url.scheme() + "://" + url.host() + ":" + url.port();
         String auth = url.queryParameter("auth");
-        if (auth != null) authMap.put(host, auth);
-        else if (authMap.containsKey(host)) builder.url(url.newBuilder().addQueryParameter("auth", authMap.get(host)).build());
+        if (auth != null) authMap.put(origin, auth);
+        else if (authMap.containsKey(origin)) builder.url(url.newBuilder().addQueryParameter("auth", authMap.get(origin)).build());
     }
 }

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.ConcurrentHashMap;
 
+import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -45,17 +46,21 @@ public class AuthInterceptor implements Interceptor {
     private String getCredentials(Request request, Request challenged) {
         String user = challenged.url().uri().getUserInfo();
         if (user == null && request.url().scheme().equals(challenged.url().scheme()) && request.url().host().equals(challenged.url().host()) && request.url().port() == challenged.url().port()) user = request.url().uri().getUserInfo();
-        return user == null && request.tag(Auth.Context.class) == null ? userMap.get(challenged.url().host()) : user;
+        return user == null && request.tag(Auth.Context.class) == null ? userMap.get(origin(challenged.url())) : user;
+    }
+
+    private static String origin(HttpUrl url) {
+        return url.scheme() + "://" + url.host() + ":" + url.port();
     }
 
     private boolean digest(String header) {
-        return header != null && header.startsWith("Digest");
+        return header != null && header.regionMatches(true, 0, "Digest ", 0, 7);
     }
 
     private Request check(Request request) {
         URI uri = request.url().uri();
         if (uri.getUserInfo() == null) return request;
-        if (request.tag(Auth.Context.class) == null) userMap.put(request.url().host(), uri.getUserInfo());
+        if (request.tag(Auth.Context.class) == null) userMap.put(origin(request.url()), uri.getUserInfo());
         return request.newBuilder().header(HttpHeaders.AUTHORIZATION, Auth.basic(uri.getUserInfo())).build();
     }
 }
