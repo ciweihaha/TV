@@ -3,6 +3,7 @@ package com.fongmi.android.tv.ui.custom;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.databinding.ActivitySearchBinding;
 import com.fongmi.android.tv.ui.adapter.KeyboardAdapter;
+import com.fongmi.android.tv.utils.Util;
 
 public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
 
@@ -10,13 +11,27 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
     private final Callback callback;
     private KeyboardAdapter adapter;
 
-    public static void init(Callback callback, ActivitySearchBinding binding) {
-        new CustomKeyboard(callback, binding).initView();
+    public static CustomKeyboard init(Callback callback, ActivitySearchBinding binding) {
+        CustomKeyboard keyboard = new CustomKeyboard(callback, binding);
+        keyboard.initView();
+        return keyboard;
     }
 
     public CustomKeyboard(Callback callback, ActivitySearchBinding binding) {
         this.callback = callback;
         this.binding = binding;
+    }
+
+    public boolean isSystemMode() {
+        return adapter != null && adapter.isSystemMode();
+    }
+
+    public void showSystemKeyboard() {
+        Util.showKeyboard(binding.keyword);
+    }
+
+    public void hideSystemKeyboard() {
+        Util.hideKeyboard(binding.keyword);
     }
 
     private void initView() {
@@ -46,7 +61,13 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         else if (resId == R.drawable.ic_keyboard_left) onMoveLeft(cursor);
         else if (resId == R.drawable.ic_keyboard_right) onMoveRight(cursor);
         else if (resId == R.drawable.ic_keyboard_back) onBackspace(sb, cursor);
-        else if (resId == R.drawable.ic_keyboard) adapter.toggle();
+        else if (resId == R.drawable.ic_keyboard) onToggleKeyboard();
+    }
+
+    private void onToggleKeyboard() {
+        adapter.toggle();
+        if (adapter.isSystemMode()) showSystemKeyboard();
+        else hideSystemKeyboard();
     }
 
     private void onMoveLeft(int cursor) {

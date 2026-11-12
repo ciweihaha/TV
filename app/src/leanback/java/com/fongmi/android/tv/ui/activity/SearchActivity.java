@@ -44,6 +44,7 @@ import okhttp3.Response;
 public class SearchActivity extends BaseActivity implements WordAdapter.OnClickListener, RecordAdapter.OnClickListener, CustomKeyboard.Callback {
 
     private ActivitySearchBinding mBinding;
+    private CustomKeyboard mKeyboard;
     private RecordAdapter mRecordAdapter;
     private WordAdapter mWordAdapter;
 
@@ -73,7 +74,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     @Override
     protected void initView(Bundle savedInstanceState) {
-        CustomKeyboard.init(this, mBinding);
+        mKeyboard = CustomKeyboard.init(this, mBinding);
         setRecyclerView();
         checkKeyword();
         onSearch();
@@ -310,6 +311,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         super.onResume();
         mBinding.mic.setFocusable(true);
         mBinding.keyword.requestFocus();
+        if (mKeyboard != null && mKeyboard.isSystemMode()) mKeyboard.showSystemKeyboard();
     }
 
     @Override

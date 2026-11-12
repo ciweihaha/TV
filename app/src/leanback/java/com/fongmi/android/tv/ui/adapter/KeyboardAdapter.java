@@ -19,17 +19,29 @@ import java.util.List;
 
 public class KeyboardAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
+    public static final int MODE_SYSTEM = 0;
+    public static final int MODE_EN = 1;
+    public static final int MODE_ZHUYIN = 2;
+
     private final List<Integer> icons = Arrays.asList(R.drawable.ic_keyboard_remote, R.drawable.ic_keyboard_left, R.drawable.ic_keyboard_right, R.drawable.ic_keyboard_back, R.drawable.ic_keyboard_search, R.drawable.ic_keyboard, R.drawable.ic_setting_home);
     private final List<String> enList = Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9");
     private final List<String> twList = Arrays.asList("ㄅ", "ㄆ", "ㄇ", "ㄈ", "ㄉ", "ㄊ", "ㄋ", "ㄌ", "ㄍ", "ㄎ", "ㄏ", "ㄐ", "ㄑ", "ㄒ", "ㄓ", "ㄔ", "ㄕ", "ㄖ", "ㄗ", "ㄘ", "ㄙ", "ㄧ", "ㄨ", "ㄩ", "ㄚ", "ㄛ", "ㄜ", "ㄝ", "ㄞ", "ㄟ", "ㄠ", "ㄡ", "ㄢ", "ㄣ", "ㄤ", "ㄥ", "ㄦ", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9");
     private final OnClickListener listener;
     private final List<Object> mItems;
+    private int mode = MODE_SYSTEM;
 
     public KeyboardAdapter(OnClickListener listener) {
         this.mItems = new ArrayList<>();
         this.listener = listener;
-        this.mItems.addAll(icons);
-        this.mItems.addAll(Setting.isZhuyin() ? twList : enList);
+        refresh();
+    }
+
+    public int getMode() {
+        return mode;
+    }
+
+    public boolean isSystemMode() {
+        return mode == MODE_SYSTEM;
     }
 
     public interface OnClickListener {
@@ -42,11 +54,24 @@ public class KeyboardAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     }
 
     public void toggle() {
-        Setting.putZhuyin(!Setting.isZhuyin());
-        mItems.removeAll(Setting.isZhuyin() ? enList : twList);
-        mItems.addAll(icons.size(), Setting.isZhuyin() ? twList : enList);
-        notifyItemRangeRemoved(icons.size(), Setting.isZhuyin() ? enList.size() : twList.size());
-        notifyItemRangeInserted(icons.size(), Setting.isZhuyin() ? twList.size() : enList.size());
+        if (mode == MODE_SYSTEM) {
+            mode = Setting.isZhuyin() ? MODE_ZHUYIN : MODE_EN;
+        } else if (mode == MODE_EN) {
+            mode = MODE_ZHUYIN;
+            Setting.putZhuyin(true);
+        } else {
+            mode = MODE_SYSTEM;
+            Setting.putZhuyin(false);
+        }
+        refresh();
+    }
+
+    private void refresh() {
+        mItems.clear();
+        mItems.addAll(icons);
+        if (mode == MODE_EN) mItems.addAll(enList);
+        else if (mode == MODE_ZHUYIN) mItems.addAll(twList);
+        notifyDataSetChanged();
     }
 
     @Override
