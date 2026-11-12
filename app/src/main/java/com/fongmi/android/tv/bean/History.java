@@ -266,7 +266,8 @@ public class History implements Diffable<History> {
     }
 
     public History cid(int cid) {
-        setKey(getSiteKey().concat(AppDatabase.SYMBOL).concat(getVodId()).concat(AppDatabase.SYMBOL) + cid);
+        // 与 Keep.save(int) 同理：残缺的 key（无 @@@ 分隔符）不重建，只更新 cid，避免同步整批失败
+        if (getKey() != null && getKey().contains(AppDatabase.SYMBOL)) setKey(getSiteKey().concat(AppDatabase.SYMBOL).concat(getVodId()).concat(AppDatabase.SYMBOL) + cid);
         setCid(cid);
         return this;
     }
@@ -276,11 +277,14 @@ public class History implements Diffable<History> {
     }
 
     public String getSiteKey() {
-        return getKey().split(AppDatabase.SYMBOL)[0];
+        if (getKey() == null) return "";
+        return getKey().split(AppDatabase.SYMBOL, -1)[0];
     }
 
     public String getVodId() {
-        return getKey().split(AppDatabase.SYMBOL)[1];
+        if (getKey() == null) return "";
+        String[] parts = getKey().split(AppDatabase.SYMBOL, -1);
+        return parts.length > 1 ? parts[1] : "";
     }
 
     public Flag getFlag() {

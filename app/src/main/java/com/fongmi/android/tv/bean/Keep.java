@@ -148,15 +148,21 @@ public class Keep implements Diffable<Keep> {
     }
 
     public String getSiteKey() {
-        return getKey().split(AppDatabase.SYMBOL)[0];
+        if (getKey() == null) return "";
+        return getKey().split(AppDatabase.SYMBOL, -1)[0];
     }
 
     public String getVodId() {
-        return getKey().split(AppDatabase.SYMBOL)[1];
+        if (getKey() == null) return "";
+        String[] parts = getKey().split(AppDatabase.SYMBOL, -1);
+        return parts.length > 1 ? parts[1] : "";
     }
 
     public void save(int cid) {
-        setKey(getSiteKey().concat(AppDatabase.SYMBOL).concat(getVodId()).concat(AppDatabase.SYMBOL) + cid);
+        // 残缺的 key（同步/备份里混入的直播收藏 key 是纯频道名、没有 @@@ 分隔符；split 默认还会丢掉尾部空串）
+        // 不再重建 key：直接抛 ArrayIndexOutOfBoundsException 会让 Keep.sync() 的 forEach 在中途失败，
+        // 后面的收藏同步不到；保留原 key、只更新 cid
+        if (getKey() != null && getKey().contains(AppDatabase.SYMBOL)) setKey(getSiteKey().concat(AppDatabase.SYMBOL).concat(getVodId()).concat(AppDatabase.SYMBOL) + cid);
         setCid(cid);
         save();
     }
