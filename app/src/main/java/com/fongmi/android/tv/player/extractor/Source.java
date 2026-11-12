@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -91,8 +90,8 @@ public class Source {
 
     public void parse(Vod vod) throws Exception {
         begin();
-        try (ExecutorService executor = Executors.newCachedThreadPool()) {
-            for (Flag flag : vod.getFlags()) parseEpisodes(flag, executor);
+        try {
+            for (Flag flag : vod.getFlags()) parseEpisodes(flag, Task.largeExecutor());
         } finally {
             end();
         }
@@ -109,7 +108,7 @@ public class Source {
         String url = fetch(result, result.getUrl().v());
         if (result.getResolvedEpisodes().isEmpty()) return url;
         result.setUrl(url);
-        Episode selected = result.getResolvedEpisodes().stream().filter(Episode::isSelected).findFirst().orElseThrow();
+        Episode selected = result.getResolvedEpisodes().stream().filter(Episode::isSelected).findFirst().orElse(result.getResolvedEpisodes().get(0));
         return fetch(result, selected.getUrl());
     }
 

@@ -170,10 +170,6 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
         activity.startActivity(intent);
     }
 
-    public static void collect(Activity activity, String key, String id, String name, String pic) {
-        start(activity, key, id, name, pic, null, true);
-    }
-
     public static void collect(Activity activity, String key, Vod item) {
         Intent intent = createIntent(activity, key, item);
         intent.putExtra("collect", true);
@@ -1025,7 +1021,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
 
     private boolean isPlayingForControls() {
         if (isWebPlaybackActive()) return isWebPlaybackPlaying();
-        return player().isPlaying() || ((isDiscMenuActive() || (isEnded() && isIsoPlaybackOngoing())) && controller().getPlayWhenReady());
+        return player().isPlaying() || ((isDiscMenuActive() || (isEnded() && isIsoPlaybackOngoing())) && controller() != null && controller().getPlayWhenReady());
     }
 
     private void checkNext() {
@@ -1191,7 +1187,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     }
 
     private void onPlayer() {
-        PlayerEngineDialog.show(this);
+        new PlayerEngineDialog().show(this);
         hideControl();
     }
 
@@ -1591,7 +1587,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     @Override
     protected void onPlayingChanged(boolean isPlaying) {
         mVod.onPlayingChanged(isPlaying && isPlayerPlaying());
-        boolean playingForControls = isPlaying || (!isWebPlaybackActive() && (isDiscMenuActive() || (isEnded() && isIsoPlaybackOngoing())) && controller().getPlayWhenReady());
+        boolean playingForControls = isPlaying || (!isWebPlaybackActive() && (isDiscMenuActive() || (isEnded() && isIsoPlaybackOngoing())) && controller() != null && controller().getPlayWhenReady());
         if (playingForControls || isPaused() || isWebPlaybackActive()) updatePlayControl(playingForControls);
     }
 
@@ -1716,12 +1712,14 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
 
     private void onPaused() {
         if (pauseWebPlayback()) return;
+        if (controller() == null) return;
         controller().pause();
         if (isDiscMenuActive() || (isEnded() && isIsoPlaybackOngoing())) updatePlayControl(isPlayingForControls());
     }
 
     private void onPlay() {
         if (resumeWebPlayback()) return;
+        if (controller() == null) return;
         if (mHistory != null && isEnded() && !isDiscMenuActive() && !isIsoPlaybackOngoing()) controller().seekTo(mVod.openingPositionMs());
         if (!player().isEmpty() && isIdle()) controller().prepare();
         if (isEnded() && isIsoPlaybackOngoing()) controller().setPlayWhenReady(true);
@@ -1888,7 +1886,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK && requestCode == 1001) PlaybackIntent.onExternalResult(data, service()::dispatchNext, controller()::seekTo);
+        if (resultCode == RESULT_OK && requestCode == 1001 && controller() != null) PlaybackIntent.onExternalResult(data, service()::dispatchNext, controller()::seekTo);
     }
 
     @Override

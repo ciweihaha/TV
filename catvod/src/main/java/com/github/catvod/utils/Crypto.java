@@ -205,6 +205,7 @@ public final class Crypto {
         if (input.length == 0) return input;
         int rsaBlockSize = getRsaBlockSize(key);
         int inputBlockSize = encrypt ? rsaBlockSize - mode.paddingOverhead : rsaBlockSize;
+        if (inputBlockSize <= 0) throw new GeneralSecurityException("Invalid RSA block size: " + inputBlockSize);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         for (int offset = 0; offset < input.length; offset += inputBlockSize) {
             int length = Math.min(inputBlockSize, input.length - offset);

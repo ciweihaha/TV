@@ -66,6 +66,11 @@ public final class LiveInput extends SeekInput<LiveInput.Listener> {
         channelNumber.setLength(0);
     }
 
+    public void cancelFindChannel() {
+        App.removeCallbacks(findChannel);
+        channelNumber.setLength(0);
+    }
+
     private int getNumber(int keyCode) {
         return keyCode >= KeyEvent.KEYCODE_NUMPAD_0 ? keyCode - KeyEvent.KEYCODE_NUMPAD_0 : keyCode - KeyEvent.KEYCODE_0;
     }

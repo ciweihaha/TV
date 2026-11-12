@@ -63,7 +63,12 @@ public class Class implements Parcelable, Diffable<Class> {
     }
 
     public static Class objectFrom(String json) {
-        return App.gson().fromJson(json, Class.class);
+        try {
+            Class cls = App.gson().fromJson(json, Class.class);
+            return cls == null ? new Class() : cls;
+        } catch (Exception e) {
+            return new Class();
+        }
     }
 
     public String getTypeId() {
@@ -124,10 +129,6 @@ public class Class implements Parcelable, Diffable<Class> {
 
     public void setSelected(boolean selected) {
         this.selected = selected;
-    }
-
-    public boolean isHome() {
-        return "home".equals(getTypeId());
     }
 
     public boolean isFolder() {

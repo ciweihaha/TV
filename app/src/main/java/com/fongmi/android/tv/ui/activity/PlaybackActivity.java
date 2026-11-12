@@ -186,10 +186,6 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         openDiscMenu("menu");
     }
 
-    protected boolean openDiscTitleMenu() {
-        return openDiscMenu("title-menu");
-    }
-
     protected boolean openDiscPopupMenu() {
         return openDiscMenu("popup");
     }
@@ -484,6 +480,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
             if (!seekToEnd) webView.resumeVideo();
             return seekToEnd;
         }
+        if (mController == null) return false;
         PlayerManager player = player();
         long targetMs = Math.max(0, player.getPosition() + deltaMs);
         long durationMs = player.getDuration();

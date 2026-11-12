@@ -13,6 +13,7 @@ import com.google.gson.JsonObject;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Response;
@@ -31,7 +32,7 @@ public class Media implements Process {
         CompletableFuture<String> future = new CompletableFuture<>();
         App.post(() -> future.complete(build(PlaybackSnapshot.capture(service.player())).toString()));
         try {
-            return Nano.ok(future.get());
+            return Nano.ok(future.get(2, TimeUnit.SECONDS));
         } catch (Exception ignored) {
             return Nano.ok("{}");
         }

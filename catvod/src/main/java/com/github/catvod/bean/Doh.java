@@ -20,6 +20,8 @@ import java.util.List;
 
 public class Doh {
 
+    private static final Gson GSON = new Gson();
+
     @SerializedName("name")
     private String name;
     @SerializedName("url")
@@ -36,14 +38,18 @@ public class Doh {
     }
 
     public static Doh objectFrom(String str) {
-        Doh item = new Gson().fromJson(str, Doh.class);
-        return item == null ? new Doh() : item;
+        try {
+            Doh item = GSON.fromJson(str, Doh.class);
+            return item == null ? new Doh() : item;
+        } catch (Exception e) {
+            return new Doh();
+        }
     }
 
     public static List<Doh> arrayFrom(JsonElement element) {
         try {
             Type listType = TypeToken.getParameterized(List.class, Doh.class).getType();
-            List<Doh> items = new Gson().fromJson(element, listType);
+            List<Doh> items = GSON.fromJson(element, listType);
             return items == null ? new ArrayList<>() : items;
         } catch (Exception e) {
             return new ArrayList<>();
@@ -97,6 +103,6 @@ public class Doh {
     @NonNull
     @Override
     public String toString() {
-        return new Gson().toJson(this);
+        return GSON.toJson(this);
     }
 }

@@ -18,13 +18,26 @@ public class FilterAdapter implements JsonDeserializer<LinkedHashMap<String, Lis
     @Override
     public LinkedHashMap<String, List<Filter>> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
         LinkedHashMap<String, List<Filter>> filterMap = new LinkedHashMap<>();
+        if (!json.isJsonObject()) return filterMap;
         JsonObject filters = json.getAsJsonObject();
-        if (filters == null) return filterMap;
         for (Map.Entry<String, JsonElement> entry : filters.entrySet()) {
             List<Filter> items = new ArrayList<>();
-            JsonElement element = filters.get(entry.getKey());
-            if (element.isJsonObject()) items.add(Filter.objectFrom(element).check().trans());
-            else for (JsonElement item : element.getAsJsonArray()) items.add(Filter.objectFrom(item).check().trans());
+            JsonElement element = entry.getValue();
+            if (element.isJsonObject()) {
+                try {
+                    Filter filter = Filter.objectFrom(element);
+                    if (filter != null) items.add(filter.check().trans());
+                } catch (Exception ignored) {
+                }
+            } else if (element.isJsonArray()) {
+                for (JsonElement item : element.getAsJsonArray()) {
+                    try {
+                        Filter filter = Filter.objectFrom(item);
+                        if (filter != null) items.add(filter.check().trans());
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
             filterMap.put(entry.getKey(), items);
         }
         return filterMap;

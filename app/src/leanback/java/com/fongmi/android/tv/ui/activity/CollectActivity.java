@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -12,11 +11,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentStatePagerAdapter;
-import androidx.leanback.widget.OnChildViewHolderSelectedListener;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
-import androidx.viewpager.widget.ViewPager;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
@@ -27,7 +23,6 @@ import com.fongmi.android.tv.databinding.ActivityCollectBinding;
 import com.fongmi.android.tv.model.SiteViewModel;
 import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.adapter.CollectAdapter;
-import com.fongmi.android.tv.ui.base.BaseActivity;
 import com.fongmi.android.tv.ui.fragment.CollectFragment;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.gson.reflect.TypeToken;
@@ -35,13 +30,12 @@ import com.google.gson.reflect.TypeToken;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CollectActivity extends BaseActivity {
+public class CollectActivity extends BasePagerActivity {
 
     private ActivityCollectBinding mBinding;
     private CollectAdapter mAdapter;
     private SiteViewModel mViewModel;
     private List<Site> mSites;
-    private View mOldView;
 
     public static void start(Activity activity, String keyword) {
         Intent intent = new Intent(activity, CollectActivity.class);
@@ -79,23 +73,6 @@ public class CollectActivity extends BaseActivity {
         setSites();
         setPager();
         search();
-    }
-
-    @Override
-    protected void initEvent() {
-        mBinding.pager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
-            @Override
-            public void onPageSelected(int position) {
-                mBinding.recycler.setSelectedPosition(position);
-                mBinding.recycler.requestFocus();
-            }
-        });
-        mBinding.recycler.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
-            @Override
-            public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
-                onChildSelected(child);
-            }
-        });
     }
 
     private void setRecyclerView() {
@@ -138,20 +115,6 @@ public class CollectActivity extends BaseActivity {
         mViewModel.searchContent(mSites, getKeyword(), false);
     }
 
-    private void onChildSelected(@Nullable RecyclerView.ViewHolder child) {
-        if (mOldView != null) mOldView.setSelected(false);
-        if ((mOldView = child != null ? child.itemView : null) == null) return;
-        mOldView.setSelected(true);
-        App.post(mRunnable, 100);
-    }
-
-    private final Runnable mRunnable = new Runnable() {
-        @Override
-        public void run() {
-            mBinding.pager.setCurrentItem(mBinding.recycler.getSelectedPosition());
-        }
-    };
-
     @Override
     protected void onBackInvoked() {
         mViewModel.stopSearch();
@@ -173,10 +136,6 @@ public class CollectActivity extends BaseActivity {
         @Override
         public int getCount() {
             return mAdapter.getItemCount();
-        }
-
-        @Override
-        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
         }
 
         @Nullable

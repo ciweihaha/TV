@@ -10,10 +10,13 @@ import com.github.catvod.net.interceptor.ResponseInterceptor;
 import com.github.catvod.utils.Auth;
 import com.google.common.net.HttpHeaders;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
@@ -28,7 +31,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.logging.HttpLoggingInterceptor;
+import okhttp3.ResponseBody;
 
 public class OkHttp {
 
@@ -47,32 +50,32 @@ public class OkHttp {
         return Loader.INSTANCE;
     }
 
-    public static OkDns dns() {
+    public static synchronized OkDns dns() {
         if (get().dns != null) return get().dns;
         return get().dns = new OkDns();
     }
 
-    public static ResponseInterceptor responseInterceptor() {
+    public static synchronized ResponseInterceptor responseInterceptor() {
         if (get().responseInterceptor != null) return get().responseInterceptor;
         return get().responseInterceptor = new ResponseInterceptor();
     }
 
-    public static RequestInterceptor requestInterceptor() {
+    public static synchronized RequestInterceptor requestInterceptor() {
         if (get().requestInterceptor != null) return get().requestInterceptor;
         return get().requestInterceptor = new RequestInterceptor();
     }
 
-    public static AuthInterceptor authInterceptor() {
+    public static synchronized AuthInterceptor authInterceptor() {
         if (get().authInterceptor != null) return get().authInterceptor;
         return get().authInterceptor = new AuthInterceptor();
     }
 
-    public static OkAuthenticator authenticator() {
+    public static synchronized OkAuthenticator authenticator() {
         if (get().authenticator != null) return get().authenticator;
         return get().authenticator = new OkAuthenticator(selector());
     }
 
-    public static OkProxySelector selector() {
+    public static synchronized OkProxySelector selector() {
         if (get().selector != null) return get().selector;
         return get().selector = new OkProxySelector();
     }
@@ -163,7 +166,7 @@ public class OkHttp {
         return client().newCall(new Request.Builder().url(url).headers(Headers.of(headers)).tag(Auth.Context.class, auth).build());
     }
 
-    public static Call newCall(String url, Map<String, String> headers, ArrayMap<String, String> params) {
+    public static Call newCall(String url, Map<String, String> headers, ArrayMap<String, String> params) throws IOException {
         return client().newCall(new Request.Builder().url(buildUrl(url, params)).headers(Headers.of(headers)).build());
     }
 
@@ -202,8 +205,31 @@ public class OkHttp {
         return body.build();
     }
 
-    private static HttpUrl buildUrl(String url, ArrayMap<String, String> params) {
-        HttpUrl.Builder builder = Objects.requireNonNull(HttpUrl.parse(url)).newBuilder();
+    public static byte[] readLimited(ResponseBody body, long maxBytes) throws IOException {
+        long contentLength = body.contentLength();
+        if (contentLength > maxBytes) throw new IOException("Response body too large: " + contentLength + " bytes");
+        try (InputStream in = body.byteStream()) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            long total = 0;
+            int n;
+            while ((n = in.read(buffer)) != -1) {
+                total += n;
+                if (total > maxBytes) throw new IOException("Response body exceeds " + maxBytes + " bytes");
+                out.write(buffer, 0, n);
+            }
+            return out.toByteArray();
+        }
+    }
+
+    public static String readLimitedString(ResponseBody body, long maxBytes) throws IOException {
+        return new String(readLimited(body, maxBytes), StandardCharsets.UTF_8);
+    }
+
+    private static HttpUrl buildUrl(String url, ArrayMap<String, String> params) throws IOException {
+        HttpUrl parsed = HttpUrl.parse(url);
+        if (parsed == null) throw new IOException("Invalid URL: " + url);
+        HttpUrl.Builder builder = parsed.newBuilder();
         for (Map.Entry<String, String> entry : params.entrySet()) builder.addQueryParameter(entry.getKey(), entry.getValue());
         return builder.build();
     }
@@ -211,9 +237,7 @@ public class OkHttp {
     private static OkHttpClient.Builder getBuilder() {
         OkProxySelector selector = selector();
         OkHttpClient.Builder builder = new OkHttpClient.Builder().addInterceptor(requestInterceptor()).addInterceptor(authInterceptor()).addInterceptor(new ProxyRedirectInterceptor(selector)).addNetworkInterceptor(responseInterceptor()).connectTimeout(TIMEOUT, TimeUnit.MILLISECONDS).readTimeout(TIMEOUT, TimeUnit.MILLISECONDS).writeTimeout(TIMEOUT, TimeUnit.MILLISECONDS).dns(dns()).hostnameVerifier((hostname, session) -> true).sslSocketFactory(getSSLContext().getSocketFactory(), trustAllCertificates()).followRedirects(false);
-        HttpLoggingInterceptor logging = new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY);
         builder.proxyAuthenticator(authenticator());
-        //builder.addNetworkInterceptor(logging);
         builder.proxySelector(selector);
         return builder;
     }

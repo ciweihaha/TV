@@ -14,6 +14,7 @@ import com.fongmi.android.tv.api.loader.BaseLoader;
 import com.fongmi.android.tv.api.loader.SpiderTestSession;
 import com.fongmi.android.tv.bean.Class;
 import com.fongmi.android.tv.bean.Episode;
+import com.fongmi.android.tv.bean.Filter;
 import com.fongmi.android.tv.bean.Flag;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Site;
@@ -37,10 +38,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import okhttp3.Call;
@@ -55,7 +59,7 @@ public class SiteApi {
         if (!site.getExt().isEmpty()) params.put("extend", site.getExt());
         Call call = site.getExt().length() <= 1000 ? OkHttp.newCall(site.getApi(), site.getHeader(), params) : OkHttp.newCall(site.getApi(), site.getHeader(), OkHttp.toBody(params));
         try (Response response = call.execute()) {
-            return response.body().string();
+            return response.body() == null ? "" : response.body().string();
         }
     }
 
@@ -101,7 +105,7 @@ public class SiteApi {
             result = Result.fromJson(homeContent);
         } else {
             try (Response response = OkHttp.newCall(site.getApi(), site.getHeader()).execute()) {
-                String homeContent = response.body().string();
+                String homeContent = response.body() == null ? "" : response.body().string();
                 SpiderDebug.log("home", homeContent);
                 result = fetchPic(site, Result.fromType(site.getType(), homeContent));
             }
@@ -168,11 +172,6 @@ public class SiteApi {
     }
 
     @NonNull
-    public static Result playerContent(@NonNull String key, @NonNull String flag, @NonNull String id) throws Exception {
-        return playerContent(key, flag, id, false);
-    }
-
-    @NonNull
     public static Result playerContent(@NonNull String key, @NonNull String flag, @NonNull String id, boolean builtin) throws Exception {
         return playerContent(key, flag, id, builtin, -1);
     }
@@ -193,11 +192,6 @@ public class SiteApi {
         if (LOCAL.equals(key) && !originalId.equals(result.getUrl().v()) && result.getSubs().isEmpty()) result.setSubs(LocalSubtitleScanner.scan(result.getUrl().v()));
         SpiderDebug.log("player", result.toString());
         return result;
-    }
-
-    @NonNull
-    public static Result preloadContent(@NonNull String key, @NonNull String flag, @NonNull String id) throws Exception {
-        return preloadContent(key, flag, id, false);
     }
 
     @NonNull
@@ -262,7 +256,8 @@ public class SiteApi {
     private static void addDirectEpisode(Flag flag, String line, @StringRes int source) {
         String url = line.trim();
         if (url.isEmpty()) return;
-        String number = String.format(Locale.getDefault(), "%02d", flag.getEpisodes().size() + 1);
+        int num = flag.getEpisodes().size() + 1;
+        String number = num < 10 ? "0" + num : String.valueOf(num);
         int delimiter = url.indexOf('$');
         if (source == R.string.push && isNamedLine(url)) {
             String title = url.substring(0, delimiter).trim();
@@ -334,19 +329,21 @@ public class SiteApi {
         if (site.getType() > 2 || result.getList().isEmpty() || !result.getVod().getPic().isEmpty()) return result;
         ArrayList<String> ids = new ArrayList<>();
         boolean empty = site.getCategories().isEmpty();
-        for (Vod item : result.getList()) if (empty || site.getCategories().contains(item.getTypeName())) ids.add(item.getId());
+        Set<String> categories = empty ? null : new HashSet<>(site.getCategories());
+        for (Vod item : result.getList()) if (empty || categories.contains(item.getTypeName())) ids.add(item.getId());
         if (ids.isEmpty()) return result.clear();
         ArrayMap<String, String> params = new ArrayMap<>();
         params.put("ac", ac(site.getType()));
         params.put("ids", TextUtils.join(",", ids));
         try (Response response = OkHttp.newCall(site.getApi(), site.getHeader(), params).execute()) {
-            result.setList(Result.fromType(site.getType(), response.body().string()).getList());
+            if (response.body() != null) result.setList(Result.fromType(site.getType(), response.body().string()).getList());
             return result;
         }
     }
 
     private static void setTypes(@NonNull Site site, @NonNull Result result) {
-        result.getTypes().stream().filter(type -> result.getFilters().containsKey(type.getTypeId())).forEach(type -> type.setFilters(result.getFilters().get(type.getTypeId())));
+        LinkedHashMap<String, List<Filter>> filters = result.getFilters();
+        result.getTypes().stream().filter(type -> filters.containsKey(type.getTypeId())).forEach(type -> type.setFilters(filters.get(type.getTypeId())));
         if (site.getCategories().isEmpty()) return;
         Map<String, Class> typeByName = new HashMap<>();
         result.getTypes().forEach(type -> typeByName.put(type.getTypeName(), type));

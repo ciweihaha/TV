@@ -106,6 +106,7 @@ public class Auth {
     }
 
     public static String digest(String userInfo, String header, Request request) {
+        if (header == null || header.length() <= 7 || !header.regionMatches(true, 0, "Digest ", 0, 7)) return "";
         Map<String, String> params = parseDigest(header.substring(7));
         String[] credentials = userInfo.split(":", 2);
         String username = credentials[0];

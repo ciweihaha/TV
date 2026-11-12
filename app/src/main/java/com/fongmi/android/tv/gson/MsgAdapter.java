@@ -11,6 +11,6 @@ public class MsgAdapter implements JsonDeserializer<String> {
 
     @Override
     public String deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-        return json.getAsString();
+        return json.isJsonPrimitive() ? json.getAsString() : "";
     }
 }

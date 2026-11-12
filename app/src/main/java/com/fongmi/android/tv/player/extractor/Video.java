@@ -13,6 +13,6 @@ public class Video implements Source.Extractor {
 
     @Override
     public String fetch(String url) throws Exception {
-        return url.substring(8);
+        return url.startsWith("video://") ? url.substring(8) : url;
     }
 }

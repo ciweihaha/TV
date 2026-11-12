@@ -214,7 +214,7 @@ public class CastActivity extends PlaybackActivity implements VodInput.Listener 
     }
 
     private void onPlayer() {
-        PlayerEngineDialog.show(this);
+        new PlayerEngineDialog().show(this);
         hideControl();
     }
 
@@ -315,11 +315,13 @@ public class CastActivity extends PlaybackActivity implements VodInput.Listener 
 
     private void onPaused() {
         mInput.cancelSeek();
+        if (controller() == null) return;
         controller().pause();
     }
 
     private void onPlay() {
         mInput.cancelSeek();
+        if (controller() == null) return;
         if (isEnded()) controller().seekTo(0);
         if (!player().isEmpty() && isIdle()) controller().prepare();
         controller().play();

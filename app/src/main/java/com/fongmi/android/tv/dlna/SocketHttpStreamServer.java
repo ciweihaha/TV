@@ -13,6 +13,7 @@ import org.jupnp.transport.spi.StreamServer;
 import org.jupnp.transport.spi.StreamServerConfiguration;
 import org.jupnp.transport.spi.UpnpStream;
 
+import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -95,6 +96,8 @@ public class SocketHttpStreamServer implements StreamServer<SocketHttpStreamServ
             } catch (SocketException e) {
                 break;
             } catch (IOException ignored) {
+            } catch (RuntimeException ignored) {
+                // A malformed request must not kill the accept loop.
             } finally {
                 if (socket != null) releaseSocket(socket);
             }
@@ -179,7 +182,7 @@ public class SocketHttpStreamServer implements StreamServer<SocketHttpStreamServ
         }
 
         private StreamRequestMessage readRequest() throws IOException {
-            InputStream is = socket.getInputStream();
+            InputStream is = new BufferedInputStream(socket.getInputStream());
             String requestLine = readLine(is);
             String[] parts = requestLine.split(" ", 3);
             if (requestLine.isEmpty() || parts.length < 2) return null;

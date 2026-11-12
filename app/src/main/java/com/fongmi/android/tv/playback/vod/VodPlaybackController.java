@@ -22,8 +22,9 @@ import com.github.catvod.utils.Trans;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 public class VodPlaybackController {
 
@@ -173,6 +174,7 @@ public class VodPlaybackController {
         updateResolvedVod(result);
         Flag flag = state.findFlag(host.getVodKey(), request);
         Episode selected = updateResolvedEpisodes(flag, request.getId(), result.getResolvedEpisodes());
+        if (selected == null) return;
         selectResolvedEpisode(flag, selected);
         requestResolvedPlayback(flag, selected, result, request);
     }
@@ -185,7 +187,8 @@ public class VodPlaybackController {
 
     private Episode updateResolvedEpisodes(Flag flag, String id, List<Episode> items) {
         List<Episode> episodes = new ArrayList<>(items);
-        Episode selected = episodes.stream().filter(Episode::isSelected).findFirst().orElseThrow();
+        if (episodes.isEmpty()) return null;
+        Episode selected = episodes.stream().filter(Episode::isSelected).findFirst().orElse(episodes.get(0));
         if (state.getHistory().isRevSort()) Collections.reverse(episodes);
         replaceResolvedEpisodes(flag, SourceUrl.original(id), episodes);
         return selected;
@@ -639,17 +642,26 @@ public class VodPlaybackController {
     private void restoreExpandedEpisodes(Flag flag) {
         Flag previous = findFlag(flag);
         if (previous == null || previous == flag) return;
-        for (int i = flag.getEpisodes().size() - 1; i >= 0; i--) restoreExpandedEpisode(flag, previous, i);
+        Map<String, List<Episode>> resolved = new HashMap<>();
+        for (Episode episode : previous.getEpisodes()) {
+            if (!SourceUrl.isResolved(episode.getUrl())) continue;
+            resolved.computeIfAbsent(SourceUrl.original(episode.getUrl()), k -> new ArrayList<>()).add(episode);
+        }
+        for (int i = flag.getEpisodes().size() - 1; i >= 0; i--) restoreExpandedEpisode(flag, resolved, i);
     }
 
-    private void restoreExpandedEpisode(Flag flag, Flag previous, int position) {
+    private void restoreExpandedEpisode(Flag flag, Map<String, List<Episode>> resolved, int position) {
         String id = flag.getEpisodes().get(position).getUrl();
         if (SourceUrl.isResolved(id)) return;
-        List<Episode> episodes = previous.getEpisodes().stream().filter(episode -> SourceUrl.isResolved(episode.getUrl()) && SourceUrl.original(episode.getUrl()).equals(id)).collect(Collectors.toCollection(ArrayList::new));
-        if (episodes.isEmpty()) return;
-        if (state.getHistory() != null && state.getHistory().isRevSort()) Collections.reverse(episodes);
+        List<Episode> episodes = resolved.get(id);
+        if (episodes == null || episodes.isEmpty()) return;
+        List<Episode> insert = episodes;
+        if (state.getHistory() != null && state.getHistory().isRevSort()) {
+            insert = new ArrayList<>(episodes);
+            Collections.reverse(insert);
+        }
         flag.getEpisodes().remove(position);
-        flag.getEpisodes().addAll(position, episodes);
+        flag.getEpisodes().addAll(position, insert);
     }
 
     private void restoreSavedEpisode(History history) {

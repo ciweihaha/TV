@@ -49,7 +49,7 @@ public class AuthInterceptor implements Interceptor {
     }
 
     private boolean digest(String header) {
-        return header != null && header.startsWith("Digest");
+        return header != null && header.regionMatches(true, 0, "Digest ", 0, 7);
     }
 
     private Request check(Request request) {

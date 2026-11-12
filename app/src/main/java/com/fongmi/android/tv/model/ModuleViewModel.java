@@ -427,6 +427,7 @@ public final class ModuleViewModel extends AndroidViewModel {
 
             @Override
             public void onProgress(long total, long downloaded, float percentDownloaded) {
+                if (total <= 0) return;
                 int progress = (int) (100L * downloaded / total);
                 long now = System.nanoTime();
                 if (percent == progress && now - updated < TimeUnit.MILLISECONDS.toNanos(500)) return;

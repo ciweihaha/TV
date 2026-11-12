@@ -390,7 +390,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
 
     private void onHome() {
         if (LiveConfig.isOnly()) setLive(getHome());
-        else LiveDialog.show(this);
+        else new LiveDialog().show(this);
         hideControl();
     }
 
@@ -439,7 +439,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     }
 
     private void onPlayer() {
-        PlayerEngineDialog.show(this);
+        new PlayerEngineDialog().show(this);
         hideControl();
     }
 
@@ -1046,11 +1046,13 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
 
     private void onPaused() {
         if (pauseWebPlayback()) return;
+        if (controller() == null) return;
         controller().pause();
     }
 
     private void onPlay() {
         if (resumeWebPlayback()) return;
+        if (controller() == null) return;
         controller().play();
     }
 

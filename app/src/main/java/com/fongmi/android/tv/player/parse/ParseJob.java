@@ -41,6 +41,7 @@ import okhttp3.Response;
 
 public class ParseJob implements ParseCallback {
 
+    private static final long MAX_BODY_BYTES = 1024 * 1024;
     private final AtomicBoolean done = new AtomicBoolean();
     private final Set<Call> calls = ConcurrentHashMap.newKeySet();
     private final List<ParseWebView> webViews;
@@ -127,10 +128,12 @@ public class ParseJob implements ParseCallback {
     }
 
     private void readJsonResult(Response response, Map<String, String> headers, Parse item, boolean fatal) throws IOException {
-        JsonObject object = Json.parse(response.body().string()).getAsJsonObject();
+        if (response.body() == null) throw new IOException("Empty parse response");
+        JsonElement parsed = Json.parse(OkHttp.readLimitedString(response.body(), MAX_BODY_BYTES));
+        if (!parsed.isJsonObject()) throw new IOException("Invalid parse response");
+        JsonObject object = parsed.getAsJsonObject();
         String url = Json.safeString(object, "url");
-        JsonObject data = object.getAsJsonObject("data");
-        if (url.isEmpty()) url = Json.safeString(data, "url");
+        if (url.isEmpty() && object.has("data") && object.get("data").isJsonObject()) url = Json.safeString(object.getAsJsonObject("data"), "url");
         checkResult(getHeader(object, headers), url, item.getName(), fatal);
     }
 

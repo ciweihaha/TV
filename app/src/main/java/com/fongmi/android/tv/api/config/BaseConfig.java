@@ -150,8 +150,9 @@ abstract class BaseConfig {
     protected JsonArray fetchArray(JsonObject object, String key) {
         if (!object.has(key)) return new JsonArray();
         JsonElement element = object.get(key);
-        if (element.isJsonObject()) return new JsonArray();
+        if (element.isJsonNull() || element.isJsonObject()) return new JsonArray();
         if (element.isJsonPrimitive()) element = fetch(element.getAsString());
+        if (!element.isJsonArray()) return new JsonArray();
         JsonArray result = new JsonArray();
         for (JsonElement item : element.getAsJsonArray()) {
             if (item.isJsonPrimitive()) result.addAll(fetch(item.getAsString()));

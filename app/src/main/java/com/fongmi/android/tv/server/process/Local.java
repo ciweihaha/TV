@@ -155,7 +155,15 @@ public class Local implements Process {
 
     private Response createFileResponse(File file, String mime, long fileLen, String etag, HttpRange range) throws IOException {
         FileInputStream input = new FileInputStream(file);
-        input.getChannel().position(range.start);
+        try {
+            input.getChannel().position(range.start);
+        } catch (IOException e) {
+            try {
+                input.close();
+            } catch (IOException ignored) {
+            }
+            throw e;
+        }
         Status status = range.requested() ? Status.PARTIAL_CONTENT : Status.OK;
         Response response = newFixedLengthResponse(status, mime, input, range.length);
         if (range.requested()) response.addHeader("Content-Range", "bytes " + range.start + "-" + range.end + "/" + fileLen);

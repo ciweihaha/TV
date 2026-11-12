@@ -22,6 +22,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -370,6 +371,7 @@ public final class Net implements AutoCloseable {
 
     public <T, R> List<R> map(List<T> items, Mapper<T, R> mapper, int limit) throws Exception {
         if (items == null || mapper == null || limit < 1) throw new IllegalArgumentException("Invalid map options");
+        limit = Math.min(limit, 16);
         if (items.isEmpty()) {
             checkOpen();
             return new ArrayList<>();
@@ -430,7 +432,8 @@ public final class Net implements AutoCloseable {
 
     private Result batchRequest(JsonObject item) {
         String url = item.get("url").getAsString();
-        return request(url, NetOptions.from(item.get("options") == null ? null : item.get("options").toString()));
+        JsonElement options = item.get("options");
+        return request(url, NetOptions.from(options == null || options.isJsonNull() ? null : options.getAsJsonObject()));
     }
 
     private void validateBatch(JsonArray requests, int limit) {
@@ -451,7 +454,7 @@ public final class Net implements AutoCloseable {
         Object[][] parts = new Object[results.length][];
         for (int i = 0; i < parts.length; i++) {
             JsonElement options = items.get(i).getAsJsonObject().get("options");
-            parts[i] = results[i].parts(NetOptions.from(options == null ? null : options.toString()));
+            parts[i] = results[i].parts(NetOptions.from(options == null || options.isJsonNull() ? null : options.getAsJsonObject()));
         }
         return parts;
     }
@@ -553,18 +556,8 @@ public final class Net implements AutoCloseable {
     }
 
     private void cancelDownload(Call call, Download download) {
-        Throwable failure = null;
-        try {
-            call.cancel();
-        } catch (RuntimeException | Error closing) {
-            failure = closing;
-        }
-        try {
-            download.cancel();
-        } catch (RuntimeException | Error closing) {
-            if (failure == null) failure = closing;
-            else if (failure != closing) failure.addSuppressed(closing);
-        }
+        Throwable failure = run(null, call::cancel);
+        failure = run(failure, () -> { download.cancel(); });
         if (failure instanceof RuntimeException closing) throw closing;
         if (failure instanceof Error closing) throw closing;
     }
@@ -868,11 +861,11 @@ public final class Net implements AutoCloseable {
         for (NetMap<?, ?> mapping : mappings) mapping.cancel();
         if (cookies instanceof SessionCookies local) local.close();
         Throwable failure = null;
-        failure = cancelCalls(pending, failure);
-        failure = closeStreams(streaming, failure);
-        failure = cancelExchanges(active, failure);
-        failure = cancelSockets(connected, failure);
-        failure = closeSessions(sessions, failure);
+        failure = closeAll(pending, Call::cancel, failure);
+        failure = closeAll(streaming, StreamResult::close, failure);
+        failure = closeAll(active, NetExchange::cancel, failure);
+        failure = closeAll(connected, NetSocket::cancel, failure);
+        failure = closeAll(sessions, Net::close, failure);
         if (parent != null) {
             synchronized (parent.lock) {
                 parent.children.remove(this);
@@ -882,10 +875,10 @@ public final class Net implements AutoCloseable {
         if (failure instanceof Error error) throw error;
     }
 
-    private Throwable cancelCalls(List<Call> pending, Throwable failure) {
-        for (Call call : pending) {
+    static <T> Throwable closeAll(Collection<T> items, Consumer<T> action, Throwable failure) {
+        for (T item : items) {
             try {
-                call.cancel();
+                action.accept(item);
             } catch (RuntimeException | Error error) {
                 if (failure == null) failure = error;
                 else if (failure != error) failure.addSuppressed(error);
@@ -894,50 +887,12 @@ public final class Net implements AutoCloseable {
         return failure;
     }
 
-    private Throwable closeStreams(List<StreamResult> streaming, Throwable failure) {
-        for (StreamResult stream : streaming) {
-            try {
-                stream.close();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-        }
-        return failure;
-    }
-
-    private Throwable cancelExchanges(List<NetExchange> active, Throwable failure) {
-        for (NetExchange exchange : active) {
-            try {
-                exchange.cancel();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-        }
-        return failure;
-    }
-
-    private Throwable cancelSockets(List<NetSocket> connected, Throwable failure) {
-        for (NetSocket socket : connected) {
-            try {
-                socket.cancel();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-        }
-        return failure;
-    }
-
-    private Throwable closeSessions(List<Net> sessions, Throwable failure) {
-        for (Net session : sessions) {
-            try {
-                session.close();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
+    private static Throwable run(Throwable failure, Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException | Error error) {
+            if (failure == null) failure = error;
+            else if (failure != error) failure.addSuppressed(error);
         }
         return failure;
     }
@@ -1069,22 +1024,12 @@ public final class Net implements AutoCloseable {
 
         private void finish(boolean cancel) {
             if (!finished.compareAndSet(false, true)) return;
-            Throwable failure = null;
-            try {
-                if (cancel) call.cancel();
-            } catch (RuntimeException | Error error) {
-                failure = error;
-            }
+            Throwable failure = run(null, () -> { if (cancel) call.cancel(); });
             synchronized (lock) {
                 streams.remove(this);
                 calls.remove(call);
             }
-            try {
-                closeBody();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
+            failure = run(failure, this::closeBody);
             if (failure instanceof RuntimeException error) throw error;
             if (failure instanceof Error error) throw error;
         }
@@ -1092,6 +1037,7 @@ public final class Net implements AutoCloseable {
 
     public static final class Result {
         private static final Gson GSON = new Gson();
+        private static final long MAX_BODY_BYTES = 16L * 1024 * 1024;
 
         public final Object code;
         public final Map<String, Object> headers;
@@ -1130,7 +1076,8 @@ public final class Net implements AutoCloseable {
         }
 
         private static Result read(Response response) throws IOException {
-            return success(response.code(), response.headers(), response.body().bytes(), true);
+            if (response.body() == null) return success(response.code(), response.headers(), new byte[0], true);
+            return success(response.code(), response.headers(), OkHttp.readLimited(response.body(), MAX_BODY_BYTES), true);
         }
 
         static Result success(int code, Headers headers, byte[] body, boolean http) {

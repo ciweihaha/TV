@@ -15,6 +15,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,7 +29,10 @@ import java.util.concurrent.TimeoutException;
 final class BrowseSearch {
 
     private static final int CATALOG_LIMIT = 50;
+    private static final int MAX_KEYWORDS = 20;
     private static final int TIMEOUT_SECONDS = 5;
+    private static final int MAX_KEY_CACHE = 16384;
+    private static final Map<String, String> KEY_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, ImmutableList<MediaItem>> results = new ConcurrentHashMap<>();
     private static final Map<String, MediaItem> items = new ConcurrentHashMap<>();
     private static final Set<ListenableFuture<?>> requests = new HashSet<>();
@@ -65,6 +69,13 @@ final class BrowseSearch {
         synchronized (results) {
             requests.removeAll(futures);
             if (current != generation || Thread.currentThread().isInterrupted()) return ImmutableList.of();
+            if (!results.containsKey(keyword) && results.size() >= MAX_KEYWORDS) {
+                String oldest = results.keySet().stream().findFirst().orElse(null);
+                if (oldest != null) {
+                    ImmutableList<MediaItem> evicted = results.remove(oldest);
+                    if (evicted != null) evicted.forEach(item -> items.remove(item.mediaId));
+                }
+            }
             results.put(keyword, matches);
             matches.forEach(item -> items.put(item.mediaId, item));
         }
@@ -79,7 +90,9 @@ final class BrowseSearch {
     }
 
     private static ImmutableList<MediaItem> selectResults(List<MediaItem> found, String keyword) {
-        found.sort((a, b) -> score(b, keyword) - score(a, keyword));
+        Map<MediaItem, Integer> scores = new IdentityHashMap<>();
+        for (MediaItem item : found) scores.put(item, score(item, keyword));
+        found.sort((a, b) -> scores.get(b) - scores.get(a));
         ImmutableList.Builder<MediaItem> selected = ImmutableList.builder();
         int live = 0, vod = 0;
         for (MediaItem item : found) if (item.mediaId.startsWith(LiveBrowse.LIVE_CH) ? live++ < CATALOG_LIMIT : vod++ < CATALOG_LIMIT) selected.add(item);
@@ -127,6 +140,10 @@ final class BrowseSearch {
     }
 
     static String key(String query) {
-        return Trans.t2s(query).trim().toLowerCase(Locale.ROOT);
+        String cached = KEY_CACHE.get(query);
+        if (cached != null) return cached;
+        String result = Trans.t2s(query).trim().toLowerCase(Locale.ROOT);
+        if (KEY_CACHE.size() < MAX_KEY_CACHE) KEY_CACHE.put(query, result);
+        return result;
     }
 }

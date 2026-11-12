@@ -13,9 +13,10 @@ public class Shell {
         try {
             StringBuilder sb = new StringBuilder();
             Process p = Runtime.getRuntime().exec(command);
-            BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            while ((line = br.readLine()) != null) sb.append(line).append("\n");
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line).append("\n");
+            }
             Logger.t(TAG).d("Shell command '%s' with exit code '%s'", command, p.waitFor());
             return Util.substring(sb.toString());
         } catch (Exception e) {

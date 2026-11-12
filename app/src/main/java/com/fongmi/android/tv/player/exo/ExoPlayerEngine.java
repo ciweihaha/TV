@@ -319,6 +319,7 @@ public class ExoPlayerEngine implements PlayerEngine, AnalyticsListener {
         SubtitleSelectionState state = subtitles.getSubtitleSelectionState();
         boolean isPrimary = state.isPrimary(selection);
         if (!isPrimary && !state.isActiveSecondary(selection)) return SubtitleContent.UNSUPPORTED;
+        if (selection.trackIndices.isEmpty()) return SubtitleContent.UNSUPPORTED;
         Format format = selection.mediaTrackGroup.getFormat(selection.trackIndices.get(0));
         SubtitleOffsets offsets = getSubtitleOffsets();
         return session.subtitleTranscriptSession().getContent(format, isPrimary ? offsets.primaryMs : offsets.secondaryMs);

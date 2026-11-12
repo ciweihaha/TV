@@ -39,6 +39,9 @@ import java.util.Map;
 @Root(name = "rss", strict = false)
 public class Result implements Parcelable {
 
+    private static final LinkedHashMap<String, List<Filter>> EMPTY_FILTERS = new LinkedHashMap<>();
+    private static final Persister PERSISTER = new Persister();
+
     @Path("class")
     @ElementList(entry = "ty", required = false, inline = true)
     @SerializedName("class")
@@ -136,7 +139,7 @@ public class Result implements Parcelable {
 
     public static Result fromXml(String str) {
         try {
-            return new Persister().read(Result.class, str, false).trans();
+            return PERSISTER.read(Result.class, str, false).trans();
         } catch (Exception e) {
             return empty();
         }
@@ -220,7 +223,7 @@ public class Result implements Parcelable {
     }
 
     public LinkedHashMap<String, List<Filter>> getFilters() {
-        return filters == null ? new LinkedHashMap<>() : filters;
+        return filters == null ? EMPTY_FILTERS : filters;
     }
 
     public Url getUrl() {
@@ -254,7 +257,7 @@ public class Result implements Parcelable {
     }
 
     public void setSubs(List<Sub> subs) {
-        if (getSubs().isEmpty()) this.subs = subs;
+        if (this.subs == null || this.subs.isEmpty()) this.subs = subs;
     }
 
     public void addSub(Sub sub) {
@@ -265,7 +268,8 @@ public class Result implements Parcelable {
     }
 
     public Map<String, String> getHeader() {
-        return header == null ? new HashMap<>() : header;
+        if (header == null) header = new HashMap<>();
+        return header;
     }
 
     public Auth.Context getAuth() {
@@ -435,7 +439,7 @@ public class Result implements Parcelable {
     }
 
     public Result clear() {
-        getList().clear();
+        if (list != null) list.clear();
         return this;
     }
 

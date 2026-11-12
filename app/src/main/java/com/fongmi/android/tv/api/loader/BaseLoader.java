@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import dalvik.system.DexClassLoader;
@@ -85,9 +86,10 @@ public class BaseLoader {
         List<SpiderLoader> retired;
         synchronized (this) {
             previous = Stream.of(nodeLoader, jarLoader, pyLoader, jsLoader).filter(Objects::nonNull).toList();
-            retiredLoaders.addAll(previous);
-            retired = exiting ? new ArrayList<>(retiredLoaders) : List.of();
-            if (exiting) retiredLoaders.clear();
+            retired = new ArrayList<>(retiredLoaders);
+            if (exiting) retired.addAll(previous);
+            retiredLoaders.clear();
+            if (!exiting) retiredLoaders.addAll(previous);
             jarLoader = new JarLoader();
             nodeLoader = new NodeLoader();
             if (exiting) {
@@ -103,25 +105,15 @@ public class BaseLoader {
 
     private void clearLoaders(List<SpiderLoader> previous, List<SpiderLoader> retired) {
         Throwable failure = null;
-        for (SpiderLoader loader : previous) failure = clearLoader(loader, failure);
-        for (SpiderLoader loader : retired) failure = destroyLoader(loader, failure);
+        for (SpiderLoader loader : previous) failure = runLoader(loader, failure, SpiderLoader::clear);
+        for (SpiderLoader loader : retired) failure = runLoader(loader, failure, SpiderLoader::destroy);
         if (failure instanceof RuntimeException error) throw error;
         if (failure instanceof Error error) throw error;
     }
 
-    private Throwable clearLoader(SpiderLoader loader, Throwable failure) {
+    private Throwable runLoader(SpiderLoader loader, Throwable failure, Consumer<SpiderLoader> action) {
         try {
-            loader.clear();
-        } catch (RuntimeException | Error error) {
-            if (failure == null) failure = error;
-            else if (failure != error) failure.addSuppressed(error);
-        }
-        return failure;
-    }
-
-    private Throwable destroyLoader(SpiderLoader loader, Throwable failure) {
-        try {
-            loader.destroy();
+            action.accept(loader);
         } catch (RuntimeException | Error error) {
             if (failure == null) failure = error;
             else if (failure != error) failure.addSuppressed(error);

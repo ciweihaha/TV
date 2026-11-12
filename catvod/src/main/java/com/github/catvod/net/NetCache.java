@@ -94,13 +94,19 @@ final class NetCache implements AutoCloseable {
     private Entry restore(String key) {
         String saved = read.apply(key);
         if (saved == null) return null;
-        JsonObject record = Json.strict(saved).getAsJsonObject();
         Entry entry = new Entry();
-        entry.value = record.get("value").toString();
-        long savedAt = record.get("time").getAsLong();
-        long now = wallClock.getAsLong();
-        entry.age = savedAt > now ? Long.MAX_VALUE : Math.max(0, now - savedAt);
-        entry.loadedAt = clock.getAsLong();
+        try {
+            JsonObject record = Json.strict(saved).getAsJsonObject();
+            if (!record.has("value") || !record.has("time")) throw new IllegalStateException("Invalid cache record");
+            entry.value = record.get("value").toString();
+            long savedAt = record.get("time").getAsLong();
+            long now = wallClock.getAsLong();
+            entry.age = savedAt > now ? Long.MAX_VALUE : Math.max(0, now - savedAt);
+            entry.loadedAt = clock.getAsLong();
+        } catch (Exception e) {
+            if (remove != null) remove.accept(key);
+            return null;
+        }
         if (entries.size() == CAPACITY && !evict()) throw new IllegalStateException("Cache capacity exceeded");
         entries.put(key, entry);
         trim();

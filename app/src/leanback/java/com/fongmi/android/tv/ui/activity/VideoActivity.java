@@ -151,10 +151,6 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         activity.startActivity(intent);
     }
 
-    public static void collect(Activity activity, String key, String id, String name, String pic) {
-        start(activity, key, id, name, pic, null, true, false);
-    }
-
     public static void collect(Activity activity, String key, Vod item) {
         Intent intent = createIntent(activity, key, item);
         intent.putExtra("collect", true);
@@ -373,7 +369,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         mBinding.flag.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
             @Override
             public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
-                if (mFlagAdapter.getItemCount() > 0) onItemClick(mFlagAdapter.get(position));
+                if (position != RecyclerView.NO_POSITION && mFlagAdapter.getItemCount() > 0) onItemClick(mFlagAdapter.get(position));
             }
         });
         mBinding.episode.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
@@ -1003,18 +999,6 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         mVod.prevEpisode(true);
     }
 
-    private void onNext(boolean notify) {
-        Episode item = mEpisodeAdapter.getNext();
-        if (!item.isSelected()) onItemClick(item);
-        else if (notify) Notify.show(mHistory.isRevPlay() ? R.string.error_play_prev : R.string.error_play_next);
-    }
-
-    private void onPrev(boolean notify) {
-        Episode item = mEpisodeAdapter.getPrev();
-        if (!item.isSelected()) onItemClick(item);
-        else if (notify) Notify.show(mHistory.isRevPlay() ? R.string.error_play_next : R.string.error_play_prev);
-    }
-
     private void onScale() {
         setScale((getScale() + 1) % ResUtil.getStringArray(R.array.select_scale).length);
     }
@@ -1105,7 +1089,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     }
 
     private void onPlayer() {
-        PlayerEngineDialog.show(this);
+        new PlayerEngineDialog().show(this);
         hideControl();
     }
 
@@ -1551,12 +1535,14 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     private void onPaused() {
         mInput.cancelSeek();
         if (pauseWebPlayback()) return;
+        if (controller() == null) return;
         controller().pause();
     }
 
     private void onPlay() {
         mInput.cancelSeek();
         if (resumeWebPlayback()) return;
+        if (controller() == null) return;
         if (mHistory != null && isEnded() && !isDiscMenuActive() && !isIsoPlaybackOngoing()) controller().seekTo(mVod.openingPositionMs());
         if (!player().isEmpty() && isIdle()) controller().prepare();
         if (isEnded() && isIsoPlaybackOngoing()) controller().setPlayWhenReady(true);
@@ -1565,17 +1551,19 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
 
     private boolean isPlayingForControls() {
         if (isWebPlaybackActive()) return isWebPlaybackPlaying();
-        return player().isPlaying() || ((isDiscMenuActive() || (isEnded() && isIsoPlaybackOngoing())) && controller().getPlayWhenReady());
+        return player().isPlaying() || ((isDiscMenuActive() || (isEnded() && isIsoPlaybackOngoing())) && controller() != null && controller().getPlayWhenReady());
     }
 
     private boolean onSeekBack() {
         mInput.cancelSeek();
+        if (controller() == null) return false;
         controller().seekBack();
         return true;
     }
 
     private boolean onSeekForward() {
         mInput.cancelSeek();
+        if (controller() == null) return false;
         controller().seekForward();
         return true;
     }
@@ -1688,7 +1676,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK && requestCode == 1001) PlaybackIntent.onExternalResult(data, service()::dispatchNext, controller()::seekTo);
+        if (resultCode == RESULT_OK && requestCode == 1001 && controller() != null) PlaybackIntent.onExternalResult(data, service()::dispatchNext, controller()::seekTo);
     }
 
     @Override

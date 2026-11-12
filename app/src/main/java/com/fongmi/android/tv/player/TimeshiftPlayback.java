@@ -30,6 +30,7 @@ import okhttp3.Response;
 
 public final class TimeshiftPlayback {
 
+    private static final long MAX_BODY_BYTES = 1024 * 1024;
     private final PlayerManager owner;
     private final Call.Factory requests;
     private final Clock clock;
@@ -173,7 +174,7 @@ public final class TimeshiftPlayback {
 
     private Result readSource(Response response) throws IOException {
         if (!response.isSuccessful() || response.body() == null) throw new IOException("Invalid timeshift response");
-        Result result = Result.fromJson(response.body().string());
+        Result result = Result.fromJson(OkHttp.readLimitedString(response.body(), MAX_BODY_BYTES));
         if (result.hasMsg() || result.needParse() || result.getRealUrl().isEmpty()) throw new IOException("Missing direct timeshift source");
         return result;
     }

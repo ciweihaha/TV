@@ -160,7 +160,8 @@ public class Action implements Process {
         String url = device.getIp() + "/action?do=sync&mode=0&type=" + type + (force ? "&force=true" : "");
         try (okhttp3.Response response = OkHttp.newCall(OkHttp.client(Constant.TIMEOUT_SYNC), url, body.build()).execute()) {
             if (!response.isSuccessful()) throw new IOException("HTTP " + response.code());
-            if (response.body() == null || !response.body().string().equals("OK")) throw new IOException("Invalid sync response");
+            if (response.body() == null) throw new IOException("Invalid sync response");
+            if (!OkHttp.readLimitedString(response.body(), 1024).equals("OK")) throw new IOException("Invalid sync response");
         }
     }
 

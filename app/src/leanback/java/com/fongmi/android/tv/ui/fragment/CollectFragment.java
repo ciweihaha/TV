@@ -85,7 +85,7 @@ public class CollectFragment extends BaseFragment implements CustomScroller.Call
     private void setViewModel() {
         mViewModel = new ViewModelProvider(this).get(SiteViewModel.class);
         mViewModel.getAction().observe(getViewLifecycleOwner(), result -> WebActivity.handleAction(requireActivity(), result));
-        mViewModel.getResult().observe(this, result -> {
+        mViewModel.getResult().observe(getViewLifecycleOwner(), result -> {
             mScroller.endLoading(result);
             addVideo(result.getList());
         });

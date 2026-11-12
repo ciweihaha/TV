@@ -25,7 +25,11 @@ import com.google.common.collect.ImmutableList;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 class VodBrowse {
 
@@ -35,7 +39,8 @@ class VodBrowse {
     static final String VOD_DETAIL = "VD:";
 
     private static final char KEY_SEPARATOR = '|';
-    private static final Map<String, Object> detailRequests = new ConcurrentHashMap<>();
+    private static final int MAX_VOD_CACHE = 50;
+    private static final Map<String, CompletableFuture<Vod>> detailRequests = new ConcurrentHashMap<>();
     private static final Map<String, Vod> vodCache = new ConcurrentHashMap<>();
     private static final Map<String, String> epNavMap = new ConcurrentHashMap<>();
     private static final Map<String, EpEntry> epEntries = new ConcurrentHashMap<>();
@@ -44,6 +49,7 @@ class VodBrowse {
 
     static synchronized void clearCache() {
         cacheGeneration++;
+        for (CompletableFuture<Vod> future : detailRequests.values()) future.complete(null);
         detailRequests.clear();
         vodCache.clear();
         epNavMap.clear();
@@ -158,30 +164,40 @@ class VodBrowse {
         if (existing != null) return resolveWithHistory(historyKey, existing);
         VodConfig.get().ensureLoaded();
         boolean builtin = SiteApi.PUSH.equals(search.siteKey) && Source.isBuiltin(search.vodId);
-        Object request = new Object();
+        CompletableFuture<Vod> future = new CompletableFuture<>();
+        CompletableFuture<Vod> existing;
         synchronized (VodBrowse.class) {
             if (generation != cacheGeneration) return null;
-            detailRequests.put(historyKey, request);
+            existing = detailRequests.putIfAbsent(historyKey, future);
         }
+        if (existing != null) return awaitSearchResult(historyKey, generation, existing);
         Vod vod;
         try {
             vod = SiteApi.detailContent(search.siteKey, search.vodId, builtin).getVod();
-        } catch (Exception e) {
-            detailRequests.remove(historyKey, request);
+        } catch (Throwable e) {
+            detailRequests.remove(historyKey, future);
+            future.completeExceptionally(e);
             throw e;
         }
         MediaItem source = BrowseSearch.getItem(mediaId);
         if (source != null && source.mediaMetadata.title != null) vod.checkName(source.mediaMetadata.title.toString());
-        String epId = indexSearchResult(historyKey, vod, request, generation);
+        String epId = indexSearchResult(historyKey, vod, future, generation);
         return epId != null ? resolveEp(epId) : null;
     }
 
     @Nullable
-    private static synchronized String indexSearchResult(String historyKey, Vod vod, Object request, int generation) {
-        if (!detailRequests.remove(historyKey, request) || generation != cacheGeneration) return null;
-        if (TextUtils.isEmpty(vod.getId()) || vod.getFlags().isEmpty()) return null;
-        vodCache.put(historyKey, vod);
+    private static synchronized String indexSearchResult(String historyKey, Vod vod, CompletableFuture<Vod> future, int generation) {
+        if (!detailRequests.remove(historyKey, future) || generation != cacheGeneration) {
+            future.complete(null);
+            return null;
+        }
+        if (TextUtils.isEmpty(vod.getId()) || vod.getFlags().isEmpty()) {
+            future.complete(null);
+            return null;
+        }
+        putVod(historyKey, vod);
         History history = createHistory(historyKey, vod);
+        future.complete(vod);
         Flag resumeFlag = findFlag(vod, history.getVodFlag());
         if (resumeFlag == null || resumeFlag.getEpisodes().isEmpty()) return null;
         int currentIdx = buildEpIndex(historyKey, resumeFlag, history, generation);
@@ -341,21 +357,72 @@ class VodBrowse {
         Vod vod = vodCache.get(historyKey);
         if (vod != null) return vod;
         if (history == null) return null;
-        Object request = new Object();
+        CompletableFuture<Vod> future = new CompletableFuture<>();
+        CompletableFuture<Vod> existing;
         synchronized (VodBrowse.class) {
             if (generation != cacheGeneration) return null;
-            detailRequests.put(historyKey, request);
+            existing = detailRequests.putIfAbsent(historyKey, future);
         }
+        if (existing != null) return awaitVod(historyKey, generation, existing);
         try {
             vod = fetchDetail(history);
-        } catch (Exception e) {
-            detailRequests.remove(historyKey, request);
+        } catch (Throwable e) {
+            detailRequests.remove(historyKey, future);
+            future.completeExceptionally(e);
             throw e;
         }
         synchronized (VodBrowse.class) {
-            if (!detailRequests.remove(historyKey, request) || generation != cacheGeneration || vod == null) return null;
-            vodCache.put(historyKey, vod);
+            if (!detailRequests.remove(historyKey, future) || generation != cacheGeneration || vod == null) {
+                future.complete(null);
+                return null;
+            }
+            putVod(historyKey, vod);
+            future.complete(vod);
             return vod;
+        }
+    }
+
+    private static synchronized void putVod(String historyKey, Vod vod) {
+        if (!vodCache.containsKey(historyKey) && vodCache.size() >= MAX_VOD_CACHE) {
+            String oldest = vodCache.keySet().stream().findFirst().orElse(null);
+            if (oldest != null) evictVod(oldest);
+        }
+        vodCache.put(historyKey, vod);
+    }
+
+    private static synchronized void evictVod(String historyKey) {
+        vodCache.remove(historyKey);
+        String prefix = historyKey + KEY_SEPARATOR;
+        epEntries.values().removeIf(entry -> entry.historyKey.equals(historyKey));
+        epNavMap.keySet().removeIf(key -> key.startsWith(prefix));
+        epCountMap.keySet().removeIf(key -> key.startsWith(prefix));
+    }
+
+    private static final long DETAIL_WAIT_MS = 10_000;
+
+    @Nullable
+    private static MediaItem awaitSearchResult(@NonNull String historyKey, int generation, CompletableFuture<Vod> future) throws Exception {
+        Vod vod = awaitVod(historyKey, generation, future);
+        if (vod == null) return null;
+        if (generation != cacheGeneration) return null;
+        History existing = History.find(historyKey);
+        if (existing != null) return resolveWithHistory(historyKey, existing);
+        return resolveWithHistory(historyKey, createHistory(historyKey, vod));
+    }
+
+    @Nullable
+    private static Vod awaitVod(@NonNull String historyKey, int generation, CompletableFuture<Vod> future) {
+        if (generation != cacheGeneration) return null;
+        try {
+            Vod vod = future.get(DETAIL_WAIT_MS, TimeUnit.MILLISECONDS);
+            return generation != cacheGeneration ? null : vod;
+        } catch (TimeoutException e) {
+            return generation != cacheGeneration ? null : vodCache.get(historyKey);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (ExecutionException e) {
+            return null;
         }
     }
 

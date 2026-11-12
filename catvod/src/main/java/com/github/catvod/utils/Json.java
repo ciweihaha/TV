@@ -43,6 +43,7 @@ public class Json {
     public static boolean isObj(String text) {
         try {
             if (TextUtils.isEmpty(text)) return false;
+            if (firstNonBlank(text) != '{') return false;
             new JSONObject(text);
             return true;
         } catch (Exception e) {
@@ -53,11 +54,22 @@ public class Json {
     public static boolean isArray(String text) {
         try {
             if (TextUtils.isEmpty(text)) return false;
+            if (firstNonBlank(text) != '[') return false;
             new JSONArray(text);
             return true;
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public static char firstNonBlank(String text) {
+        if (text == null) return 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c <= ' ') continue;
+            return c;
+        }
+        return 0;
     }
 
     public static boolean isEmpty(JsonObject obj, String key) {
@@ -80,16 +92,19 @@ public class Json {
     public static List<String> safeListString(JsonObject obj, String key) {
         List<String> result = new ArrayList<>();
         if (!obj.has(key)) return result;
-        if (obj.get(key).isJsonObject()) result.add(safeString(obj, key));
-        else for (JsonElement opt : obj.getAsJsonArray(key)) result.add(opt.getAsString());
+        JsonElement element = obj.get(key);
+        if (element.isJsonObject()) result.add(safeString(obj, key));
+        else if (element.isJsonPrimitive()) result.add(element.getAsString());
+        else if (element.isJsonArray()) for (JsonElement opt : element.getAsJsonArray()) if (opt.isJsonPrimitive()) result.add(opt.getAsString());
         return result;
     }
 
     public static List<JsonElement> safeListElement(JsonObject obj, String key) {
         List<JsonElement> result = new ArrayList<>();
         if (!obj.has(key)) return result;
-        if (obj.get(key).isJsonObject()) result.add(obj.get(key).getAsJsonObject());
-        else for (JsonElement opt : obj.getAsJsonArray(key)) result.add(opt.getAsJsonObject());
+        JsonElement element = obj.get(key);
+        if (element.isJsonObject()) result.add(element.getAsJsonObject());
+        else if (element.isJsonArray()) for (JsonElement opt : element.getAsJsonArray()) if (opt.isJsonObject()) result.add(opt.getAsJsonObject());
         return result;
     }
 

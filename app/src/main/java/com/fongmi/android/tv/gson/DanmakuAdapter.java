@@ -17,8 +17,12 @@ public class DanmakuAdapter implements JsonDeserializer<List<Danmaku>> {
 
     @Override
     public List<Danmaku> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-        List<Danmaku> items = json.isJsonPrimitive() ? parsePrimitive(json.getAsString().trim(), typeOfT) : App.gson().fromJson(json, typeOfT);
-        return items.stream().filter(d -> !d.isEmpty()).collect(Collectors.toCollection(ArrayList::new));
+        List<Danmaku> items;
+        if (json.isJsonPrimitive()) items = parsePrimitive(json.getAsString().trim(), typeOfT);
+        else if (json.isJsonArray()) items = App.gson().fromJson(json, typeOfT);
+        else return new ArrayList<>();
+        if (items == null) return new ArrayList<>();
+        return items.stream().filter(d -> d != null && !d.isEmpty()).collect(Collectors.toCollection(ArrayList::new));
     }
 
     private List<Danmaku> parsePrimitive(String text, Type type) {

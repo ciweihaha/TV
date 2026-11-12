@@ -31,12 +31,16 @@ public class UrlUtil {
     }
 
     public static String convert(String url) {
+        if (url != null) {
+            String trimmed = url.trim();
+            if (trimmed.regionMatches(true, 0, "http://", 0, 7) || trimmed.regionMatches(true, 0, "https://", 0, 8)) return url;
+        }
         String scheme = UriUtil.scheme(url);
         String prefix = scheme + "://";
         return switch (scheme) {
             case "assets" -> url.replace(prefix, Server.get().getAddress("/"));
             case "proxy" -> url.replace(prefix, Server.get().getAddress("/proxy?"));
-            case "file" -> Server.get().getAddress("/file/") + Uri.encode(url.substring((prefix).length()), "/");
+            case "file" -> Server.get().getAddress("/file/") + Uri.encode(url.startsWith(prefix) ? url.substring(prefix.length()) : url.startsWith("file:") ? url.substring(5) : url, "/");
             default -> url;
         };
     }

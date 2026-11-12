@@ -2,6 +2,7 @@ package com.github.catvod.utils;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -18,6 +20,7 @@ import java.util.zip.ZipFile;
 public final class Archive {
 
     private static final int COPY_BUFFER_SIZE = 64 * 1024;
+    private static final long MAX_GZIP_BYTES = 128L * 1024 * 1024;
 
     private static File createTempFile(File target) throws IOException {
         File parent = target.getAbsoluteFile().getParentFile();
@@ -80,7 +83,7 @@ public final class Archive {
         try (GZIPInputStream input = new GZIPInputStream(new BufferedInputStream(new FileInputStream(source)));
              FileOutputStream fileOutput = new FileOutputStream(target);
              BufferedOutputStream output = new BufferedOutputStream(fileOutput)) {
-            transfer(input, output, Long.MAX_VALUE);
+            transfer(input, output, MAX_GZIP_BYTES);
             output.flush();
             fileOutput.getFD().sync();
         }
@@ -88,7 +91,9 @@ public final class Archive {
 
     public static String readGzip(File file) {
         try (GZIPInputStream is = new GZIPInputStream(new BufferedInputStream(new FileInputStream(file)))) {
-            return Path.read(is);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            transfer(is, out, MAX_GZIP_BYTES);
+            return out.toString(StandardCharsets.UTF_8);
         } catch (IOException e) {
             e.printStackTrace();
             return "";

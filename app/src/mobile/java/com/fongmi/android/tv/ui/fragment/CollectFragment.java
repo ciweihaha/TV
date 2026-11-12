@@ -105,8 +105,8 @@ public class CollectFragment extends BaseFragment implements MenuProvider, Colle
 
     private void setViewModel() {
         mViewModel = new ViewModelProvider(this).get(SiteViewModel.class).init();
-        mViewModel.getSearch().observe(this, this::setCollect);
-        mViewModel.getResult().observe(this, this::setSearch);
+        mViewModel.getSearch().observe(getViewLifecycleOwner(), this::setCollect);
+        mViewModel.getResult().observe(getViewLifecycleOwner(), this::setSearch);
         mViewModel.getAction().observe(getViewLifecycleOwner(), result -> WebActivity.handleAction(requireActivity(), result));
     }
 
@@ -184,12 +184,6 @@ public class CollectFragment extends BaseFragment implements MenuProvider, Colle
     public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
         if (menuItem.getItemId() == android.R.id.home) requireActivity().getOnBackPressedDispatcher().onBackPressed();
         return true;
-    }
-
-    @Override
-    public void onHiddenChanged(boolean hidden) {
-        if (hidden) requireActivity().removeMenuProvider(this);
-        else initMenu();
     }
 
     @Override

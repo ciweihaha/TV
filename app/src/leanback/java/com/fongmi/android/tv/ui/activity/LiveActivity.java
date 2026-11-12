@@ -195,7 +195,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.group.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
             @Override
             public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
-                if (mGroupAdapter.getItemCount() > 0) onChildSelected(child, mGroup = mGroupAdapter.get(position));
+                if (position != RecyclerView.NO_POSITION && mGroupAdapter.getItemCount() > 0) onChildSelected(child, mGroup = mGroupAdapter.get(position));
             }
         });
     }
@@ -416,7 +416,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     private void onPlayer() {
-        PlayerEngineDialog.show(this);
+        new PlayerEngineDialog().show(this);
         hideControl();
     }
 
@@ -1012,12 +1012,14 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     private void onPaused() {
         mInput.cancelSeek();
         if (pauseWebPlayback()) return;
+        if (controller() == null) return;
         controller().pause();
     }
 
     private void onPlay() {
         mInput.cancelSeek();
         if (resumeWebPlayback()) return;
+        if (controller() == null) return;
         controller().play();
     }
 
@@ -1157,6 +1159,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     @Override
     protected void onDestroy() {
         mInput.cancelSeek();
+        mInput.cancelFindChannel();
         mClock.release();
         if (isBindingOwner() && isOwner()) Source.get().exit();
         App.removeCallbacks(mR0, mR1, mR2, mR3, mR4);

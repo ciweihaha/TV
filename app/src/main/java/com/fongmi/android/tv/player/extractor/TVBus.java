@@ -12,6 +12,7 @@ import com.fongmi.android.tv.utils.ResUtil;
 import com.github.catvod.net.Download;
 import com.github.catvod.utils.Path;
 import com.github.catvod.utils.UriUtil;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.orhanobut.logger.Logger;
 import com.tvbus.engine.Listener;
@@ -19,6 +20,7 @@ import com.tvbus.engine.TVCore;
 
 import java.io.File;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class TVBus implements Source.Extractor, Listener {
 
@@ -33,13 +35,12 @@ public class TVBus implements Source.Extractor, Listener {
         return "tvbus".equals(UriUtil.scheme(uri));
     }
 
-    private void init(Core core) {
+    private void init(Core core) throws Exception {
         try {
             App.get().setHook(core.getHook());
             tvcore = new TVCore(getPath(core.getSo())).listener(this).auth(core.getAuth()).name(core.getName()).pass(core.getPass()).domain(core.getDomain()).broker(core.getBroker());
             for (Core.Option option : core.getOption()) tvcore.option(option.getKey(), option.getValues());
             tvcore.serv(0).play(8902).mode(1).init();
-        } catch (Exception ignored) {
         } finally {
             App.get().setHook(null);
         }
@@ -58,7 +59,7 @@ public class TVBus implements Source.Extractor, Listener {
         if (tvcore == null) init(core = c);
         latch = new CountDownLatch(1);
         tvcore.start(url);
-        latch.await();
+        if (!latch.await(30, TimeUnit.SECONDS)) throw new ExtractException(ResUtil.getString(R.string.error_play_url));
         return check();
     }
 
@@ -89,18 +90,29 @@ public class TVBus implements Source.Extractor, Listener {
     @Override
     public void onPrepared(String result) {
         Logger.t(TAG).d(result);
-        JsonObject json = App.gson().fromJson(result, JsonObject.class);
-        if (json.get("hls") == null) return;
-        hls = json.get("hls").getAsString();
-        latch.countDown();
+        try {
+            JsonObject json = App.gson().fromJson(result, JsonObject.class);
+            if (json == null || !json.has("hls")) return;
+            JsonElement hlsElement = json.get("hls");
+            if (!hlsElement.isJsonPrimitive()) return;
+            hls = hlsElement.getAsString();
+            if (latch != null) latch.countDown();
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
     public void onStop(String result) {
         Logger.t(TAG).d(result);
-        JsonObject json = App.gson().fromJson(result, JsonObject.class);
-        hls = json.get("errno").getAsString();
-        if (hls.startsWith("-")) latch.countDown();
+        try {
+            JsonObject json = App.gson().fromJson(result, JsonObject.class);
+            if (json == null || !json.has("errno")) return;
+            JsonElement errno = json.get("errno");
+            if (!errno.isJsonPrimitive()) return;
+            hls = errno.getAsString();
+            if (hls.startsWith("-") && latch != null) latch.countDown();
+        } catch (Exception ignored) {
+        }
     }
 
     @Override

@@ -81,8 +81,10 @@ public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.ViewHolder
 
         @Override
         public boolean onLongClick(View v) {
-            mItems.remove(getLayoutPosition());
-            notifyItemRemoved(getLayoutPosition());
+            int position = getLayoutPosition();
+            if (position == RecyclerView.NO_POSITION) return false;
+            mItems.remove(position);
+            notifyItemRemoved(position);
             listener.onDataChanged(getItemCount());
             Setting.putKeyword(App.gson().toJson(mItems));
             return true;
