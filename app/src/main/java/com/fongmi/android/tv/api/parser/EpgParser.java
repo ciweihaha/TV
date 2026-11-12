@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 public class EpgParser {
 
     private static final String TAG = EpgParser.class.getSimpleName();
+    private static final Persister PERSISTER = new Persister();
     private static final Pattern XML_TIME = Pattern.compile("(\\d{4}(?:\\d{2}){0,5})(?:\\s*(Z|UTC|GMT|[+-]\\d{2}:?\\d{2}))?");
     private static final DateTimeFormatter XML_DATE = DateTimeFormatter.ofPattern("uuuuMMddHHmmss", Locale.ROOT).withResolverStyle(ResolverStyle.STRICT);
 
@@ -76,10 +77,6 @@ public class EpgParser {
         checkInterrupted();
         bindResultsToLive(live, result);
         Log.i(TAG, "start done elapsed=" + (System.currentTimeMillis() - t0) + "ms");
-    }
-
-    public static Epg getEpg(String xml, String key, ZoneId zoneId) {
-        return getEpg(xml, key, null, zoneId);
     }
 
     public static Epg getEpg(String xml, String key, String date, ZoneId zoneId) {
@@ -179,17 +176,18 @@ public class EpgParser {
 
     private static XmlData parseXmlData(InputNode root) throws Exception {
         if (root == null || !"tv".equals(root.getName())) throw new IOException("Invalid XMLTV root");
-        return new XmlData(new Persister().read(Tv.class, root, false));
+        return new XmlData(PERSISTER.read(Tv.class, root, false));
     }
 
     private static ProgrammeResult processProgramme(XmlData data, Map<String, Set<String>> liveChannelMap, ZoneId zoneId) throws InterruptedIOException {
         ProgrammeResult result = new ProgrammeResult(new HashMap<>(), new HashMap<>());
-        for (String xmlId : data.ids) processChannel(data, liveChannelMap, zoneId, xmlId, result);
+        Map<String, Map<String, Set<String>>> seen = new HashMap<>();
+        for (String xmlId : data.ids) processChannel(data, liveChannelMap, zoneId, xmlId, result, seen);
         result.epgMap.values().forEach(days -> days.values().forEach(epg -> epg.getList().sort(Comparator.comparingLong(EpgData::getStartTime))));
         return result;
     }
 
-    private static void processChannel(XmlData data, Map<String, Set<String>> liveChannelMap, ZoneId zoneId, String xmlId, ProgrammeResult result) throws InterruptedIOException {
+    private static void processChannel(XmlData data, Map<String, Set<String>> liveChannelMap, ZoneId zoneId, String xmlId, ProgrammeResult result, Map<String, Map<String, Set<String>>> seen) throws InterruptedIOException {
         checkInterrupted();
         Set<String> targets = findTargetChannels(xmlId, liveChannelMap, data);
         if (targets.isEmpty()) return;
@@ -197,19 +195,19 @@ public class EpgParser {
         String src = getChannelSource(data, xmlId);
         for (String id : targets) {
             if (!src.isEmpty()) result.srcMap.putIfAbsent(id, src);
-            addProgrammeEntries(result.epgMap, id, entries, zoneId, targets);
+            addProgrammeEntries(result.epgMap, seen, id, entries, zoneId, targets);
         }
     }
 
-    private static void addProgrammeEntries(Map<String, Map<String, Epg>> epgMap, String id, List<EpgData> entries, ZoneId zoneId, Set<String> targets) {
-        for (EpgData entry : entries) addProgrammeEntry(epgMap, id, entry, zoneId, targets);
+    private static void addProgrammeEntries(Map<String, Map<String, Epg>> epgMap, Map<String, Map<String, Set<String>>> seen, String id, List<EpgData> entries, ZoneId zoneId, Set<String> targets) {
+        for (EpgData entry : entries) addProgrammeEntry(epgMap, seen, id, entry, zoneId, targets);
     }
 
-    private static void addProgrammeEntry(Map<String, Map<String, Epg>> epgMap, String id, EpgData entry, ZoneId zoneId, Set<String> targets) {
+    private static void addProgrammeEntry(Map<String, Map<String, Epg>> epgMap, Map<String, Map<String, Set<String>>> seen, String id, EpgData entry, ZoneId zoneId, Set<String> targets) {
         String date = Instant.ofEpochMilli(entry.getStartTime()).atZone(zoneId).format(Formatters.DATE);
         List<EpgData> list = epgMap.computeIfAbsent(id, k -> new TreeMap<>()).computeIfAbsent(date, d -> Epg.create(id, d)).getList();
-        boolean duplicate = list.stream().anyMatch(item -> item.getStartTime() == entry.getStartTime() && item.getEndTime() == entry.getEndTime() && item.getTitle().equals(entry.getTitle()));
-        if (!duplicate) list.add(targets.size() == 1 ? entry : copyEntry(entry));
+        Set<String> keys = seen.computeIfAbsent(id, k -> new HashMap<>()).computeIfAbsent(date, d -> new HashSet<>());
+        if (keys.add(entry.getStartTime() + "|" + entry.getEndTime() + "|" + entry.getTitle())) list.add(targets.size() == 1 ? entry : copyEntry(entry));
     }
 
     private static String getChannelSource(XmlData data, String xmlId) {

@@ -22,8 +22,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
+import java.util.regex.Pattern;
 
 public final class LogSession {
+
+    private static final Pattern DIGITS_PATTERN = Pattern.compile("[0-9]+");
 
     static final long DURATION = TimeUnit.MINUTES.toMillis(60);
     static final int MAX_LINES = 5000;
@@ -128,11 +131,6 @@ public final class LogSession {
     public synchronized String getCode() {
         expire();
         return session == null ? "" : session.code;
-    }
-
-    public synchronized long getRemainingMillis() {
-        expire();
-        return session == null ? 0 : Math.max(0, session.deadline - clock.getAsLong());
     }
 
     public synchronized String getError() {
@@ -310,7 +308,7 @@ public final class LogSession {
     }
 
     private static long parseCursor(String cursor) {
-        if (!cursor.matches("[0-9]+")) throw new IllegalArgumentException("Invalid log cursor");
+        if (!DIGITS_PATTERN.matcher(cursor).matches()) throw new IllegalArgumentException("Invalid log cursor");
         try {
             return Long.parseLong(cursor);
         } catch (NumberFormatException e) {

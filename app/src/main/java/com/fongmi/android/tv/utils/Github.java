@@ -1,9 +1,13 @@
 package com.fongmi.android.tv.utils;
 
+import java.util.regex.Pattern;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class Github {
+
+    private static final Pattern DIGITS_PATTERN = Pattern.compile("[0-9]+");
 
     private static final String REPO = "FongMi/Release";
 
@@ -39,7 +43,7 @@ public class Github {
         int[] version = new int[3];
         try {
             for (int i = 0; i < parts.length; i++) {
-                if (!parts[i].matches("[0-9]+")) return null;
+                if (!DIGITS_PATTERN.matcher(parts[i]).matches()) return null;
                 version[i] = Integer.parseInt(parts[i]);
             }
         } catch (NumberFormatException e) {

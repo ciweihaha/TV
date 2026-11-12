@@ -4,11 +4,11 @@ import android.text.TextUtils;
 
 import androidx.annotation.Nullable;
 
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.server.Server;
 import com.fongmi.android.tv.utils.UrlUtil;
 import com.fongmi.hook.Hook;
 import com.github.catvod.net.OkHttp;
-import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 
 import java.util.Collections;
@@ -40,7 +40,7 @@ public class Core {
     private List<Option> option;
 
     public static Core objectFrom(String str) {
-        return new Gson().fromJson(str, Core.class);
+        return App.gson().fromJson(str, Core.class);
     }
 
     public static String getString(String value) {

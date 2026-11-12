@@ -3,7 +3,6 @@ package com.fongmi.android.tv.player.media;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public final class ConcatenatingUrl {
 
@@ -52,7 +51,12 @@ public final class ConcatenatingUrl {
         if (edl.length() > 0) edl.append(';');
         String source = segment.url();
         edl.append('%').append(source.getBytes(StandardCharsets.UTF_8).length).append('%').append(source);
-        edl.append(String.format(Locale.ROOT, ",0,%d.%03d", segment.durationMs() / 1000, segment.durationMs() % 1000));
+        long seconds = segment.durationMs() / 1000;
+        long millis = segment.durationMs() % 1000;
+        edl.append(",0,").append(seconds).append('.');
+        if (millis < 10) edl.append("00");
+        else if (millis < 100) edl.append('0');
+        edl.append(millis);
     }
 
     public record Segment(String url, long durationMs) {

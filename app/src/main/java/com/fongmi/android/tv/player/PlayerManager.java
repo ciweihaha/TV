@@ -163,10 +163,6 @@ public class PlayerManager implements ParseCallback {
         return engine != null ? engine.getDiscMenuController() : null;
     }
 
-    public boolean isDiscMenuAvailable() {
-        return !isEmpty() && player.getDiscMenuState().availability == DiscMenuState.AVAILABILITY_AVAILABLE;
-    }
-
     public boolean runMpvScript(MpvScripts.Item item) {
         return engine instanceof MpvPlayerEngine mpv && mpv.runScript(item);
     }
@@ -288,10 +284,6 @@ public class PlayerManager implements ParseCallback {
 
     public boolean isPortrait() {
         return getVideoHeight() > getVideoWidth();
-    }
-
-    public boolean isLandscape() {
-        return getVideoWidth() > getVideoHeight();
     }
 
     public boolean isLive() {

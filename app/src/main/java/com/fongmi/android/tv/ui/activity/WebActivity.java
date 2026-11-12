@@ -49,6 +49,7 @@ import java.util.Set;
 public final class WebActivity extends BaseActivity implements BrowserWebView.BrowserListener {
 
     private static final String EXTRA_WEB = "web";
+    private static final Set<String> BLOCKED_SCHEMES = Set.of("file", "content", "javascript", "data", "about", "intent");
 
     private ActivityWebBinding binding;
     private BrowserWebView webView;
@@ -225,7 +226,7 @@ public final class WebActivity extends BaseActivity implements BrowserWebView.Br
     static Intent externalIntent(Uri uri) throws URISyntaxException {
         Intent parsed = "intent".equals(uri.getScheme()) ? Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME) : new Intent(Intent.ACTION_VIEW, uri);
         Uri data = parsed.getData();
-        if (data == null || data.getScheme() == null || Set.of("file", "content", "javascript", "data", "about", "intent").contains(UriUtil.scheme(data))) return null;
+        if (data == null || data.getScheme() == null || BLOCKED_SCHEMES.contains(UriUtil.scheme(data))) return null;
         return new Intent(Intent.ACTION_VIEW, data).addCategory(Intent.CATEGORY_BROWSABLE).setPackage(parsed.getPackage());
     }
 

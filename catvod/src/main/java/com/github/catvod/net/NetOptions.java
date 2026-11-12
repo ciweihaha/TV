@@ -69,6 +69,11 @@ public class NetOptions {
         return options == null ? new NetOptions() : options;
     }
 
+    public static NetOptions from(JsonObject json) {
+        NetOptions options = json == null ? null : GSON.fromJson(json, NetOptions.class);
+        return options == null ? new NetOptions() : options;
+    }
+
     static NetOptions text(String method, String body, Map<String, String> headers, int timeout) {
         NetOptions options = new NetOptions();
         JsonObject values = headers == null ? new JsonObject() : GSON.toJsonTree(headers).getAsJsonObject();

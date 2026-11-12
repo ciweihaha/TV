@@ -18,7 +18,6 @@ import com.google.common.net.HttpHeaders;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import okhttp3.Response;
@@ -26,23 +25,32 @@ import okhttp3.Response;
 public class LiveParser {
 
     private static final Pattern M3U = Pattern.compile("^(?!.*#genre#).*#EXTM3U.*", Pattern.MULTILINE);
-    private static final Pattern HTTP_USER_AGENT = Pattern.compile(".*http-user-agent=\"(.?|.+?)\".*");
-    private static final Pattern CATCHUP_REPLACE = Pattern.compile(".*catchup-replace=\"(.?|.+?)\".*");
-    private static final Pattern CATCHUP_SOURCE = Pattern.compile(".*catchup-source=\"(.?|.+?)\".*");
-    private static final Pattern CATCHUP = Pattern.compile(".*catchup=\"(.?|.+?)\".*");
-    private static final Pattern TVG_CHNO = Pattern.compile(".*tvg-chno=\"(.?|.+?)\".*");
-    private static final Pattern TVG_LOGO = Pattern.compile(".*tvg-logo=\"(.?|.+?)\".*");
-    private static final Pattern TVG_NAME = Pattern.compile(".*tvg-name=\"(.?|.+?)\".*");
-    private static final Pattern TVG_URL = Pattern.compile(".*tvg-url=\"(.?|.+?)\".*");
-    private static final Pattern TVG_ID = Pattern.compile(".*tvg-id=\"(.?|.+?)\".*");
-    private static final Pattern URL_TVG = Pattern.compile(".*url-tvg=\"(.?|.+?)\".*");
-    private static final Pattern GROUP = Pattern.compile(".*group-title=\"(.?|.+?)\".*");
-    private static final Pattern NAME = Pattern.compile(".*,(.+?)$");
 
-    private static String extract(String line, Pattern pattern) {
-        Matcher matcher = pattern.matcher(line.trim());
-        if (matcher.matches()) return matcher.group(1).trim();
-        return "";
+    private static final String GROUP_TOKEN = "group-title=\"";
+    private static final String TVG_NAME_TOKEN = "tvg-name=\"";
+    private static final String TVG_CHNO_TOKEN = "tvg-chno=\"";
+    private static final String TVG_LOGO_TOKEN = "tvg-logo=\"";
+    private static final String TVG_ID_TOKEN = "tvg-id=\"";
+    private static final String CATCHUP_TOKEN = "catchup=\"";
+    private static final String CATCHUP_SOURCE_TOKEN = "catchup-source=\"";
+    private static final String CATCHUP_REPLACE_TOKEN = "catchup-replace=\"";
+    private static final String TVG_URL_TOKEN = "tvg-url=\"";
+    private static final String URL_TVG_TOKEN = "url-tvg=\"";
+    private static final String HTTP_USER_AGENT_TOKEN = "http-user-agent=\"";
+
+    private static String extractAttr(String line, String token) {
+        int start = line.lastIndexOf(token);
+        if (start < 0) return "";
+        int valueStart = start + token.length();
+        int end = line.indexOf('"', valueStart);
+        if (end < 0) return "";
+        return line.substring(valueStart, end).trim();
+    }
+
+    private static String extractName(String line) {
+        String trimmed = line.trim();
+        int comma = trimmed.lastIndexOf(',');
+        return comma < 0 ? "" : trimmed.substring(comma + 1).trim();
     }
 
     private static String extract(String line, String... keywords) {
@@ -110,29 +118,29 @@ public class LiveParser {
             if (setting.find(line)) {
                 setting.check(line);
             } else if (line.startsWith("#EXTM3U")) {
-                catchup.setType(extract(line, CATCHUP));
-                catchup.setSource(extract(line, CATCHUP_SOURCE));
-                catchup.setReplace(extract(line, CATCHUP_REPLACE));
-                if (live.getEpg().isEmpty()) live.setEpg(extract(line, TVG_URL).replace("\"", ""));
-                if (live.getEpg().isEmpty()) live.setEpg(extract(line, URL_TVG).replace("\"", ""));
+                catchup.setType(extractAttr(line, CATCHUP_TOKEN));
+                catchup.setSource(extractAttr(line, CATCHUP_SOURCE_TOKEN));
+                catchup.setReplace(extractAttr(line, CATCHUP_REPLACE_TOKEN));
+                if (live.getEpg().isEmpty()) live.setEpg(extractAttr(line, TVG_URL_TOKEN).replace("\"", ""));
+                if (live.getEpg().isEmpty()) live.setEpg(extractAttr(line, URL_TVG_TOKEN).replace("\"", ""));
                 if (live.getEpg().isEmpty()) live.setEpg(extract(line, "tvg-url=", "url-tvg="));
             } else if (line.startsWith("#EXTINF:")) {
-                Group group = live.find(Group.create(extract(line, GROUP), live.isPass()));
-                channel = group.find(Channel.create(extract(line, NAME)));
-                channel.setUa(extract(line, HTTP_USER_AGENT));
-                channel.setTvgName(extract(line, TVG_NAME));
-                channel.setNumber(extract(line, TVG_CHNO));
-                channel.setLogo(extract(line, TVG_LOGO));
-                channel.setTvgId(extract(line, TVG_ID));
+                Group group = live.find(Group.create(extractAttr(line, GROUP_TOKEN), live.isPass()));
+                channel = group.find(Channel.create(extractName(line)));
+                channel.setUa(extractAttr(line, HTTP_USER_AGENT_TOKEN));
+                channel.setTvgName(extractAttr(line, TVG_NAME_TOKEN));
+                channel.setNumber(extractAttr(line, TVG_CHNO_TOKEN));
+                channel.setLogo(extractAttr(line, TVG_LOGO_TOKEN));
+                channel.setTvgId(extractAttr(line, TVG_ID_TOKEN));
                 Catchup unknown = Catchup.create();
-                unknown.setType(extract(line, CATCHUP));
-                unknown.setSource(extract(line, CATCHUP_SOURCE));
-                unknown.setReplace(extract(line, CATCHUP_REPLACE));
+                unknown.setType(extractAttr(line, CATCHUP_TOKEN));
+                unknown.setSource(extractAttr(line, CATCHUP_SOURCE_TOKEN));
+                unknown.setReplace(extractAttr(line, CATCHUP_REPLACE_TOKEN));
                 channel.setCatchup(Catchup.decide(unknown, catchup));
             } else if (!line.startsWith("#") && line.contains("://")) {
-                String[] parts = line.split("\\|", 2);
-                if (parts.length > 1) setting.headers(parts[1]);
-                channel.getUrls().add(parts[0]);
+                int pipe = line.indexOf('|');
+                if (pipe >= 0) setting.headers(line.substring(pipe + 1));
+                channel.getUrls().add(pipe < 0 ? line : line.substring(0, pipe));
                 setting.copy(channel).clear();
             }
         }
@@ -143,6 +151,7 @@ public class LiveParser {
         text = text.replace("\r\n", "\n").replace("\r", "");
         for (String line : text.split("\n")) {
             if (Thread.interrupted()) break;
+            if (line.isEmpty()) continue;
             String[] split = line.split(",", 2);
             if (setting.find(line)) setting.check(line);
             if (line.contains("#genre#")) setting.clear();
@@ -152,9 +161,9 @@ public class LiveParser {
                 Group group = live.getGroups().get(live.getGroups().size() - 1);
                 Channel channel = group.find(Channel.create(split[0]));
                 for (String url : split[1].split("#")) {
-                    String[] parts = url.split("\\|", 2);
-                    if (parts.length > 1) setting.headers(parts[1]);
-                    channel.getUrls().add(parts[0]);
+                    int pipe = url.indexOf('|');
+                    if (pipe >= 0) setting.headers(url.substring(pipe + 1));
+                    channel.getUrls().add(pipe < 0 ? url : url.substring(0, pipe));
                     setting.copy(channel);
                 }
             }
@@ -162,6 +171,8 @@ public class LiveParser {
     }
 
     private static class Setting {
+
+        private static final Pattern PIPE = Pattern.compile("\\|");
 
         private String ua;
         private String key;
@@ -222,37 +233,47 @@ public class LiveParser {
             return this;
         }
 
+        private static String valueAfter(String line, String key) {
+            int index = line.indexOf(key);
+            if (index < 0) return null;
+            String value = line.substring(index + key.length()).trim();
+            return value.isEmpty() ? null : value;
+        }
+
+        private static String valueAfterIgnoreCase(String line, String key) {
+            int index = indexOfIgnoreCase(line, key);
+            if (index < 0) return null;
+            String value = line.substring(index + key.length()).trim();
+            return value.isEmpty() ? null : value;
+        }
+
+        private static int indexOfIgnoreCase(String text, String key) {
+            int max = text.length() - key.length();
+            for (int i = 0; i <= max; i++) if (text.regionMatches(true, i, key, 0, key.length())) return i;
+            return -1;
+        }
+
+        private static String unquote(String value) {
+            return value == null ? null : value.replace("\"", "");
+        }
+
         private void ua(String line) {
-            try {
-                if (line.contains("user-agent=")) ua = line.split("(?i)user-agent=")[1].trim().replace("\"", "");
-                if (line.contains("ua=")) ua = line.split("ua=")[1].trim().replace("\"", "");
-            } catch (Exception e) {
-                e.printStackTrace();
-                ua = null;
-            }
+            if (line.contains("user-agent=")) ua = unquote(valueAfter(line, "user-agent="));
+            if (line.contains("ua=")) ua = unquote(valueAfter(line, "ua="));
         }
 
         private void referer(String line) {
-            try {
-                referer = line.split("(?i)referer=")[1].trim().replace("\"", "");
-            } catch (Exception e) {
-                e.printStackTrace();
-                referer = null;
-            }
+            referer = unquote(valueAfterIgnoreCase(line, "referer="));
         }
 
         private void referrer(String line) {
-            try {
-                referer = line.split("(?i)referrer=")[1].trim().replace("\"", "");
-            } catch (Exception e) {
-                e.printStackTrace();
-                referer = null;
-            }
+            referer = unquote(valueAfterIgnoreCase(line, "referrer="));
         }
 
         private void parse(String line) {
             try {
-                parse = Integer.parseInt(line.split("parse=")[1].trim());
+                String value = valueAfter(line, "parse=");
+                parse = value == null ? null : Integer.parseInt(value);
             } catch (Exception e) {
                 e.printStackTrace();
                 parse = null;
@@ -260,46 +281,29 @@ public class LiveParser {
         }
 
         private void click(String line) {
-            try {
-                click = line.split("click=")[1].trim();
-            } catch (Exception e) {
-                e.printStackTrace();
-                click = null;
-            }
+            click = valueAfter(line, "click=");
         }
 
         private void format(String line) {
-            try {
-                if (line.startsWith("format=")) format = line.split("format=")[1].trim();
-                if (line.contains("manifest_type=")) format = line.split("manifest_type=")[1].trim();
-                if ("mpd".equals(format) || "dash".equals(format)) format = MimeTypes.APPLICATION_MPD;
-                if ("hls".equals(format)) format = MimeTypes.APPLICATION_M3U8;
-            } catch (Exception e) {
-                e.printStackTrace();
-                format = null;
-            }
+            if (line.startsWith("format=")) format = valueAfter(line, "format=");
+            if (line.contains("manifest_type=")) format = valueAfter(line, "manifest_type=");
+            if ("mpd".equals(format) || "dash".equals(format)) format = MimeTypes.APPLICATION_MPD;
+            if ("hls".equals(format)) format = MimeTypes.APPLICATION_M3U8;
         }
 
         private void cookie(String line) {
-            try {
-                header.put("Cookie", line.split("(?i)cookie=")[1].trim().replace("\"", ""));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            String value = unquote(valueAfterIgnoreCase(line, "cookie="));
+            if (value != null) header.put("Cookie", value);
         }
 
         private void origin(String line) {
-            try {
-                origin = line.split("(?i)origin=")[1].trim();
-            } catch (Exception e) {
-                e.printStackTrace();
-                origin = null;
-            }
+            origin = valueAfterIgnoreCase(line, "origin=");
         }
 
         private void key(String line) {
             try {
-                key = line.contains("license_key=") ? line.split("license_key=")[1].trim() : line;
+                key = line.contains("license_key=") ? valueAfter(line, "license_key=") : line;
+                if (key == null) return;
                 if (key.startsWith("http")) httpKey();
                 else localKey();
             } catch (Exception e) {
@@ -309,31 +313,31 @@ public class LiveParser {
         }
 
         private void type(String line) {
-            try {
-                type = line.contains("license_type=") ? line.split("license_type=")[1].trim() : line;
-            } catch (Exception e) {
-                e.printStackTrace();
-                type = null;
-            }
+            type = line.contains("license_type=") ? valueAfter(line, "license_type=") : line;
         }
 
         private void drmLegacy(String line) {
-            try {
-                line = line.split("drm_legacy=")[1].trim();
-                String[] split = line.split("\\|", 2);
-                type(split[0].trim());
-                key(split[1].trim());
-            } catch (Exception e) {
-                e.printStackTrace();
+            String value = valueAfter(line, "drm_legacy=");
+            int pipe = value == null ? -1 : value.indexOf('|');
+            if (pipe < 0) {
                 type = null;
                 key = null;
+                return;
             }
+            type(value.substring(0, pipe).trim());
+            key(value.substring(pipe + 1).trim());
         }
 
         private void header(String line) {
             try {
-                if (line.contains("#EXTHTTP:")) header.putAll(Json.toMap(Json.parse(line.split("#EXTHTTP:")[1].trim())));
-                if (line.contains("header=")) header.putAll(Json.toMap(Json.parse(line.split("header=")[1].trim())));
+                if (line.contains("#EXTHTTP:")) {
+                    String value = valueAfter(line, "#EXTHTTP:");
+                    if (value != null) header.putAll(Json.toMap(Json.parse(value)));
+                }
+                if (line.contains("header=")) {
+                    String value = valueAfter(line, "header=");
+                    if (value != null) header.putAll(Json.toMap(Json.parse(value)));
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -341,8 +345,10 @@ public class LiveParser {
 
         private void headers(String line) {
             try {
-                if (line.contains("headers=")) headers(header, line.split("headers=")[1].trim().split("&"));
-                else if (line.contains("|")) for (String text : line.split("\\|")) headers(text);
+                if (line.contains("headers=")) {
+                    String value = valueAfter(line, "headers=");
+                    if (value != null) headers(header, value.split("&"));
+                } else if (line.contains("|")) for (String text : PIPE.split(line)) headers(text);
                 else headers(header, line.trim().split("&"));
             } catch (Exception e) {
                 e.printStackTrace();
@@ -351,7 +357,7 @@ public class LiveParser {
 
         private void drmHeaders(String line) {
             try {
-                if (line.contains("|")) for (String text : line.split("\\|")) drmHeaders(text);
+                if (line.contains("|")) for (String text : PIPE.split(line)) drmHeaders(text);
                 else headers(drmHeader, line.trim().split("&"));
             } catch (Exception e) {
                 e.printStackTrace();
@@ -371,17 +377,18 @@ public class LiveParser {
         }
 
         private void forceKey(String line) {
-            try {
-                forceKey = Boolean.parseBoolean(line.split("forceKey=")[1].trim());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            String value = valueAfter(line, "forceKey=");
+            if (value != null) forceKey = Boolean.parseBoolean(value);
         }
 
         private void httpKey() {
-            String[] parts = key.split("\\|", 2);
-            if (parts.length > 1) drmHeaders(parts[1]);
-            key = parts[0].trim();
+            int pipe = key.indexOf('|');
+            if (pipe >= 0) {
+                drmHeaders(key.substring(pipe + 1));
+                key = key.substring(0, pipe).trim();
+            } else {
+                key = key.trim();
+            }
         }
 
         private void localKey() {

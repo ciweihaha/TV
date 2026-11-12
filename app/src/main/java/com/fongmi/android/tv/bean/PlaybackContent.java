@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 public record PlaybackContent(long primaryStartTimeUs, long primaryEndTimeUs, String primary, long secondaryStartTimeUs, long secondaryEndTimeUs, String secondary, boolean danmaku) {
@@ -39,9 +38,30 @@ public record PlaybackContent(long primaryStartTimeUs, long primaryEndTimeUs, St
 
     public long getId() {
         long id = 0xcbf29ce484222325L;
-        String value = primaryStartTimeUs + "\n" + primaryEndTimeUs + "\n" + secondaryStartTimeUs + "\n" + secondaryEndTimeUs + "\n" + danmaku + "\n" + primary.length() + ":" + primary + secondary;
+        id = hash(id, String.valueOf(primaryStartTimeUs));
+        id = hash(id, '\n');
+        id = hash(id, String.valueOf(primaryEndTimeUs));
+        id = hash(id, '\n');
+        id = hash(id, String.valueOf(secondaryStartTimeUs));
+        id = hash(id, '\n');
+        id = hash(id, String.valueOf(secondaryEndTimeUs));
+        id = hash(id, '\n');
+        id = hash(id, String.valueOf(danmaku));
+        id = hash(id, '\n');
+        id = hash(id, String.valueOf(primary.length()));
+        id = hash(id, ':');
+        id = hash(id, primary);
+        id = hash(id, secondary);
+        return id;
+    }
+
+    private static long hash(long id, CharSequence value) {
         for (int i = 0; i < value.length(); i++) id = (id ^ value.charAt(i)) * 0x100000001b3L;
         return id;
+    }
+
+    private static long hash(long id, char c) {
+        return (id ^ c) * 0x100000001b3L;
     }
 
     public String getTime() {
@@ -66,8 +86,30 @@ public record PlaybackContent(long primaryStartTimeUs, long primaryEndTimeUs, St
 
     private static String format(long time) {
         long seconds = time / 1000;
-        String value = seconds >= 3600 ? String.format(Locale.ROOT, "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60) : String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60);
-        return time % 1000 == 0 ? value : value + String.format(Locale.ROOT, ".%03d", time % 1000);
+        long millis = time % 1000;
+        StringBuilder sb = new StringBuilder();
+        if (seconds >= 3600) {
+            sb.append(seconds / 3600).append(':');
+            appendTwoDigits(sb, seconds / 60 % 60);
+            sb.append(':');
+            appendTwoDigits(sb, seconds % 60);
+        } else {
+            appendTwoDigits(sb, seconds / 60);
+            sb.append(':');
+            appendTwoDigits(sb, seconds % 60);
+        }
+        if (millis != 0) {
+            sb.append('.');
+            if (millis < 10) sb.append("00");
+            else if (millis < 100) sb.append('0');
+            sb.append(millis);
+        }
+        return sb.toString();
+    }
+
+    private static void appendTwoDigits(StringBuilder sb, long value) {
+        if (value < 10) sb.append('0');
+        sb.append(value);
     }
 
     public boolean isActive(long positionMs) {

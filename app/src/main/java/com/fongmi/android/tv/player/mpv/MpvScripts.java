@@ -25,8 +25,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 
 public final class MpvScripts {
+
+    private static final Pattern SCRIPT_ID_PATTERN = Pattern.compile("[a-f0-9]{32}");
 
     public static final String PREFERENCE_KEY = "mpv_scripts";
     public static final int MAX_TITLE_LENGTH = 64;
@@ -45,7 +48,7 @@ public final class MpvScripts {
 
     private static Item readItem(JSONObject object) throws JSONException {
         String id = object.getString("id");
-        if (!id.matches("[a-f0-9]{32}")) throw new JSONException("Invalid script ID");
+        if (!SCRIPT_ID_PATTERN.matcher(id).matches()) throw new JSONException("Invalid script ID");
         String name = object.getString("fileName");
         String command = object.optString("command", "");
         String legacyBinding = object.optString("binding", "");

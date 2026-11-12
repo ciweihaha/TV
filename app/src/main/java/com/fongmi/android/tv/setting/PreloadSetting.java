@@ -13,6 +13,34 @@ public class PreloadSetting {
     public static final int MAX_TIME_SECONDS = 120;
     public static final int STEP_TIME_SECONDS = 10;
 
+    public static final int TYPE_THREADS = 0;
+    public static final int TYPE_SIZE = 1;
+    public static final int TYPE_TIME = 2;
+
+    public static int getMin(int type) {
+        if (type == TYPE_THREADS) return MIN_THREADS;
+        if (type == TYPE_SIZE) return MIN_SIZE_MB;
+        return MIN_TIME_SECONDS;
+    }
+
+    public static int getMax(int type) {
+        if (type == TYPE_THREADS) return MAX_THREADS;
+        if (type == TYPE_SIZE) return MAX_SIZE_MB;
+        return MAX_TIME_SECONDS;
+    }
+
+    public static int getStep(int type) {
+        if (type == TYPE_SIZE) return STEP_SIZE_MB;
+        if (type == TYPE_TIME) return STEP_TIME_SECONDS;
+        return 1;
+    }
+
+    public static int getValue(int type) {
+        if (type == TYPE_THREADS) return getThreads();
+        if (type == TYPE_SIZE) return getSizeMb();
+        return getTimeSeconds();
+    }
+
     public static boolean isEnabled() {
         return Prefers.getBoolean("preload");
     }

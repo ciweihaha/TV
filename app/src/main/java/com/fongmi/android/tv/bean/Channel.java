@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -75,6 +74,9 @@ public class Channel {
     private List<Epg> dataList;
     private transient boolean epgFromLive;
     private transient Auth.Context auth;
+    private transient Epg dataCache;
+    private transient String dataCacheDate;
+    private transient ZoneId dataCacheZone;
 
     public Channel() {
     }
@@ -116,7 +118,7 @@ public class Channel {
     }
 
     public Channel setNumber(int number) {
-        setNumber(String.format(Locale.getDefault(), "%03d", number));
+        setNumber(number < 10 ? "00" + number : number < 100 ? "0" + number : String.valueOf(number));
         return this;
     }
 
@@ -214,7 +216,7 @@ public class Channel {
     }
 
     public Catchup getCatchup() {
-        return catchup == null ? new Catchup() : catchup;
+        return catchup == null ? Catchup.EMPTY : catchup;
     }
 
     public void setCatchup(Catchup catchup) {
@@ -222,7 +224,7 @@ public class Channel {
     }
 
     public Map<String, String> getHeader() {
-        return header == null ? new HashMap<>() : header;
+        return header == null ? Collections.emptyMap() : header;
     }
 
     public void setHeader(Map<String, String> header) {
@@ -261,6 +263,7 @@ public class Channel {
         if (dataList == null) dataList = new ArrayList<>();
         dataList.removeIf(e -> e.equal(data.getDate()));
         dataList.add(data);
+        dataCache = null;
     }
 
     public Epg getData(ZoneId zoneId) {
@@ -269,6 +272,7 @@ public class Channel {
 
     Epg getData(ZoneId zoneId, LocalDate day) {
         String date = day.format(Formatters.DATE);
+        if (dataCache != null && date.equals(dataCacheDate) && zoneId.equals(dataCacheZone)) return dataCache;
         List<Epg> days = getDataList();
         Epg today = days.stream().filter(e -> e.equal(date)).findFirst().orElseGet(() -> Epg.create(getTvgId(), date));
         long midnight = day.atStartOfDay(zoneId).toInstant().toEpochMilli();
@@ -277,11 +281,18 @@ public class Channel {
             if (epg.equal(date)) continue;
             for (EpgData item : epg.getList()) if (item.getStartTime() < midnight && item.getEndTime() > midnight) list.add(item);
         }
-        if (list.isEmpty()) return today;
-        list.addAll(today.getList());
-        list.sort(Comparator.comparingLong(EpgData::getStartTime));
-        Epg result = Epg.create(getTvgId(), date);
-        result.setList(list);
+        Epg result;
+        if (list.isEmpty()) {
+            result = today;
+        } else {
+            list.addAll(today.getList());
+            list.sort(Comparator.comparingLong(EpgData::getStartTime));
+            result = Epg.create(getTvgId(), date);
+            result.setList(list);
+        }
+        dataCache = result;
+        dataCacheDate = date;
+        dataCacheZone = zoneId;
         return result;
     }
 
@@ -291,6 +302,7 @@ public class Channel {
 
     public void setDataList(List<Epg> list) {
         this.dataList = new ArrayList<>(list);
+        dataCache = null;
     }
 
     public int getIndex() {
@@ -304,7 +316,8 @@ public class Channel {
     public void setIndex(String line) {
         for (int i = 0; i < getUrls().size(); i++) {
             String url = getUrls().get(i);
-            if (url.equals(line) || (url.contains("$") && line.equals(url.split("\\$")[0]))) {
+            int dollar = url.indexOf('$');
+            if (url.equals(line) || (dollar >= 0 && line.equals(url.substring(0, dollar)))) {
                 setIndex(i);
                 break;
             }
@@ -342,7 +355,9 @@ public class Channel {
     public String getCurrent() {
         if (getUrls().isEmpty()) return "";
         String url = getUrls().get(getIndex());
-        return (getDrm() != null) ? url : url.split("\\$")[0];
+        if (getDrm() != null) return url;
+        int dollar = url.indexOf('$');
+        return dollar >= 0 ? url.substring(0, dollar) : url;
     }
 
     public boolean isOnly() {
@@ -358,15 +373,25 @@ public class Channel {
     }
 
     public boolean hasCatchup() {
-        if (getCatchup().isEmpty() && getCurrent().contains("/PLTV/")) setCatchup(Catchup.PLTV());
-        if (!getCatchup().getRegex().isEmpty()) return getCatchup().match(getCurrent());
-        return !getCatchup().isEmpty();
+        Catchup catchup = getCatchup();
+        String current = getCurrent();
+        if (catchup.isEmpty() && current.contains("/PLTV/")) {
+            setCatchup(Catchup.PLTV());
+            catchup = getCatchup();
+        }
+        if (!catchup.getRegex().isEmpty()) return catchup.match(current);
+        return !catchup.isEmpty();
     }
 
     public String getLine() {
         if (getUrls().size() <= 1) return "";
-        String[] sp = getUrls().get(getIndex()).split("\\$");
-        if (sp.length > 1 && !sp[1].isEmpty()) return sp[1];
+        String url = getUrls().get(getIndex());
+        int first = url.indexOf('$');
+        if (first >= 0) {
+            int second = url.indexOf('$', first + 1);
+            String name = second >= 0 ? url.substring(first + 1, second) : url.substring(first + 1);
+            if (!name.isEmpty()) return name;
+        }
         return ResUtil.getString(R.string.live_line, getIndex() + 1);
     }
 

@@ -12,8 +12,12 @@ import com.fongmi.android.tv.player.PlayerManager;
 import com.fongmi.android.tv.setting.SpeedSetting;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 public final class ExoCommand {
+
+    private static final Pattern TOKEN_PATTERN = Pattern.compile("[^\\s;]+");
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?");
 
     private static final long CHAPTER_RESTART_THRESHOLD_MS = 5_000;
 
@@ -151,11 +155,6 @@ public final class ExoCommand {
         return Result.APPLIED;
     }
 
-    static long seekPosition(String commandText, long currentPositionMs, long durationMs) {
-        Parsed parsed = parse(commandText);
-        return parsed == null || !parsed.property.equals("seek") ? C.TIME_UNSET : seekPosition(parsed, currentPositionMs, durationMs);
-    }
-
     private static long seekPosition(Parsed parsed, long currentPositionMs, long durationMs) {
         if (currentPositionMs == C.TIME_UNSET) return C.TIME_UNSET;
         if (durationMs == C.TIME_UNSET && (parsed.mode.contains("percent") || parsed.mode.equals("absolute") && parsed.number < 0)) return C.TIME_UNSET;
@@ -172,16 +171,6 @@ public final class ExoCommand {
 
     private static boolean isMillis(double milliseconds) {
         return Double.isFinite(milliseconds) && milliseconds > Long.MIN_VALUE && milliseconds < Long.MAX_VALUE;
-    }
-
-    static float videoScale(String commandText, float current) {
-        Parsed parsed = parse(commandText);
-        return parsed == null || !isVideoScale(parsed.property) ? Float.NaN : (float) propertyValue(parsed, current);
-    }
-
-    static double propertyValue(String commandText, double current) {
-        Parsed parsed = parse(commandText);
-        return parsed == null ? Double.NaN : propertyValue(parsed, current);
     }
 
     private static double propertyValue(Parsed parsed, double current) {
@@ -245,7 +234,7 @@ public final class ExoCommand {
     }
 
     private static boolean isTrackId(String text) {
-        return text.matches("[^\\s;]+");
+        return TOKEN_PATTERN.matcher(text).matches();
     }
 
     private static Parsed parseChapterStep(String text) {
@@ -303,7 +292,7 @@ public final class ExoCommand {
     }
 
     private static Parsed parseNumeric(String property, String mode, String numericText) {
-        if (!numericText.matches("[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?")) return null;
+        if (!NUMBER_PATTERN.matcher(numericText).matches()) return null;
         try {
             double number = Double.parseDouble(numericText);
             return Double.isFinite(number) ? new Parsed(property, mode, number) : null;

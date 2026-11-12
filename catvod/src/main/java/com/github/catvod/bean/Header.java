@@ -13,6 +13,8 @@ import java.util.List;
 
 public class Header {
 
+    private static final Gson GSON = new Gson();
+
     @SerializedName("host")
     private String host;
     @SerializedName("header")
@@ -21,7 +23,7 @@ public class Header {
     public static List<Header> arrayFrom(JsonElement element) {
         try {
             Type listType = TypeToken.getParameterized(List.class, Header.class).getType();
-            List<Header> items = new Gson().fromJson(element, listType);
+            List<Header> items = GSON.fromJson(element, listType);
             return items == null ? Collections.emptyList() : items;
         } catch (Exception e) {
             return Collections.emptyList();

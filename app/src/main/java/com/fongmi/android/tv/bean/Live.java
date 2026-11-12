@@ -25,6 +25,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.annotations.SerializedName;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -124,6 +125,10 @@ public class Live {
     @Ignore
     private transient Auth.Context auth;
 
+    private transient String epgApiCache;
+    private transient List<String> epgXmlCache;
+    private transient Map<String, Long> epgXmlAttempted;
+
     public Live() {
     }
 
@@ -204,8 +209,11 @@ public class Live {
         return TextUtils.isEmpty(epg) ? "" : epg;
     }
 
-    public void setEpg(String epg) {
+    public synchronized void setEpg(String epg) {
         this.epg = epg;
+        epgApiCache = null;
+        epgXmlCache = null;
+        epgXmlAttempted = null;
     }
 
     public String getUa() {
@@ -305,14 +313,37 @@ public class Live {
     }
 
     public String getEpgApi() {
-        for (String url : getEpg().split(",")) if (url.contains("{")) return url;
-        return getEpg();
+        if (epgApiCache == null) {
+            epgApiCache = getEpg();
+            for (String url : getEpg().split(",")) if (url.contains("{")) {
+                epgApiCache = url;
+                break;
+            }
+        }
+        return epgApiCache;
     }
 
     public List<String> getEpgXml() {
-        List<String> items = new ArrayList<>();
-        for (String epg : getEpg().split(",")) if (!epg.contains("{") && (epg.contains("xml") || epg.contains("gz"))) items.add(epg);
-        return items;
+        if (epgXmlCache == null) {
+            epgXmlCache = new ArrayList<>();
+            for (String epg : getEpg().split(",")) if (!epg.contains("{") && (epg.contains("xml") || epg.contains("gz"))) epgXmlCache.add(epg);
+        }
+        return epgXmlCache;
+    }
+
+    public synchronized boolean tryMarkEpgXmlAttempted(String url) {
+        if (epgXmlAttempted == null) epgXmlAttempted = new HashMap<>();
+        Long expiry = epgXmlAttempted.get(url);
+        if (expiry != null && expiry > System.currentTimeMillis()) return true;
+        long sixHours = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(6);
+        long midnight = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        epgXmlAttempted.put(url, Math.min(sixHours, midnight));
+        return false;
+    }
+
+    public synchronized void markEpgXmlFailed(String url) {
+        if (epgXmlAttempted == null) epgXmlAttempted = new HashMap<>();
+        epgXmlAttempted.put(url, System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10));
     }
 
     public boolean isEmpty() {

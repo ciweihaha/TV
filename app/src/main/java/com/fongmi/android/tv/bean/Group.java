@@ -15,7 +15,9 @@ import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Group {
 
@@ -29,6 +31,10 @@ public class Group {
     private boolean selected;
     private int position;
     private int width;
+
+    private transient Map<String, Channel> channelIndex;
+    private transient List<Channel> indexedList;
+    private transient int indexedSize;
 
     public Group(String name) {
         this(name, false);
@@ -130,32 +136,52 @@ public class Group {
         return isKeep();
     }
 
-    public int find(int number) {
-        List<Channel> items = getChannel();
-        for (int i = items.size() - 1; i >= 0; i--) {
-            try {
-                if (Integer.parseInt(items.get(i).getNumber()) == number) return i;
-            } catch (NumberFormatException e) {
-            }
-        }
-        return -1;
-    }
-
     public int find(String name) {
         return getChannel().lastIndexOf(Channel.create(name));
     }
 
     public void add(Channel channel) {
-        Channel exist = getChannel().stream().filter(item -> item.equals(channel)).findFirst().orElse(null);
-        if (exist != null) exist.getUrls().addAll(channel.getUrls());
-        else getChannel().add(Channel.create(channel));
+        ensureIndex();
+        Channel exist;
+        if (channel.getName().isEmpty()) {
+            exist = getChannel().stream().filter(item -> item.equals(channel)).findFirst().orElse(null);
+        } else {
+            exist = channelIndex.get(channel.getName());
+        }
+        if (exist != null) {
+            exist.getUrls().addAll(channel.getUrls());
+        } else {
+            Channel copy = Channel.create(channel);
+            getChannel().add(copy);
+            if (channelIndex != null && !copy.getName().isEmpty()) channelIndex.putIfAbsent(copy.getName(), copy);
+            indexedSize = getChannel().size();
+        }
     }
 
     public Channel find(Channel channel) {
-        Channel exist = getChannel().stream().filter(item -> item.equals(channel)).findFirst().orElse(null);
-        if (exist != null) return exist;
+        String name = channel.getName();
+        if (name.isEmpty()) {
+            Channel exist = getChannel().stream().filter(item -> item.equals(channel)).findFirst().orElse(null);
+            if (exist != null) return exist;
+        } else {
+            ensureIndex();
+            Channel found = channelIndex.get(name);
+            if (found != null) return found;
+        }
         getChannel().add(channel);
+        if (channelIndex != null && !name.isEmpty()) channelIndex.putIfAbsent(name, channel);
+        indexedSize = getChannel().size();
         return channel;
+    }
+
+    private void ensureIndex() {
+        List<Channel> list = getChannel();
+        if (channelIndex == null || indexedList != list || indexedSize != list.size()) {
+            channelIndex = new HashMap<>();
+            for (Channel item : list) if (!item.getName().isEmpty()) channelIndex.putIfAbsent(item.getName(), item);
+            indexedList = list;
+            indexedSize = list.size();
+        }
     }
 
     public Channel current() {

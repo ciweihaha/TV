@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.regex.Pattern;
 
 import dalvik.system.DexClassLoader;
 
@@ -38,6 +39,8 @@ import fi.iki.elonen.NanoHTTPD.Response;
 import okhttp3.HttpUrl;
 
 public final class SpiderTestSession implements AutoCloseable {
+
+    private static final Pattern CLASS_NAME_PATTERN = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*");
 
     private static final String PREFIX = "spider-test:";
     private static final String PREVIEW = "spider-test://";
@@ -178,7 +181,7 @@ public final class SpiderTestSession implements AutoCloseable {
     static void validate(String api, String jar) throws Exception {
         if (api == null || api.isBlank()) throw new IllegalArgumentException("Crawler API is required");
         if (api.startsWith("csp_")) {
-            if (!api.substring(4).matches("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*")) throw new IllegalArgumentException("Invalid Java crawler class");
+            if (!CLASS_NAME_PATTERN.matcher(api.substring(4)).matches()) throw new IllegalArgumentException("Invalid Java crawler class");
             if (jar == null || jar.isBlank()) throw new IllegalArgumentException("Java crawler JAR is required");
             return;
         }
@@ -430,123 +433,68 @@ public final class SpiderTestSession implements AutoCloseable {
             if (failure instanceof Error error) throw error;
         }
 
-        private Throwable close(Throwable failure) {
+        private static Throwable run(Throwable failure, Runnable action) {
             try {
-                close();
+                action.run();
             } catch (RuntimeException | Error error) {
                 if (failure == null) failure = error;
                 else if (failure != error) failure.addSuppressed(error);
             }
             return failure;
+        }
+
+        private Throwable close(Throwable failure) {
+            return run(failure, this::close);
         }
 
         private Throwable end(Throwable failure) {
-            try {
-                end();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            return run(failure, this::end);
         }
 
         private Throwable cancelDownload() {
-            try {
-                if (download != null) download.cancel();
-                return null;
-            } catch (RuntimeException | Error error) {
-                return error;
-            }
+            return run(null, () -> { if (download != null) download.cancel(); });
         }
 
         private Throwable closeSource(Throwable failure) {
-            try {
-                if (source != null) source.close();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            return run(failure, () -> { if (source != null) source.close(); });
         }
 
         private static Throwable closeUnpublishedNetwork(Spider created) {
-            try {
+            return run(null, () -> {
                 created.js.close();
                 if (created.net != null) created.net.close();
-                return null;
-            } catch (RuntimeException | Error error) {
-                return error;
-            }
+            });
         }
 
         private static Throwable closeSpiderNetwork(Spider current, Throwable failure) {
-            try {
+            return run(failure, () -> {
                 if (current != null) current.js.close();
                 if (current != null && current.net != null) current.net.close();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            });
         }
 
         private static Throwable cancelJavaScript(JsLoader loader, Throwable failure) {
-            try {
-                if (loader != null) loader.clear();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            return run(failure, () -> { if (loader != null) loader.clear(); });
         }
 
         private Throwable destroyUnpublished(Spider created, Throwable failure) {
-            try {
-                cleanup.execute(created::destroy);
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            return run(failure, () -> cleanup.execute(created::destroy));
         }
 
         private Throwable destroyLater(Spider current, JsLoader loader, File jar, Throwable failure) {
-            try {
-                cleanup.execute(() -> destroy(current, loader, jar));
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            return run(failure, () -> cleanup.execute(() -> destroy(current, loader, jar)));
         }
 
         private static Throwable destroySpider(Spider current) {
-            try {
-                if (current != null) current.destroy();
-                return null;
-            } catch (RuntimeException | Error error) {
-                return error;
-            }
+            return run(null, () -> { if (current != null) current.destroy(); });
         }
 
         private static Throwable clearModule(JsLoader loader, Throwable failure) {
-            try {
-                if (loader != null) loader.clear();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            return cancelJavaScript(loader, failure);
         }
 
         private static Throwable deleteJar(File jar, Throwable failure) {
-            try {
-                if (jar != null) jar.delete();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-            return failure;
+            return run(failure, () -> { if (jar != null) jar.delete(); });
         }
     }
 }

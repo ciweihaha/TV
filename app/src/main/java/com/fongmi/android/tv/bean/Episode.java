@@ -92,11 +92,14 @@ public class Episode implements Parcelable, Diffable<Episode> {
         setSelected(false);
     }
 
-    public int getScore(String name, int number) {
+    public int getScore(String name, String lowerName, int number) {
         if (getName().equalsIgnoreCase(name)) return 100;
         if (number != -1 && getNumber() == number) return 80;
-        if (number == -1 && name.length() >= 2 && getName().toLowerCase().contains(name.toLowerCase())) return 70;
-        if (number == -1 && getName().length() >= 2 && name.toLowerCase().contains(getName().toLowerCase())) return 60;
+        if (number == -1) {
+            String lower = getName().toLowerCase();
+            if (name.length() >= 2 && lower.contains(lowerName)) return 70;
+            if (getName().length() >= 2 && lowerName.contains(lower)) return 60;
+        }
         return 0;
     }
 
@@ -146,13 +149,6 @@ public class Episode implements Parcelable, Diffable<Episode> {
     @Override
     public boolean isSameContent(Episode other) {
         return getUrl().equals(other.getUrl()) && getDesc().equals(other.getDesc());
-    }
-
-    public record Rule(Episode episode, int score) {
-
-        public boolean find() {
-            return score > 0;
-        }
     }
 
     public static final Creator<Episode> CREATOR = new Creator<>() {

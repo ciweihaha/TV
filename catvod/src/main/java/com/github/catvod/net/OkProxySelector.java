@@ -19,7 +19,6 @@ public class OkProxySelector extends ProxySelector {
     private final List<Proxy> proxy;
     private final ProxySelector system;
     private volatile int generation;
-    private boolean authSet;
 
     public OkProxySelector() {
         proxy = new CopyOnWriteArrayList<>();

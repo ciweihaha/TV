@@ -3,7 +3,6 @@ package com.fongmi.android.tv.utils;
 import android.net.Uri;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.TextUtils;
 import android.text.style.ClickableSpan;
 
 import com.fongmi.android.tv.api.config.RuleConfig;
@@ -13,9 +12,7 @@ import com.fongmi.android.tv.player.extractor.Source;
 import com.github.catvod.utils.Json;
 import com.github.catvod.utils.Trans;
 import com.github.catvod.utils.UriUtil;
-import com.github.catvod.utils.Util;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -60,8 +57,11 @@ public class Sniffer {
 
     private static Rule getRule(Uri uri) {
         if (uri.getHost() == null) return Rule.empty();
-        String hosts = TextUtils.join(",", Arrays.asList(UriUtil.host(uri), UriUtil.host(uri.getQueryParameter("url"))));
-        for (Rule rule : RuleConfig.get().getRules()) for (String host : rule.getHosts()) if (Util.containOrMatch(hosts, host)) return rule;
+        String hosts = UriUtil.host(uri) + "," + UriUtil.host(uri.getQueryParameter("url"));
+        for (Rule rule : RuleConfig.get().getRules()) {
+            for (String host : rule.getHosts()) if (hosts.contains(host)) return rule;
+            for (Pattern pattern : rule.getHostPatterns()) if (pattern.matcher(hosts).matches()) return rule;
+        }
         return Rule.empty();
     }
 

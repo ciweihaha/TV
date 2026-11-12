@@ -12,9 +12,6 @@ import com.fongmi.android.tv.bean.Device;
 import com.fongmi.android.tv.databinding.AdapterDeviceBinding;
 import com.google.android.material.color.MaterialColors;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class DeviceAdapter extends BaseDiffAdapter<Device, DeviceAdapter.ViewHolder> {
 
     private final OnClickListener listener;
@@ -33,12 +30,6 @@ public class DeviceAdapter extends BaseDiffAdapter<Device, DeviceAdapter.ViewHol
     public interface OnConnectListener extends OnClickListener {
 
         void onLogsClick(Device item);
-    }
-
-    public List<String> getIps() {
-        List<String> ips = new ArrayList<>();
-        for (Device item : getItems()) if (item.isApp()) ips.add(item.getIp());
-        return ips;
     }
 
     @NonNull

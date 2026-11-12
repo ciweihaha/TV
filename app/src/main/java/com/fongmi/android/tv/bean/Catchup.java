@@ -11,11 +11,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public class Catchup {
 
     private static final Pattern TOKEN_PATTERN = Pattern.compile("(\\$?\\{[^}]*\\})");
     private static final Pattern TAG_PATTERN = Pattern.compile("\\{([^}]+)\\}");
+
+    public static final Catchup EMPTY = new Catchup();
 
     @SerializedName("type")
     private String type;
@@ -23,6 +26,9 @@ public class Catchup {
     private String days;
     @SerializedName("regex")
     private String regex;
+
+    private transient Pattern pattern;
+    private transient String patternRegex;
     @SerializedName("source")
     private String source;
     @SerializedName("replace")
@@ -56,10 +62,6 @@ public class Catchup {
         this.type = type;
     }
 
-    public String getDays() {
-        return TextUtils.isEmpty(days) ? "" : days;
-    }
-
     public void setDays(String days) {
         this.days = days;
     }
@@ -70,6 +72,8 @@ public class Catchup {
 
     public void setRegex(String regex) {
         this.regex = regex;
+        this.pattern = null;
+        this.patternRegex = null;
     }
 
     public String getReplace() {
@@ -89,7 +93,21 @@ public class Catchup {
     }
 
     public boolean match(String url) {
-        return url.contains(getRegex()) || Pattern.compile(getRegex()).matcher(url).find();
+        String regex = getRegex();
+        if (url.contains(regex)) return true;
+        try {
+            return getPattern(regex).matcher(url).find();
+        } catch (PatternSyntaxException e) {
+            return false;
+        }
+    }
+
+    private synchronized Pattern getPattern(String regex) {
+        if (pattern == null || !regex.equals(patternRegex)) {
+            patternRegex = regex;
+            pattern = Pattern.compile(regex);
+        }
+        return pattern;
     }
 
     public boolean isEmpty() {

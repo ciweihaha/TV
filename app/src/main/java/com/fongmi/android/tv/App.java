@@ -25,6 +25,7 @@ import com.fongmi.android.tv.utils.RuntimeInstaller;
 import com.fongmi.hook.Hook;
 import com.github.catvod.Runtime;
 import com.github.catvod.utils.RuntimeModule;
+import com.github.catvod.utils.Task;
 import com.google.gson.Gson;
 
 import java.io.IOException;
@@ -104,7 +105,7 @@ public class App extends Application implements Application.ActivityLifecycleCal
     private void initRuntime() {
         MpvLibrary.setLibraryLoader(MpvUtil::loadRuntime);
         RuntimeModule.refresh();
-        cleanRuntime();
+        Task.execute(this::cleanRuntime);
         RuntimeReceiver.register(this);
     }
 

@@ -27,6 +27,8 @@ import java.util.regex.Pattern;
 
 public final class MpvScriptSession {
 
+    private static final Pattern SCRIPT_PATH_PATTERN = Pattern.compile("tv_[a-f0-9]{32}/run");
+
     public enum State {
         RUNNING, DONE, ERROR, TIMEOUT, LOADING, LOADED
     }
@@ -221,7 +223,7 @@ public final class MpvScriptSession {
     private void addBinding(Set<String> names, JSONObject entry) {
         if (entry.optString("owner").isEmpty()) return;
         Matcher matcher = SCRIPT_BINDING.matcher(entry.optString("cmd").strip());
-        if (matcher.matches() && !matcher.group(1).matches("tv_[a-f0-9]{32}/run")) names.add(matcher.group(1));
+        if (matcher.matches() && !SCRIPT_PATH_PATTERN.matcher(matcher.group(1)).matches()) names.add(matcher.group(1));
     }
 
     private void updateStatus(MpvScripts.Item item, State state, String error) {

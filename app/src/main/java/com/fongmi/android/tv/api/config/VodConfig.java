@@ -24,6 +24,7 @@ import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -39,6 +40,7 @@ public class VodConfig extends BaseConfig {
     private List<Doh> doh;
     private List<Rule> rules;
     private List<Site> sites;
+    private transient Map<String, Site> siteIndex;
     private List<String> ads;
     private List<String> flags;
     private List<Parse> parses;
@@ -95,6 +97,7 @@ public class VodConfig extends BaseConfig {
         wall = null;
         parse = null;
         sites = null;
+        siteIndex = null;
         flags = null;
         rules = null;
         parses = null;
@@ -224,6 +227,8 @@ public class VodConfig extends BaseConfig {
 
     private void setSites(List<Site> sites) {
         this.sites = sites;
+        siteIndex = new HashMap<>();
+        for (Site site : sites) siteIndex.putIfAbsent(site.getKey(), site);
     }
 
     public List<Parse> getParses() {
@@ -309,7 +314,8 @@ public class VodConfig extends BaseConfig {
     }
 
     public Site getSite(String key) {
-        return getSites().stream().filter(item -> item.getKey().equals(key)).findFirst().orElse(new Site());
+        Site site = siteIndex == null ? null : siteIndex.get(key);
+        return site == null ? new Site() : site;
     }
 
     private void setParse(Config config, Parse parse, boolean save) {

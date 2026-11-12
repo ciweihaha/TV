@@ -17,10 +17,10 @@ import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Text;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 public class Flag implements Parcelable, Diffable<Flag> {
 
@@ -90,11 +90,19 @@ public class Flag implements Parcelable, Diffable<Flag> {
 
     public void setEpisodes(String url) {
         String[] urls = url.contains("#") ? url.split("#") : new String[]{url};
+        Set<Episode> existing = new HashSet<>(getEpisodes());
         for (int i = 0; i < urls.length; i++) {
-            String[] split = urls[i].split("\\$", 2);
-            String number = String.format(Locale.getDefault(), "%02d", i + 1);
-            Episode episode = split.length > 1 ? Episode.create(split[0].isEmpty() ? number : split[0].trim(), split[1]) : Episode.create(number, urls[i]);
-            if (!getEpisodes().contains(episode)) getEpisodes().add(episode);
+            int dollar = urls[i].indexOf('$');
+            int num = i + 1;
+            String number = num < 10 ? "0" + num : String.valueOf(num);
+            Episode episode;
+            if (dollar >= 0) {
+                String name = urls[i].substring(0, dollar);
+                episode = Episode.create(name.isEmpty() ? number : name.trim(), urls[i].substring(dollar + 1));
+            } else {
+                episode = Episode.create(number, urls[i]);
+            }
+            if (existing.add(episode)) getEpisodes().add(episode);
         }
     }
 
@@ -135,10 +143,17 @@ public class Flag implements Parcelable, Diffable<Flag> {
 
     public Episode findByName(String name) {
         int number = Util.getNumber(name);
-        return getEpisodes().stream()
-                .map(episode -> new Episode.Rule(episode, episode.getScore(name, number)))
-                .filter(Episode.Rule::find).max(Comparator.comparingInt(Episode.Rule::score)).map(Episode.Rule::episode)
-                .orElse(null);
+        String lowerName = name.toLowerCase();
+        Episode best = null;
+        int bestScore = 0;
+        for (Episode episode : getEpisodes()) {
+            int score = episode.getScore(name, lowerName, number);
+            if (score > bestScore) {
+                bestScore = score;
+                best = episode;
+            }
+        }
+        return best;
     }
 
     private boolean isPositionValid() {
@@ -147,8 +162,9 @@ public class Flag implements Parcelable, Diffable<Flag> {
 
     public void mergeEpisodes(List<Episode> items, boolean rev) {
         Episode current = isPositionValid() ? getEpisodes().get(getPosition()) : null;
+        Set<Episode> existing = new HashSet<>(getEpisodes());
         for (Episode item : items) {
-            if (getEpisodes().contains(item)) continue;
+            if (!existing.add(item)) continue;
             if (rev) getEpisodes().add(0, item);
             else getEpisodes().add(item);
         }

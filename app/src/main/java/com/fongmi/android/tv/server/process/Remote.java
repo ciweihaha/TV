@@ -49,13 +49,13 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Method;
@@ -64,6 +64,9 @@ import fi.iki.elonen.NanoHTTPD.Response.Status;
 import okhttp3.HttpUrl;
 
 public class Remote implements Process {
+
+    private static final Pattern KEY_ID_PATTERN = Pattern.compile("[a-zA-Z0-9-]{1,64}");
+    private static final Pattern HEX32_PATTERN = Pattern.compile("[0-9a-f]{32}");
 
     private static final Set<String> COMMANDS = Set.of("play", "pause", "stop", "prev", "next", "repeat_on", "repeat_off", "seek", "speed");
     private static final Set<String> KEY_ACTIONS = Set.of("press", "down", "repeat", "up", "cancel");
@@ -100,14 +103,14 @@ public class Remote implements Process {
         if (key && keyCode == null) return response(Status.BAD_REQUEST, "Invalid remote key");
         String keyAction = session.getParms().getOrDefault("action", "press");
         String keyId = session.getParms().getOrDefault("id", "");
-        if (key && (!KEY_ACTIONS.contains(keyAction) || !keyAction.equals("press") && !keyId.matches("[a-zA-Z0-9-]{1,64}"))) return response(Status.BAD_REQUEST, "Invalid remote key action");
+        if (key && (!KEY_ACTIONS.contains(keyAction) || !keyAction.equals("press") && !KEY_ID_PATTERN.matcher(keyId).matches())) return response(Status.BAD_REQUEST, "Invalid remote key action");
         if ((control || media || key) && !isSameOrigin(session.getHeaders())) return response(Status.FORBIDDEN, "Same origin required");
         long position = control && type.equals("seek") ? seekPosition(session.getParms().get("position")) : 0;
         if (position < 0) return response(Status.BAD_REQUEST, "Invalid seek position");
         float speed = control && type.equals("speed") ? speedValue(session.getParms().get("speed")) : 1;
         if (!Float.isFinite(speed) || speed < SpeedSetting.MIN || speed > SpeedSetting.MAX) return response(Status.BAD_REQUEST, "Invalid playback speed");
         String mediaKey = session.getParms().get("key");
-        if (media && (mediaKey == null || !mediaKey.matches("[0-9a-f]{32}"))) return response(Status.BAD_REQUEST, "Invalid playback key");
+        if (media && (mediaKey == null || !HEX32_PATTERN.matcher(mediaKey).matches())) return response(Status.BAD_REQUEST, "Invalid playback key");
         Sub sub;
         Danmaku comments;
         try {
@@ -285,7 +288,7 @@ public class Remote implements Process {
     }
 
     private Response artwork(String key) {
-        if (key == null || !key.matches("[0-9a-f]{32}")) return response(Status.BAD_REQUEST, "Invalid artwork key");
+        if (key == null || !HEX32_PATTERN.matcher(key).matches()) return response(Status.BAD_REQUEST, "Invalid artwork key");
         FutureTask<Uri> source = new FutureTask<>(() -> {
             PlaybackService service = Server.get().getService();
             if (service == null || !service.hasRemotePlayback()) return null;
@@ -364,11 +367,5 @@ public class Remote implements Process {
         String host = headers.get("host");
         HttpUrl target = host == null ? null : HttpUrl.parse("http://" + host);
         return source != null && source.equals(target);
-    }
-
-    private Response response(Status status, String text) {
-        Response response = newFixedLengthResponse(status, status == Status.OK ? "application/json; charset=utf-8" : "text/plain; charset=utf-8", text);
-        response.addHeader("Cache-Control", "no-store");
-        return response;
     }
 }

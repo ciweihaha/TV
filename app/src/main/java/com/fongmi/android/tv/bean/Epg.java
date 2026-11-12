@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 
@@ -31,7 +32,7 @@ public class Epg {
     }
 
     public static Epg objectFrom(String str, String key, String date, ZoneId zoneId) {
-        if (!Json.isObj(str)) return EpgParser.getEpg(str, key, date, zoneId);
+        if (Json.firstNonBlank(str) != '{') return EpgParser.getEpg(str, key, date, zoneId);
         try {
             Epg item = App.gson().fromJson(str, Epg.class);
             item.setTime(zoneId);
@@ -89,6 +90,7 @@ public class Epg {
     private void setTime(ZoneId zoneId) {
         setList(new ArrayList<>(new LinkedHashSet<>(getList())));
         for (EpgData item : getList()) setTime(item, zoneId);
+        getList().sort(Comparator.comparingLong(EpgData::getStartTime));
     }
 
     private void setTime(EpgData item, ZoneId zoneId) {
@@ -115,9 +117,19 @@ public class Epg {
     }
 
     public int getInRange() {
+        List<EpgData> list = getList();
         long now = System.currentTimeMillis();
-        for (int i = 0; i < getList().size(); i++) if (getList().get(i).isInRange(now)) return i;
-        return -1;
+        int low = 0, high = list.size() - 1, result = -1;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            if (list.get(mid).getStartTime() <= now) {
+                result = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return result >= 0 && list.get(result).isInRange(now) ? result : -1;
     }
 
     private long parseEpgTime(String source, ZoneId zoneId) {

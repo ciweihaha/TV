@@ -277,14 +277,11 @@ public class History implements Diffable<History> {
     }
 
     public String getSiteKey() {
-        if (getKey() == null) return "";
-        return getKey().split(AppDatabase.SYMBOL, -1)[0];
+        return AppDatabase.siteKey(getKey());
     }
 
     public String getVodId() {
-        if (getKey() == null) return "";
-        String[] parts = getKey().split(AppDatabase.SYMBOL, -1);
-        return parts.length > 1 ? parts[1] : "";
+        return AppDatabase.vodId(getKey());
     }
 
     public Flag getFlag() {

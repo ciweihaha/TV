@@ -53,23 +53,6 @@ public class EpisodeAdapter extends RecyclerView.Adapter<BaseEpisodeHolder> {
         return mItems.indexOf(item);
     }
 
-    public Episode getActivated() {
-        return mItems.get(getPosition());
-    }
-
-    public Episode getNext() {
-        int current = getPosition();
-        int max = getItemCount() - 1;
-        current = ++current > max ? max : current;
-        return mItems.get(current);
-    }
-
-    public Episode getPrev() {
-        int current = getPosition();
-        current = --current < 0 ? 0 : current;
-        return mItems.get(current);
-    }
-
     public List<Episode> getItems() {
         return mItems;
     }

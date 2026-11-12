@@ -28,6 +28,8 @@ import java.util.Objects;
 @Entity(indices = @Index(value = {"uuid", "name"}, unique = true))
 public class Device implements Diffable<Device>, Comparable<Device> {
 
+    private static final Comparator<Device> COMPARATOR = Comparator.comparingInt(Device::getType).thenComparing(Device::getName, String.CASE_INSENSITIVE_ORDER).thenComparing(Device::getUuid);
+
     @PrimaryKey(autoGenerate = true)
     @SerializedName("id")
     private Integer id;
@@ -115,7 +117,8 @@ public class Device implements Diffable<Device>, Comparable<Device> {
     }
 
     public boolean canRename() {
-        return isApp() && !getUuid().isBlank() && !getUuid().matches("0+");
+        String uuid = getUuid();
+        return isApp() && !uuid.isBlank() && uuid.chars().anyMatch(c -> c != '0');
     }
 
     public String getAlias() {
@@ -221,6 +224,6 @@ public class Device implements Diffable<Device>, Comparable<Device> {
 
     @Override
     public int compareTo(Device other) {
-        return Comparator.comparingInt(Device::getType).thenComparing(Device::getName, String.CASE_INSENSITIVE_ORDER).thenComparing(Device::getUuid).compare(this, other);
+        return COMPARATOR.compare(this, other);
     }
 }

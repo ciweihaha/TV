@@ -79,10 +79,6 @@ public class EpgData {
         this.endTime = endTime;
     }
 
-    public boolean isInRange() {
-        return isInRange(System.currentTimeMillis());
-    }
-
     boolean isInRange(long now) {
         return getStartTime() <= now && now < getEndTime();
     }
@@ -105,6 +101,7 @@ public class EpgData {
     private static String formatTime(String time) {
         if (time.isEmpty()) return time;
         if (time.equals("24:00:00")) return "24:00";
+        if (time.length() == 5 && time.charAt(2) == ':') return time;
         try {
             return LocalTime.parse(time).format(Formatters.TIME);
         } catch (DateTimeParseException e) {

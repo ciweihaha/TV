@@ -12,13 +12,12 @@ import com.fongmi.android.tv.ui.activity.SettingPreloadActivity;
 import com.fongmi.android.tv.utils.FileUtil;
 import com.fongmi.android.tv.utils.KeyUtil;
 import com.fongmi.android.tv.utils.SliderUtil;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class PreloadDialog extends BaseAlertDialog {
 
-    public static final int THREADS = 0;
-    public static final int SIZE = 1;
-    public static final int TIME = 2;
+    public static final int THREADS = PreloadSetting.TYPE_THREADS;
+    public static final int SIZE = PreloadSetting.TYPE_SIZE;
+    public static final int TIME = PreloadSetting.TYPE_TIME;
 
     private DialogSpeedBinding binding;
     private int type;
@@ -37,17 +36,12 @@ public class PreloadDialog extends BaseAlertDialog {
     }
 
     @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
-    }
-
-    @Override
     protected void initView() {
         type = requireArguments().getInt("type");
-        binding.slider.setValueTo(getMax());
-        binding.slider.setValueFrom(getMin());
-        binding.slider.setStepSize(getStep());
-        SliderUtil.setValue(binding.slider, getValue());
+        binding.slider.setValueTo(PreloadSetting.getMax(type));
+        binding.slider.setValueFrom(PreloadSetting.getMin(type));
+        binding.slider.setStepSize(PreloadSetting.getStep(type));
+        SliderUtil.setValue(binding.slider, PreloadSetting.getValue(type));
         binding.slider.setLabelFormatter(value -> format(Math.round(value)));
     }
 
@@ -69,29 +63,9 @@ public class PreloadDialog extends BaseAlertDialog {
         getDialog().getWindow().setBackgroundDrawableResource(android.R.color.transparent);
     }
 
-    private int getMin() {
-        if (type == THREADS) return PreloadSetting.MIN_THREADS;
-        if (type == SIZE) return PreloadSetting.MIN_SIZE_MB;
-        return PreloadSetting.MIN_TIME_SECONDS;
-    }
 
-    private int getMax() {
-        if (type == THREADS) return PreloadSetting.MAX_THREADS;
-        if (type == SIZE) return PreloadSetting.MAX_SIZE_MB;
-        return PreloadSetting.MAX_TIME_SECONDS;
-    }
 
-    private int getStep() {
-        if (type == SIZE) return PreloadSetting.STEP_SIZE_MB;
-        if (type == TIME) return PreloadSetting.STEP_TIME_SECONDS;
-        return 1;
-    }
 
-    private int getValue() {
-        if (type == THREADS) return PreloadSetting.getThreads();
-        if (type == SIZE) return PreloadSetting.getSizeMb();
-        return PreloadSetting.getTimeSeconds();
-    }
 
     private String format(int value) {
         if (type == THREADS) return getString(R.string.player_preload_threads_value, value);

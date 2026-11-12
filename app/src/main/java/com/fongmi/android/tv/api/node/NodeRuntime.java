@@ -15,7 +15,6 @@ import com.github.catvod.utils.Json;
 import com.github.catvod.utils.RuntimeModule;
 import com.github.catvod.utils.Task;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -39,7 +38,10 @@ public final class NodeRuntime implements NodeRuntimeApi.Callback {
 
     public static boolean isConfig(String url) {
         if (url == null || url.regionMatches(true, 0, "content://", 0, 10)) return false;
-        String value = url.split("[?#]", 2)[0];
+        int cut = url.indexOf('?');
+        int hash = url.indexOf('#');
+        if (hash >= 0 && (cut < 0 || hash < cut)) cut = hash;
+        String value = cut < 0 ? url : url.substring(0, cut);
         try {
             value = URLDecoder.decode(value, StandardCharsets.UTF_8);
         } catch (IllegalArgumentException ignored) {
@@ -122,13 +124,17 @@ public final class NodeRuntime implements NodeRuntimeApi.Callback {
     }
 
     private String cookie(JsonObject options) {
-        JsonObject result = JsonParser.parseString(SUCCESS_RESPONSE).getAsJsonObject();
+        JsonObject result = new JsonObject();
+        result.addProperty("success", true);
+        result.addProperty("code", 0);
         result.addProperty("cookie", WebViewCookies.get(Json.safeString(options, "url")));
         return result.toString();
     }
 
     private String userAgent() {
-        JsonObject result = JsonParser.parseString(SUCCESS_RESPONSE).getAsJsonObject();
+        JsonObject result = new JsonObject();
+        result.addProperty("success", true);
+        result.addProperty("code", 0);
         result.addProperty("ua", WebActivity.getUserAgent());
         return result.toString();
     }

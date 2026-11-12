@@ -19,8 +19,12 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.ConcurrentModificationException;
+import java.util.regex.Pattern;
 
 public final class SpiderSource {
+
+    private static final Pattern VERSION_PATTERN = Pattern.compile("[A-Za-z0-9_-]{43}");
+    private static final Pattern BACKUP_PATTERN = Pattern.compile("[A-Za-z0-9_-]{43}\\.bak");
 
     public static final int MAX_BYTES = 2 * 1024 * 1024;
     private final File file;
@@ -128,7 +132,7 @@ public final class SpiderSource {
     }
 
     private File backup(String id) throws IOException {
-        if (!id.matches("[A-Za-z0-9_-]{43}")) throw new IllegalArgumentException("Invalid source version");
+        if (!VERSION_PATTERN.matcher(id).matches()) throw new IllegalArgumentException("Invalid source version");
         File backup = new File(history, id + ".bak");
         if (!backup.isFile()) throw new IOException("Source version is missing");
         return backup;
@@ -136,7 +140,7 @@ public final class SpiderSource {
 
     private File[] backups() throws IOException {
         if (!history.exists()) return new File[0];
-        File[] files = history.listFiles(file -> file.isFile() && file.getName().matches("[A-Za-z0-9_-]{43}\\.bak"));
+        File[] files = history.listFiles(file -> file.isFile() && BACKUP_PATTERN.matcher(file.getName()).matches());
         if (files == null) throw new IOException("Cannot read source versions");
         Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed().thenComparing(File::getName));
         return files;

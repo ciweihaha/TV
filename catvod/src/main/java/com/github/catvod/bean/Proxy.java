@@ -16,6 +16,8 @@ import java.util.Objects;
 
 public class Proxy implements Comparable<Proxy> {
 
+    private static final Gson GSON = new Gson();
+
     @SerializedName("name")
     private String name;
     @SerializedName("hosts")
@@ -30,7 +32,7 @@ public class Proxy implements Comparable<Proxy> {
     public static List<Proxy> arrayFrom(JsonElement element) {
         try {
             Type listType = TypeToken.getParameterized(List.class, Proxy.class).getType();
-            List<Proxy> items = new Gson().fromJson(element, listType);
+            List<Proxy> items = GSON.fromJson(element, listType);
             return items == null ? Collections.emptyList() : items;
         } catch (Exception e) {
             return Collections.emptyList();

@@ -26,6 +26,7 @@ import java.util.Properties;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Pattern;
 
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Method;
@@ -33,6 +34,10 @@ import fi.iki.elonen.NanoHTTPD.Response;
 import fi.iki.elonen.NanoHTTPD.Response.Status;
 
 public class Upload implements Process {
+
+    private static final Pattern HEX32_PATTERN = Pattern.compile("[0-9a-f]{32}");
+    private static final Pattern HEX64_PATTERN = Pattern.compile("[0-9a-f]{64}");
+    private static final Pattern INDEX_PATTERN = Pattern.compile("0|[1-9][0-9]{0,9}");
 
     private static final long CHUNK_SIZE = 4 * 1024 * 1024;
     private static final long MAX_AGE = 7 * 24 * 60 * 60 * 1000L;
@@ -72,7 +77,7 @@ public class Upload implements Process {
 
     private Response handleUpload(String url, Map<String, String> params, Map<String, String> files) throws IOException {
         String id = params.get("id");
-        if (id == null || !id.matches("[0-9a-f]{32}")) throw new IllegalArgumentException("Invalid upload ID");
+        if (id == null || !HEX32_PATTERN.matcher(id).matches()) throw new IllegalArgumentException("Invalid upload ID");
         File meta = new File(storage, id + ".properties");
         File data = new File(storage, id + ".part");
         Properties info = new Properties();
@@ -100,7 +105,7 @@ public class Upload implements Process {
         String path = params.get("path"), name = params.get("name"), hash = params.get("sha256");
         long size = Long.parseLong(params.get("size"));
         File target = target(path, name);
-        if (size < 0 || size > 9007199254740991L || hash == null || !hash.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Invalid upload file");
+        if (size < 0 || size > 9007199254740991L || hash == null || !HEX64_PATTERN.matcher(hash).matches()) throw new IllegalArgumentException("Invalid upload file");
         if (!info.isEmpty()) {
             if (!path.equals(info.getProperty("path")) || !name.equals(info.getProperty("name")) || !hash.equals(info.getProperty("sha256")) || size != Long.parseLong(info.getProperty("size"))) throw new IllegalArgumentException("Upload file changed");
             if (!info.containsKey("revision") && !Boolean.parseBoolean(info.getProperty("complete"))) {
@@ -160,7 +165,7 @@ public class Upload implements Process {
     private void addSavedChunk(TreeSet<Long> saved, File file, String prefix, long total) throws IOException {
         if (!file.isFile() || !file.getName().startsWith(prefix)) return;
         String index = file.getName().substring(prefix.length());
-        if (!index.matches("0|[1-9][0-9]{0,9}")) return;
+        if (!INDEX_PATTERN.matcher(index).matches()) return;
         long value = Long.parseLong(index), start = value * CHUNK_SIZE;
         if (start >= total || file.length() != Math.min(CHUNK_SIZE, total - start)) throw new IOException("Invalid saved upload chunk");
         saved.add(value);

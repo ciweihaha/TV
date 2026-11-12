@@ -16,16 +16,13 @@ import com.fongmi.android.tv.utils.Util;
 import com.github.catvod.utils.Trans;
 import com.github.catvod.utils.UriUtil;
 import com.google.gson.annotations.SerializedName;
-import com.google.gson.reflect.TypeToken;
 
 import org.simpleframework.xml.Element;
 import org.simpleframework.xml.ElementList;
 import org.simpleframework.xml.Path;
 import org.simpleframework.xml.Root;
 
-import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
@@ -39,6 +36,9 @@ public class Vod implements Parcelable, Diffable<Vod> {
     @Element(name = "name", required = false)
     @SerializedName("vod_name")
     private String vodName;
+
+    private transient String nameCache;
+    private transient String nameCacheSource;
     @Element(name = "type", required = false)
     @SerializedName("type_name")
     private String typeName;
@@ -116,17 +116,6 @@ public class Vod implements Parcelable, Diffable<Vod> {
         this.site = in.readParcelable(Site.class.getClassLoader());
     }
 
-    public static Vod objectFrom(String str) {
-        Vod vod = App.gson().fromJson(str, Vod.class);
-        return vod == null ? new Vod() : vod.trans().setFlags();
-    }
-
-    public static List<Vod> arrayFrom(String str) {
-        Type listType = TypeToken.getParameterized(List.class, Vod.class).getType();
-        List<Vod> items = App.gson().fromJson(str, listType);
-        return items == null ? Collections.emptyList() : items;
-    }
-
     public String getId() {
         return TextUtils.isEmpty(vodId) ? "" : vodId.trim();
     }
@@ -136,7 +125,11 @@ public class Vod implements Parcelable, Diffable<Vod> {
     }
 
     public String getName() {
-        return TextUtils.isEmpty(vodName) ? "" : Html.fromHtml(vodName, Html.FROM_HTML_MODE_LEGACY).toString().trim();
+        if (TextUtils.isEmpty(vodName)) return "";
+        if (nameCache != null && vodName.equals(nameCacheSource)) return nameCache;
+        nameCacheSource = vodName;
+        nameCache = Html.fromHtml(vodName, Html.FROM_HTML_MODE_LEGACY).toString().trim();
+        return nameCache;
     }
 
     public String getName(String fallback) {
@@ -148,6 +141,8 @@ public class Vod implements Parcelable, Diffable<Vod> {
 
     public void setName(String vodName) {
         this.vodName = vodName;
+        this.nameCache = null;
+        this.nameCacheSource = null;
     }
 
     public String getTypeName() {
@@ -198,10 +193,6 @@ public class Vod implements Parcelable, Diffable<Vod> {
         return TextUtils.isEmpty(vodPlayFrom) ? "" : vodPlayFrom;
     }
 
-    public void setPlayFrom(String vodPlayFrom) {
-        this.vodPlayFrom = vodPlayFrom;
-    }
-
     public String getPlayUrl() {
         return TextUtils.isEmpty(vodPlayUrl) ? "" : vodPlayUrl;
     }
@@ -212,10 +203,6 @@ public class Vod implements Parcelable, Diffable<Vod> {
 
     public String getPlayId() {
         return TextUtils.isEmpty(vodPlayId) ? "" : vodPlayId;
-    }
-
-    public void setPlayId(String vodPlayId) {
-        this.vodPlayId = vodPlayId;
     }
 
     public String getTag() {
@@ -308,10 +295,12 @@ public class Vod implements Parcelable, Diffable<Vod> {
     }
 
     public Vod setFlags() {
-        String[] playUrls = getPlayUrl().split("\\$\\$\\$");
-        String[] playFlags = getPlayFrom().split("\\$\\$\\$");
         if (!getFlags().isEmpty()) for (Flag item : getFlags()) item.setEpisodes(item.getUrls());
-        else IntStream.range(0, playFlags.length).filter(i -> !playFlags[i].trim().isEmpty() && i < playUrls.length && !TextUtils.isEmpty(playUrls[i])).mapToObj(i -> Flag.create(playFlags[i].trim(), playUrls[i])).forEach(getFlags()::add);
+        else {
+            String[] playUrls = getPlayUrl().split("\\$\\$\\$");
+            String[] playFlags = getPlayFrom().split("\\$\\$\\$");
+            IntStream.range(0, playFlags.length).filter(i -> !playFlags[i].trim().isEmpty() && i < playUrls.length && !TextUtils.isEmpty(playUrls[i])).mapToObj(i -> Flag.create(playFlags[i].trim(), playUrls[i])).forEach(getFlags()::add);
+        }
         return this;
     }
 

@@ -32,7 +32,11 @@ public class LiveApi {
 
     public static boolean parseXml(@NonNull Live item) {
         boolean parsed = false;
-        for (String url : item.getEpgXml()) parsed |= startXml(item, url);
+        for (String url : item.getEpgXml()) {
+            if (item.tryMarkEpgXmlAttempted(url)) continue;
+            if (startXml(item, url)) parsed = true;
+            else item.markEpgXmlFailed(url);
+        }
         return parsed;
     }
 

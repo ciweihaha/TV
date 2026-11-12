@@ -9,11 +9,14 @@ import com.github.catvod.utils.Path;
 import com.github.catvod.utils.UriUtil;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 public class Strm implements Source.Extractor {
+
+    private static final Pattern URL_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9+.-]*:\\S+");
 
     private static final long MAX_STRM_BYTES = 64 * 1024;
 
@@ -43,6 +46,6 @@ public class Strm implements Source.Extractor {
     private String parseTarget(String content, String url) {
         if (content.startsWith("\uFEFF")) content = content.substring(1);
         String line = content.split("\\R", 2)[0].trim();
-        return line.matches("[a-zA-Z][a-zA-Z0-9+.-]*:\\S+") ? line : url;
+        return URL_PATTERN.matcher(line).matches() ? line : url;
     }
 }

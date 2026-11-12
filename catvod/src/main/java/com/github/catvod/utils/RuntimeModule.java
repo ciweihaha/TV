@@ -30,6 +30,7 @@ import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
+import java.util.regex.Pattern;
 
 import dalvik.system.DexClassLoader;
 
@@ -41,6 +42,9 @@ public enum RuntimeModule {
     THUNDER("thunder", "Thunder", "libxl_thunder_sdk.so"),
     MPV("mpv", "MPV", "libplayer.so"),
     BDJ("bdj", "BD-J", "");
+
+    private static final Pattern DEX_PATTERN = Pattern.compile("classes(?:[2-9]|1[0-6])?\\.dex");
+    private static final Pattern HEX64_PATTERN = Pattern.compile("[0-9a-f]{64}");
 
     public final String id;
     public final String title;
@@ -469,7 +473,7 @@ public enum RuntimeModule {
     private static void verifyDexEntry(ZipFile apk, ZipEntry entry, HashSet<String> files) throws IOException {
         String name = entry.getName();
         if (!name.endsWith(".dex")) return;
-        if (!name.matches("classes(?:[2-9]|1[0-6])?\\.dex") || !files.add(name) || entry.getSize() < 112 || entry.getSize() > 64 * 1024 * 1024) throw new IOException("Invalid runtime DEX");
+        if (!DEX_PATTERN.matcher(name).matches() || !files.add(name) || entry.getSize() < 112 || entry.getSize() > 64 * 1024 * 1024) throw new IOException("Invalid runtime DEX");
         try (DataInputStream input = new DataInputStream(apk.getInputStream(entry))) {
             if (input.readInt() != 0x6465780a) throw new IOException("Invalid runtime DEX header");
         }
@@ -478,7 +482,7 @@ public enum RuntimeModule {
     private static String readHostCppSha256(JSONObject libraries) throws IOException, JSONException {
         if (libraries.length() != 1 || !libraries.has("libc++_shared.so")) throw new IOException("Invalid MPV host libraries");
         String expected = libraries.getString("libc++_shared.so");
-        if (!expected.matches("[0-9a-f]{64}")) throw new IOException("Invalid MPV host library digest");
+        if (!HEX64_PATTERN.matcher(expected).matches()) throw new IOException("Invalid MPV host library digest");
         return expected;
     }
 
@@ -512,7 +516,7 @@ public enum RuntimeModule {
     private HashSet<String> verifyPayloadMetadata(List<Payload> files, String abi) throws IOException {
         var paths = new HashSet<String>();
         for (Payload payload : files) {
-            if (!paths.add(payload.path) || !payload.sha256.matches("[0-9a-f]{64}") || payload.size <= 0 || payload.size > 128 * 1024 * 1024) throw new IOException("Invalid runtime payload metadata");
+            if (!paths.add(payload.path) || !HEX64_PATTERN.matcher(payload.sha256).matches() || payload.size <= 0 || payload.size > 128 * 1024 * 1024) throw new IOException("Invalid runtime payload metadata");
             verifyPayloadPath(payload, abi);
         }
         return paths;

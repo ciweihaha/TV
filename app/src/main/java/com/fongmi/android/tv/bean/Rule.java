@@ -33,6 +33,7 @@ public class Rule {
     private List<String> exclude;
     private transient volatile List<Pattern> regexPatterns;
     private transient volatile List<Pattern> excludePatterns;
+    private transient volatile List<Pattern> hostPatterns;
 
     public Rule(String name) {
         this.name = name;
@@ -85,6 +86,12 @@ public class Rule {
     public List<Pattern> getExcludePatterns() {
         List<Pattern> result = excludePatterns;
         if (result == null) excludePatterns = result = compile(getExclude());
+        return result;
+    }
+
+    public List<Pattern> getHostPatterns() {
+        List<Pattern> result = hostPatterns;
+        if (result == null) hostPatterns = result = compile(getHosts());
         return result;
     }
 

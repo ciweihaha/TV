@@ -20,22 +20,6 @@ public class Cate implements Parcelable {
         this.ratio = (Float) in.readValue(Float.class.getClassLoader());
     }
 
-    public int getLand() {
-        return land == null ? 0 : land;
-    }
-
-    public int getCircle() {
-        return circle == null ? 0 : circle;
-    }
-
-    public float getRatio() {
-        return ratio == null ? 0 : ratio;
-    }
-
-    public Style getStyle() {
-        return Style.get(getLand(), getCircle(), getRatio());
-    }
-
     @Override
     public int describeContents() {
         return 0;

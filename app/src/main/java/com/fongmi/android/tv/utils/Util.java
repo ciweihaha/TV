@@ -35,6 +35,10 @@ import java.util.regex.Pattern;
 public class Util {
 
     private static final Pattern EPISODE = Pattern.compile("(?i)(?:ep|第|e|[\\-\\.\\s])\\s?(\\d{1,4})");
+    private static final Pattern BRACKET = Pattern.compile("\\[.*?\\]|\\(.*?\\)");
+    private static final Pattern YEAR = Pattern.compile("\\b(19|20)\\d{2}\\b");
+    private static final Pattern QUALITY = Pattern.compile("(?i)2160p|1080p|720p|480p|4k|h26[45]|x26[45]|mp4");
+    private static final Pattern NON_DIGIT = Pattern.compile("\\D+");
 
     public static void toggleFullscreen(Activity activity, boolean fullscreen) {
         if (fullscreen) hideSystemUI(activity);
@@ -111,16 +115,25 @@ public class Util {
 
     public static int getNumber(String text) {
         try {
-            text = text.replaceAll("\\[.*?\\]|\\(.*?\\)", "");
-            text = text.replaceAll("\\b(19|20)\\d{2}\\b", "");
-            text = text.toLowerCase().replaceAll("2160p|1080p|720p|480p|4k|h26[45]|x26[45]|mp4", "");
+            String trimmed = text.trim();
+            if (isAllDigits(trimmed)) return Integer.parseInt(trimmed);
+            text = BRACKET.matcher(text).replaceAll("");
+            text = YEAR.matcher(text).replaceAll("");
+            text = QUALITY.matcher(text).replaceAll("");
             Matcher matcher = EPISODE.matcher(text);
             if (matcher.find()) return Integer.parseInt(matcher.group(1));
-            String number = text.replaceAll("\\D+", "");
+            String number = NON_DIGIT.matcher(text).replaceAll("");
             return number.isEmpty() ? -1 : Integer.parseInt(number);
         } catch (Exception e) {
             return -1;
         }
+    }
+
+    private static boolean isAllDigits(String text) {
+        if (text.isEmpty()) return false;
+        for (int i = 0; i < text.length(); i++) if (!Character.isDigit(text.charAt(i))) return false;
+        if (text.length() == 4 && (text.startsWith("19") || text.startsWith("20"))) return false;
+        return true;
     }
 
     public static String clean(String text) {
@@ -167,10 +180,6 @@ public class Util {
         return "leanback".equals(BuildConfig.FLAVOR);
     }
 
-    public static boolean isMobile() {
-        return "mobile".equals(BuildConfig.FLAVOR);
-    }
-
     public static boolean isFullscreen(Activity activity) {
         if (activity == null || activity.getWindow() == null) return false;
         return isLeanback() || (activity.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
@@ -188,8 +197,11 @@ public class Util {
         }
     }
 
+    private static final ThreadLocal<StringBuilder> TIME_BUILDER = ThreadLocal.withInitial(StringBuilder::new);
+
     public static String timeMs(long timeMs) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = TIME_BUILDER.get();
+        sb.setLength(0);
         return format(sb, new Formatter(sb, Locale.getDefault()), timeMs);
     }
 }

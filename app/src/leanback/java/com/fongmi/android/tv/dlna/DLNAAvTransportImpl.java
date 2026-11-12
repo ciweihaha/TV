@@ -39,8 +39,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class DLNAAvTransportImpl extends AbstractAVTransportService {
+
+    private static final Pattern TIME_PATTERN = Pattern.compile("[0-9]+:[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?");
 
     private final Context context;
     private final Runnable onChange;
@@ -397,7 +400,7 @@ public class DLNAAvTransportImpl extends AbstractAVTransportService {
 
     private long parseTimeToMs(String time) throws AVTransportException {
         try {
-            if (time == null || !time.matches("[0-9]+:[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?")) throw new NumberFormatException();
+            if (time == null || !TIME_PATTERN.matcher(time).matches()) throw new NumberFormatException();
             String[] parts = time.split(":");
             int dot = parts[2].indexOf('.');
             long secs = Long.parseLong(dot >= 0 ? parts[2].substring(0, dot) : parts[2]);

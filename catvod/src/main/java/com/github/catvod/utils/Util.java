@@ -12,6 +12,8 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Enumeration;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import okhttp3.OkHttp;
 
@@ -20,6 +22,9 @@ public class Util {
     public static final String OKHTTP = "okhttp/" + OkHttp.VERSION;
     public static final String CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
     public static final int URL_SAFE = Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP;
+
+    private static final Pattern INVALID_PATTERN = Pattern.compile("(?!)");
+    private static final ConcurrentHashMap<String, Pattern> PATTERN_CACHE = new ConcurrentHashMap<>();
 
     public static String base64(String s) {
         return base64(s.getBytes());
@@ -47,13 +52,28 @@ public class Util {
 
     public static byte[] hex2byte(String s) {
         byte[] bytes = new byte[s.length() / 2];
-        for (int i = 0; i < bytes.length; i++) bytes[i] = Integer.valueOf(s.substring(i * 2, i * 2 + 2), 16).byteValue();
+        for (int i = 0; i < bytes.length; i++) {
+            int hi = Character.digit(s.charAt(i * 2), 16);
+            int lo = Character.digit(s.charAt(i * 2 + 1), 16);
+            if (hi < 0 || lo < 0) throw new NumberFormatException("Invalid hex: " + s.substring(i * 2, i * 2 + 2));
+            bytes[i] = (byte) ((hi << 4) + lo);
+        }
         return bytes;
     }
 
     public static boolean containOrMatch(String text, String regex) {
         try {
-            return text.contains(regex) || text.matches(regex);
+            if (text.contains(regex)) return true;
+            Pattern pattern = PATTERN_CACHE.get(regex);
+            if (pattern == null) {
+                try {
+                    pattern = Pattern.compile(regex);
+                } catch (Exception e) {
+                    pattern = INVALID_PATTERN;
+                }
+                if (PATTERN_CACHE.size() < 128) PATTERN_CACHE.put(regex, pattern);
+            }
+            return pattern != INVALID_PATTERN && pattern.matcher(text).matches();
         } catch (Exception e) {
             return false;
         }

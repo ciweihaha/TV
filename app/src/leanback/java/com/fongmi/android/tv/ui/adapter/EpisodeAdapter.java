@@ -47,19 +47,6 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
         return mItems.isEmpty() ? new Episode() : mItems.get(getPosition());
     }
 
-    public Episode getNext() {
-        int current = getPosition();
-        int max = getItemCount() - 1;
-        current = ++current > max ? max : current;
-        return mItems.get(current);
-    }
-
-    public Episode getPrev() {
-        int current = getPosition();
-        current = --current < 0 ? 0 : current;
-        return mItems.get(current);
-    }
-
     public void setNextFocusDown(int nextFocusDown) {
         this.nextFocusDown = nextFocusDown;
         notifyDataSetChanged();

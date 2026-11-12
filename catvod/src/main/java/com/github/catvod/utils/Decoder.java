@@ -52,19 +52,23 @@ public class Decoder {
 
     private static String fix(String url, String data) {
         Matcher matcher = JS_URI.matcher(data);
-        while (matcher.find()) data = replace(url, data, matcher.group());
+        if (matcher.find()) {
+            StringBuilder sb = new StringBuilder();
+            do {
+                String ext = matcher.group();
+                String t = ext.replace("\"./", "\"" + UriUtil.resolve(url, "./"));
+                t = t.replace("\"../", "\"" + UriUtil.resolve(url, "../"));
+                t = t.replace("./", "__JS1__").replace("../", "__JS2__");
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(t));
+            } while (matcher.find());
+            matcher.appendTail(sb);
+            data = sb.toString();
+        }
         if (data.contains("../")) data = data.replace("../", UriUtil.resolve(url, "../"));
         if (data.contains("./")) data = data.replace("./", UriUtil.resolve(url, "./"));
         if (data.contains("__JS1__")) data = data.replace("__JS1__", "./");
         if (data.contains("__JS2__")) data = data.replace("__JS2__", "../");
         return data;
-    }
-
-    private static String replace(String url, String data, String ext) {
-        String t = ext.replace("\"./", "\"" + UriUtil.resolve(url, "./"));
-        t = t.replace("\"../", "\"" + UriUtil.resolve(url, "../"));
-        t = t.replace("./", "__JS1__").replace("../", "__JS2__");
-        return data.replace(ext, t);
     }
 
     private static String cbc(String data) throws Exception {
