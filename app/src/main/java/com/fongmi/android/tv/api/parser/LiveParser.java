@@ -47,7 +47,12 @@ public class LiveParser {
 
     private static String extract(String line, String... keywords) {
         String[] splits = line.split(" ");
-        for (String split : splits) for (String keyword : keywords) if (split.contains(keyword)) return split.split("=")[1].replace("\"", "");
+        for (String split : splits) for (String keyword : keywords) if (split.contains(keyword)) {
+            // 空值（如 tvg-url=）时 split("=") 只有 1 段，[1] 会抛 ArrayIndexOutOfBoundsException，
+            // 整个 m3u() 解析中途失败、直播源一个台都导不进来；用 limit 2 保留值里的 '='（如 EPG 地址的 ?x=1）
+            String[] kv = split.split("=", 2);
+            return kv.length > 1 ? kv[1].replace("\"", "") : "";
+        }
         return "";
     }
 
