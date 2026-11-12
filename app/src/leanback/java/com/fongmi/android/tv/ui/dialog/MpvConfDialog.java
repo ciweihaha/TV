@@ -4,7 +4,6 @@ import android.text.TextUtils;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.R;
@@ -12,28 +11,17 @@ import com.fongmi.android.tv.databinding.DialogMpvConfBinding;
 import com.fongmi.android.tv.event.ServerEvent;
 import com.fongmi.android.tv.player.mpv.MpvConfigFile;
 import com.fongmi.android.tv.utils.Notify;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-public class MpvConfDialog extends BaseAlertDialog {
+public class MpvConfDialog extends BaseEventDialog {
 
     private DialogMpvConfBinding binding;
-
-    public static void show(FragmentActivity activity) {
-        new MpvConfDialog().show(activity.getSupportFragmentManager(), null);
-    }
 
     @Override
     protected ViewBinding getBinding() {
         return binding = DialogMpvConfBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
     }
 
     @Override
@@ -71,18 +59,5 @@ public class MpvConfDialog extends BaseAlertDialog {
         if (event.type() != ServerEvent.Type.SETTING) return;
         setText(event.text());
         binding.positive.performClick();
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
-        setWidth(0.55f);
-        EventBus.getDefault().register(this);
-    }
-
-    @Override
-    public void onStop() {
-        super.onStop();
-        EventBus.getDefault().unregister(this);
     }
 }

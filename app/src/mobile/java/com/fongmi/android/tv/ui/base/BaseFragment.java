@@ -7,6 +7,7 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
 import androidx.viewbinding.ViewBinding;
 
@@ -57,6 +58,15 @@ public abstract class BaseFragment extends Fragment {
         if (isVisibleToUser && isViewCreated && !isDataLoaded) {
             lazyLoad();
             isDataLoaded = true;
+        }
+    }
+
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        if (hidden) {
+            if (this instanceof MenuProvider provider) requireActivity().removeMenuProvider(provider);
+        } else {
+            initMenu();
         }
     }
 

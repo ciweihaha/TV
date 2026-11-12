@@ -97,7 +97,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
     }
 
     private void onMpvConf(View view) {
-        MpvConfDialog.show(this);
+        new MpvConfDialog().show(this);
     }
 
     private void setMpvGpuNext(View view) {
@@ -151,7 +151,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
     }
 
     private void onBuffer(View view) {
-        BufferDialog.show(this);
+        new BufferDialog().show(this);
     }
 
     @Override
@@ -184,7 +184,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
     }
 
     private void onUa(View view) {
-        UaDialog.show(this);
+        new UaDialog().show(this);
     }
 
     @Override

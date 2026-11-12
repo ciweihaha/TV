@@ -1,13 +1,11 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogDohBinding;
 import com.fongmi.android.tv.ui.adapter.DohAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.github.catvod.bean.Doh;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class DohDialog extends BaseAlertDialog implements DohAdapter.OnClickListener {
 
@@ -24,18 +22,9 @@ public class DohDialog extends BaseAlertDialog implements DohAdapter.OnClickList
         return this;
     }
 
-    public void show(FragmentActivity activity) {
-        show(activity.getSupportFragmentManager(), null);
-    }
-
     @Override
     protected ViewBinding getBinding() {
         return binding = DialogDohBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
     }
 
     @Override

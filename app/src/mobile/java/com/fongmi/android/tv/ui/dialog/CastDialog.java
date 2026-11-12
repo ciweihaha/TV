@@ -3,8 +3,6 @@ package com.fongmi.android.tv.ui.dialog;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 
@@ -72,11 +70,6 @@ public class CastDialog extends DeviceDialog {
         if (fd.contains("127.0.0.1")) fd = fd.replace("127.0.0.1", Util.getIp());
         requireArguments().putString("history", history.toString().replace(id, fd));
         return this;
-    }
-
-    public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof CastDialog) return;
-        show(activity.getSupportFragmentManager(), null);
     }
 
     @Override

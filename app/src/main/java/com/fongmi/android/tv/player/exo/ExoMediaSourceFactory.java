@@ -87,10 +87,6 @@ public class ExoMediaSourceFactory implements MediaSource.Factory {
         return new DefaultDataSource.Factory(App.get(), factory);
     }
 
-    public static DataSource.Factory createDataSourceFactory(Map<String, String> headers) {
-        return createDataSourceFactory(headers, null);
-    }
-
     public static DataSource.Factory createDataSourceFactory(Map<String, String> headers, Auth.Context auth) {
         Cache sharedCache = getCache();
         CacheDataSource.Factory factory = new CacheDataSource.Factory().setCache(sharedCache).setUpstreamDataSourceFactory(createUpstreamDataSourceFactory(headers, auth)).setCacheWriteDataSinkFactory(null).setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);

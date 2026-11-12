@@ -1,6 +1,5 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.api.config.LiveConfig;
@@ -9,7 +8,6 @@ import com.fongmi.android.tv.databinding.DialogLiveBinding;
 import com.fongmi.android.tv.impl.LiveListener;
 import com.fongmi.android.tv.ui.adapter.LiveAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.List;
 
@@ -28,18 +26,9 @@ public class LiveDialog extends BaseAlertDialog implements LiveAdapter.OnClickLi
         return this;
     }
 
-    public void show(FragmentActivity activity) {
-        show(activity.getSupportFragmentManager(), null);
-    }
-
     @Override
     protected ViewBinding getBinding() {
         return binding = DialogLiveBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
     }
 
     @Override

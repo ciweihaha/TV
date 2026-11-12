@@ -25,7 +25,6 @@ import java.util.function.Consumer;
 
 import okhttp3.Call;
 import okhttp3.HttpUrl;
-import okhttp3.Response;
 
 public class SubtitleApi {
 
@@ -50,12 +49,12 @@ public class SubtitleApi {
 
     public static void search(String keyword, int pos, Consumer<SubtitleSearchPage> success, Consumer<Exception> error) {
         int requestId = begin();
-        newSearchCall(keyword, pos).enqueue(new ApiCallback<>(requestId, REQUEST_ID, response -> parseSearch(read(response)), success, error));
+        newSearchCall(keyword, pos).enqueue(new ApiCallback<>(requestId, REQUEST_ID, response -> parseSearch(ApiCallback.read(response)), success, error));
     }
 
     public static void detail(int id, Consumer<List<SubtitleSearchItem>> success, Consumer<Exception> error) {
         int requestId = begin();
-        newDetailCall(id).enqueue(new ApiCallback<>(requestId, REQUEST_ID, response -> parseDetail(read(response)), success, error));
+        newDetailCall(id).enqueue(new ApiCallback<>(requestId, REQUEST_ID, response -> parseDetail(ApiCallback.read(response)), success, error));
     }
 
     public static void loadSubtitle(SubtitleSearchItem item, Consumer<List<SubtitleSearchItem>> success, Consumer<Exception> error) {
@@ -118,12 +117,6 @@ public class SubtitleApi {
         ApiCallback.post(requestId, REQUEST_ID, () -> success.accept(List.of(local)));
     }
 
-    private static String read(Response response) throws IOException {
-        String text = response.body().string();
-        if (!response.isSuccessful()) throw new IOException("HTTP " + response.code() + " " + response.message());
-        if (TextUtils.isEmpty(text)) throw new IOException(ResUtil.getString(R.string.error_empty));
-        return text;
-    }
 
     private static AssrtResponse parse(String text) throws IOException {
         AssrtResponse response = AssrtResponse.from(text);

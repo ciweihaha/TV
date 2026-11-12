@@ -1,6 +1,5 @@
 package com.fongmi.android.tv.ui.activity;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
@@ -23,10 +22,6 @@ public class ScanActivity extends BaseActivity implements BarcodeCallback {
 
     private ActivityScanBinding mBinding;
     private CaptureManager mCapture;
-
-    public static void start(Activity activity) {
-        activity.startActivity(new Intent(activity, ScanActivity.class));
-    }
 
     @Override
     protected ViewBinding getBinding() {

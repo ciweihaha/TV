@@ -9,7 +9,6 @@
     <string name="live_line">Line <xliff:g name="name">%s</xliff:g></string>
 
     <!-- Detail -->
-    <string name="detail_title"><xliff:g name="name">%s</xliff:g> : <xliff:g name="name">%s</xliff:g></string>
     <string name="detail_site">Site: <xliff:g name="name">%s</xliff:g></string>
     <string name="detail_year">Year: <xliff:g name="name">%s</xliff:g></string>
     <string name="detail_area">Area: <xliff:g name="name">%s</xliff:g></string>
@@ -61,7 +60,6 @@
     <string name="play_backward_hint">Reverse play switched</string>
     <string name="play_switch_flag">Switching flag to <xliff:g name="name">%s</xliff:g></string>
     <string name="play_switch_site">Switching site to <xliff:g name="name">%s</xliff:g></string>
-    <string name="play_switch_parse">Switching parse to <xliff:g name="name">%s</xliff:g></string>
 
     <!-- Playback Setting -->
     <string name="setting_tab_offset">Offset</string>
@@ -275,7 +273,6 @@
     <string name="setting_custom">Custom</string>
     <string name="setting_size">Image size</string>
     <string name="setting_doh">DoH</string>
-    <string name="setting_proxy">Proxy</string>
     <string name="setting_cache">Cache</string>
     <string name="setting_backup">Backup</string>
     <string name="setting_restore">Restore</string>
@@ -290,7 +287,6 @@
     <string name="module_installing">Installing…</string>
     <string name="module_cancelling">Cancelling…</string>
     <string name="module_cancelled">Cancelled</string>
-    <string name="module_complete">Installed</string>
     <string name="module_failed">Failed: %1$s</string>
     <string name="module_cancel">Cancel</string>
     <string name="module_failed_title">Operation failed</string>
@@ -321,7 +317,6 @@
     <string name="module_remove">Remove</string>
     <string name="module_removing">Removing…</string>
     <string name="module_confirm_remove">Confirm removal in the system dialog</string>
-    <string name="module_removed">Removed</string>
 
     <!-- Backup & Restore -->
     <string name="restore_select">Select backup</string>
@@ -331,15 +326,12 @@
     <string name="backup_fail">Backup failed</string>
 
     <!-- Player -->
-    <string name="player">Player</string>
     <string name="player_engine">Engine</string>
     <string name="player_debug">Debug</string>
     <string name="player_render">Video output</string>
     <string name="player_libass">libass</string>
     <string name="player_background">Background play</string>
     <string name="player_audio_pass_through">Audio passthrough</string>
-    <string name="player_audio_decode">Audio software decode</string>
-    <string name="player_video_decode">Video software decode</string>
     <string name="player_dolby_vision_output">Dolby Vision</string>
     <string name="player_aac_track">Prefer aac track</string>
     <string name="player_adblock">Remove ads</string>
@@ -404,15 +396,10 @@
     <string name="error_play_next">It\'s the last episode!</string>
     <string name="error_play_prev">It\'s the first episode!</string>
     <string name="error_play_parse">Unable to parse url</string>
-    <string name="error_play_drm">This device does not support the required DRM scheme</string>
     <string name="error_play_url">Unable to load url</string>
     <string name="error_episode_missing">Cannot restore the saved episode. Select another episode.</string>
     <string name="error_episode_not_found">Cannot find the requested episode. Select another episode.</string>
-    <string name="error_play_flag">No flag data</string>
     <string name="error_play_timeout">Timed out</string><string name="error_audio_effect_unsupported">Audio settings are unavailable for the current playback mode</string>
-    <string name="bdj_preparing">Preparing BD-J menu</string>
-    <string name="error_bdj_prepare">ISO menu check or BD-J setup failed: %1$s</string>
-    <string name="error_audio_effect_tunnel">Audio settings are unavailable in tunnel mode</string>
     <string name="error_audio_effect_passthrough">Audio settings are unavailable for passthrough audio</string>
     <string name="error_audio_effect_apply">Unable to apply audio settings</string>
     <string name="error_video_effect_unsupported">Video settings are unavailable for the current playback mode</string>
@@ -451,7 +438,6 @@
     <string name="yes">Yes</string>
     <string name="none">None</string>
     <string name="times">times</string>
-    <string name="lines">lines</string>
 
     <string-array name="select_dolby_vision_output">
         <item>Auto</item>
@@ -601,7 +587,6 @@
     <string name="speed_value_50" translatable="false">5.0</string>
 
     <string name="phone_input">Remote input</string>
-    <string name="log_action">Logs</string>
     <string name="device_open_web">Controls</string>
     <string name="device_view_logs">Logs</string>
     <string name="device_rename">Name device</string>

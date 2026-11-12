@@ -88,11 +88,6 @@ public final class PlaybackButtonsDialog {
         }
 
         @Override
-        protected int getWidth() {
-            return Math.min(ResUtil.dp2px(420), ResUtil.getScreenWidth() / 2);
-        }
-
-        @Override
         public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
             super.onViewCreated(view, savedInstanceState);
             panel.bind(binding, savedInstanceState);

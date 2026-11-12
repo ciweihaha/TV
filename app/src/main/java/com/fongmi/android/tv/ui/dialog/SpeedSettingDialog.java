@@ -5,15 +5,11 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.DialogFragment;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogSpeedSettingBinding;
 import com.fongmi.android.tv.utils.ResUtil;
-import com.fongmi.android.tv.utils.Util;
 
 public final class SpeedSettingDialog {
 
@@ -22,11 +18,7 @@ public final class SpeedSettingDialog {
     }
 
     public void show(FragmentActivity activity) {
-        FragmentManager manager = activity.getSupportFragmentManager();
-        if (manager.isStateSaved()) return;
-        for (Fragment fragment : manager.getFragments()) if (fragment instanceof BottomSheet || fragment instanceof SideSheet) return;
-        DialogFragment dialog = Util.isFullscreenLand(activity) || Util.isLeanback() ? new SideSheet() : new BottomSheet();
-        dialog.show(manager, null);
+        PlaybackDialog.showSheet(activity, new BottomSheet(), new SideSheet());
     }
 
     public static final class BottomSheet extends BaseBottomSheetDialog {

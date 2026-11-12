@@ -5,13 +5,11 @@ import static com.github.catvod.utils.Util.substring;
 import android.text.TextUtils;
 import android.view.View;
 
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogInfoBinding;
 import com.fongmi.android.tv.player.PlayerManager;
 import com.fongmi.android.tv.utils.Util;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -32,18 +30,9 @@ public class InfoDialog extends BaseAlertDialog {
         return dialog;
     }
 
-    public void show(FragmentActivity activity) {
-        show(activity.getSupportFragmentManager(), null);
-    }
-
     @Override
     protected ViewBinding getBinding() {
         return binding = DialogInfoBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
     }
 
     @Override

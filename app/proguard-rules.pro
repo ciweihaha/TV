@@ -43,9 +43,6 @@
 -dontwarn javax.script.**
 -dontwarn jdk.dynalink.**
 
-# Sardine
--keep class com.thegrizzlylabs.sardineandroid.** { *; }
-
 # TVBus
 -keep class com.tvbus.engine.** { *; }
 

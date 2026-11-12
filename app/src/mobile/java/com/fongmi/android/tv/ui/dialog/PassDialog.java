@@ -8,8 +8,6 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogPassBinding;
@@ -22,11 +20,6 @@ public class PassDialog extends BaseBottomSheetDialog {
 
     public static PassDialog create() {
         return new PassDialog();
-    }
-
-    public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof PassDialog) return;
-        show(activity.getSupportFragmentManager(), null);
     }
 
     @Override

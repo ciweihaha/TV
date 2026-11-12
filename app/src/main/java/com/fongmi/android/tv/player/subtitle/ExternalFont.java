@@ -51,10 +51,6 @@ public final class ExternalFont {
         return Path.mpv("fonts");
     }
 
-    public static List<Entry> getAll() {
-        return getAll(null);
-    }
-
     public static List<Entry> getAll(@Nullable File additionalDirectory) {
         List<File> directories = getDirectories(additionalDirectory);
         List<File[]> filesByDirectory = new ArrayList<>();

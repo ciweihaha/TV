@@ -29,6 +29,20 @@ public abstract class AppDatabase extends RoomDatabase {
     public static final String NAME = "tv";
     public static final String SYMBOL = "@@@";
 
+    public static String siteKey(String key) {
+        if (key == null) return "";
+        int index = key.indexOf(SYMBOL);
+        return index < 0 ? key : key.substring(0, index);
+    }
+
+    public static String vodId(String key) {
+        if (key == null) return "";
+        int first = key.indexOf(SYMBOL);
+        if (first < 0) return "";
+        int second = key.indexOf(SYMBOL, first + SYMBOL.length());
+        return second < 0 ? key.substring(first + SYMBOL.length()) : key.substring(first + SYMBOL.length(), second);
+    }
+
     private static volatile AppDatabase instance;
 
     public static synchronized AppDatabase get() {

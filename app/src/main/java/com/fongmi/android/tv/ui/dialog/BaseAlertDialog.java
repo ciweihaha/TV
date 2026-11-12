@@ -7,6 +7,7 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.utils.ResUtil;
@@ -16,7 +17,13 @@ public abstract class BaseAlertDialog extends DialogFragment {
 
     protected abstract ViewBinding getBinding();
 
-    protected abstract MaterialAlertDialogBuilder getBuilder();
+    protected MaterialAlertDialogBuilder getBuilder() {
+        return builder().setView(getBinding().getRoot());
+    }
+
+    public void show(FragmentActivity activity) {
+        show(activity.getSupportFragmentManager(), null);
+    }
 
     @NonNull
     @Override

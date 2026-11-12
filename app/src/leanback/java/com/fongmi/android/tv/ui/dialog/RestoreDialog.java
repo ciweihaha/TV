@@ -1,6 +1,5 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogRestoreBinding;
@@ -8,7 +7,6 @@ import com.fongmi.android.tv.db.BackupManager;
 import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.ui.adapter.RestoreAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.File;
 
@@ -27,18 +25,9 @@ public class RestoreDialog extends BaseAlertDialog implements RestoreAdapter.OnC
         return this;
     }
 
-    public void show(FragmentActivity activity) {
-        show(activity.getSupportFragmentManager(), null);
-    }
-
     @Override
     protected ViewBinding getBinding() {
         return binding = DialogRestoreBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
     }
 
     @Override

@@ -1,6 +1,5 @@
 package com.fongmi.android.tv.server.process;
 
-import static fi.iki.elonen.NanoHTTPD.newFixedLengthResponse;
 
 import com.fongmi.android.tv.server.LogSession;
 import com.fongmi.android.tv.server.impl.Process;
@@ -95,11 +94,5 @@ public class Log implements Process {
         String host = headers.get("host");
         HttpUrl target = host == null ? null : HttpUrl.parse("http://" + host);
         return source != null && target != null && source.equals(target);
-    }
-
-    private Response response(Status status, String text) {
-        Response response = newFixedLengthResponse(status, status == Status.OK ? "application/json; charset=utf-8" : "text/plain; charset=utf-8", text);
-        response.addHeader("Cache-Control", "no-store");
-        return response;
     }
 }

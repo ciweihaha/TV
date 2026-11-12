@@ -87,10 +87,6 @@ public interface PlayerEngine {
         return C.TIME_UNSET;
     }
 
-    default boolean preload(PlaySpec spec, long startPositionMs) {
-        return preload(spec, startPositionMs, () -> {});
-    }
-
     default boolean preload(PlaySpec spec, long startPositionMs, Runnable onError) {
         return false;
     }

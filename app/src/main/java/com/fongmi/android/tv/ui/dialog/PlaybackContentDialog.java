@@ -127,11 +127,6 @@ public final class PlaybackContentDialog {
         private PlaybackContentPanel panel;
 
         @Override
-        protected int getWidth() {
-            return Math.min(ResUtil.dp2px(420), ResUtil.getScreenWidth() / 2);
-        }
-
-        @Override
         protected ViewBinding getBinding(@NonNull LayoutInflater inflater, @Nullable ViewGroup container) {
             return binding = DialogPlaybackContentBinding.inflate(inflater, container, false);
         }

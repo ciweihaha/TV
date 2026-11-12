@@ -1,8 +1,12 @@
 package com.fongmi.android.tv.impl;
 
+import android.text.TextUtils;
+
 import androidx.annotation.NonNull;
 
 import com.fongmi.android.tv.App;
+import com.fongmi.android.tv.R;
+import com.fongmi.android.tv.utils.ResUtil;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -18,6 +22,13 @@ public record ApiCallback<T>(int requestId, AtomicInteger currentId, Parser<T> p
         App.post(() -> {
             if (currentId.get() == requestId) action.run();
         });
+    }
+
+    public static String read(Response response) throws IOException {
+        String text = response.body().string();
+        if (!response.isSuccessful()) throw new IOException("HTTP " + response.code() + " " + response.message());
+        if (TextUtils.isEmpty(text)) throw new IOException(ResUtil.getString(R.string.error_empty));
+        return text;
     }
 
     @Override

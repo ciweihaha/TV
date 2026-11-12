@@ -6,8 +6,6 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 import androidx.media3.common.MediaEdition;
 import androidx.viewbinding.ViewBinding;
 
@@ -34,11 +32,6 @@ public final class EditionDialog extends BaseBottomSheetDialog implements Editio
     public EditionDialog player(PlayerManager player) {
         this.player = player;
         return this;
-    }
-
-    public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof EditionDialog) return;
-        show(activity.getSupportFragmentManager(), null);
     }
 
     @Override

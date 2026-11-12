@@ -80,12 +80,6 @@ public class RuntimeInstaller {
         }
     }
 
-    public static JSONObject getExternalAsset(RuntimeModule module, String url, CancellationSignal signal) throws IOException {
-        JSONObject asset = getExternalAsset(module, getCatalog(url, signal));
-        signal.throwIfCanceled();
-        return asset;
-    }
-
     private static JSONObject getCatalog(String url, CancellationSignal signal) throws IOException {
         signal.throwIfCanceled();
         Call call = OkHttp.client().newCall(new Request.Builder().url(url).build());

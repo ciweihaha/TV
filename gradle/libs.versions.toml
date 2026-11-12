@@ -24,7 +24,6 @@ viewpager2 = "1.1.0"
 
 androidGifDrawable = "1.2.32"
 androidautosize = "1.2.1"
-brotli = "0.1.2"
 commonsCompress = "1.28.0"
 customactivityoncrash = "2.4.0"
 flexbox = "3.0.0"
@@ -34,8 +33,6 @@ gson = "2.15.0"
 guava = "33.8.0-android"
 jsoup = "1.24.1"
 jupnp = "3.0.5"
-juniversalchardet = "1.0.3"
-junit = "4.13.2"
 logger = "2.2.0"
 lottie = "6.7.1"
 material = "1.14.0"
@@ -44,10 +41,7 @@ nanohttpd = "2.3.1"
 newpipeextractor = "v0.27.1"
 okhttp = "5.5.1"
 permissionx = "1.8.1"
-rtmpClient = "v3.2.0.m2"
-sardine = "0.9"
 simpleXml = "2.7.1"
-smbj = "0.15.0"
 textdrawable = "1.0.3"
 zxingAndroidEmbedded = "4.3.0"
 zxingCore = "3.5.4"
@@ -72,7 +66,6 @@ viewpager2 = { group = "androidx.viewpager2", name = "viewpager2", version.ref =
 
 android-gif-drawable = { group = "pl.droidsonroids.gif", name = "android-gif-drawable", version.ref = "androidGifDrawable" }
 androidautosize = { group = "com.github.JessYanCoding", name = "AndroidAutoSize", version.ref = "androidautosize" }
-brotli = { group = "org.brotli", name = "dec", version.ref = "brotli" }
 commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 customactivityoncrash = { group = "cat.ereza", name = "customactivityoncrash", version.ref = "customactivityoncrash" }
 eventbus = { group = "org.greenrobot", name = "eventbus", version.ref = "greenrobot" }
@@ -86,9 +79,6 @@ glide-okhttp3-integration = { group = "com.github.bumptech.glide", name = "okhtt
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
-juniversalchardet = { group = "com.googlecode.juniversalchardet", name = "juniversalchardet", version.ref = "juniversalchardet" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-rtmp-client = { group = "com.github.mcxinyu", name = "LibRtmp-Client-for-Android", version.ref = "rtmpClient" }
 logger = { group = "com.orhanobut", name = "logger", version.ref = "logger" }
 lottie = { group = "com.airbnb.android", name = "lottie", version.ref = "lottie" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
@@ -98,15 +88,11 @@ newpipeextractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor"
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-dnsoverhttps = { group = "com.squareup.okhttp3", name = "okhttp-dnsoverhttps", version.ref = "okhttp" }
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
-okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
-okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
 org-jupnp = { group = "org.jupnp", name = "org.jupnp", version.ref = "jupnp" }
 org-jupnp-android = { group = "org.jupnp", name = "org.jupnp.android", version.ref = "jupnp" }
 org-jupnp-support = { group = "org.jupnp", name = "org.jupnp.support", version.ref = "jupnp" }
 permissionx = { group = "com.guolindev.permissionx", name = "permissionx", version.ref = "permissionx" }
-sardine = { group = "com.github.thegrizzlylabs", name = "sardine-android", version.ref = "sardine" }
 simple-xml = { group = "org.simpleframework", name = "simple-xml", version.ref = "simpleXml" }
-smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
 textdrawable = { group = "com.github.jahirfiquitiva", name = "TextDrawable", version.ref = "textdrawable" }
 zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embedded", version.ref = "zxingAndroidEmbedded" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }

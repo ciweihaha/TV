@@ -760,18 +760,8 @@ public final class Download implements AutoCloseable {
     }
 
     private Throwable stopParts(Call parent, ExecutorService workers, boolean finished) {
-        Throwable closing = null;
-        try {
-            if (!finished) parent.cancel();
-        } catch (RuntimeException | Error e) {
-            closing = e;
-        }
-        try {
-            stopWorkers(workers);
-        } catch (RuntimeException | Error e) {
-            if (closing == null) closing = e;
-            else if (closing != e) closing.addSuppressed(e);
-        }
+        Throwable closing = run(null, () -> { if (!finished) parent.cancel(); });
+        closing = run(closing, () -> stopWorkers(workers));
         return closing;
     }
 
@@ -859,46 +849,33 @@ public final class Download implements AutoCloseable {
         for (int i = 0; i < MAX_PARTS; i++) Files.deleteIfExists(part(i).toPath());
     }
 
+    private static Throwable run(Throwable failure, Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException | Error error) {
+            if (failure == null) failure = error;
+            else if (failure != error) failure.addSuppressed(error);
+        }
+        return failure;
+    }
+
     private void cancelParts() {
         partsCanceled = true;
-        Throwable failure = null;
-        for (Call request : requests) {
-            try {
-                request.cancel();
-            } catch (RuntimeException | Error error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-        }
+        Throwable failure = Net.closeAll(requests, Call::cancel, null);
         if (failure instanceof RuntimeException error) throw error;
         if (failure instanceof Error error) throw error;
     }
 
     private void cancelRequests() {
         Call request = call;
-        Throwable failure = null;
-        try {
-            if (request != null) request.cancel();
-        } catch (RuntimeException | Error error) {
-            failure = error;
-        }
-        try {
-            cancelParts();
-        } catch (RuntimeException | Error error) {
-            if (failure == null) failure = error;
-            else if (failure != error) failure.addSuppressed(error);
-        }
+        Throwable failure = run(null, () -> { if (request != null) request.cancel(); });
+        failure = run(failure, this::cancelParts);
         if (failure instanceof RuntimeException error) throw error;
         if (failure instanceof Error error) throw error;
     }
 
     private void stopWorkers(ExecutorService workers) {
-        Throwable failure = null;
-        try {
-            cancelParts();
-        } catch (RuntimeException | Error error) {
-            failure = error;
-        }
+        Throwable failure = run(null, this::cancelParts);
         workers.shutdownNow();
         awaitWorkers(workers);
         if (failure instanceof RuntimeException error) throw error;

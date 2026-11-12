@@ -2,13 +2,11 @@ package com.fongmi.android.tv.ui.dialog;
 
 import android.widget.TextView;
 
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogContentBinding;
 import com.fongmi.android.tv.ui.custom.CustomMovement;
 import com.github.bassaer.library.MDColor;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class ContentDialog extends BaseAlertDialog {
 
@@ -24,18 +22,9 @@ public class ContentDialog extends BaseAlertDialog {
         return this;
     }
 
-    public void show(FragmentActivity activity) {
-        show(activity.getSupportFragmentManager(), null);
-    }
-
     @Override
     protected ViewBinding getBinding() {
         return binding = DialogContentBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
     }
 
     @Override

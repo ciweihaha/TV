@@ -13,6 +13,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
+import java.util.function.Consumer;
 
 abstract class SpiderLoader {
 
@@ -20,6 +21,7 @@ abstract class SpiderLoader {
     private final Map<String, FutureTask<Spider>> loading = new HashMap<>();
     private volatile boolean closed;
     private boolean destroyed;
+    protected volatile String recent;
 
     public final void clear() {
         throwFailure(closeLoader());
@@ -33,7 +35,7 @@ abstract class SpiderLoader {
             active = new ArrayList<>(spiders.values());
             spiders.clear();
         }
-        for (Spider spider : active) failure = destroySpider(spider, failure);
+        for (Spider spider : active) failure = runSpider(spider, failure, Spider::destroy);
         if (!active.isEmpty()) failure = clearReferences(failure);
         throwFailure(failure);
     }
@@ -50,7 +52,7 @@ abstract class SpiderLoader {
         }
         for (FutureTask<Spider> task : pending) task.cancel(true);
         Throwable failure = null;
-        for (Spider spider : active) failure = closeSpider(spider, failure);
+        for (Spider spider : active) failure = runSpider(spider, failure, Spider::close);
         return clearReferences(failure);
     }
 
@@ -108,6 +110,16 @@ abstract class SpiderLoader {
         return spiders.get(key);
     }
 
+    public synchronized void setRecent(String recent) {
+        checkOpen();
+        this.recent = recent;
+    }
+
+    public Object[] proxy(Map<String, String> params) throws Exception {
+        Spider spider = findSpider(recent);
+        return spider != null ? spider.proxy(params) : null;
+    }
+
     private Spider createSpider(String key, Context context, String ext, Callable<Spider> factory) throws Exception {
         Spider spider = factory.call();
         if (!closed) spider.init(context, ext);
@@ -126,14 +138,14 @@ abstract class SpiderLoader {
     }
 
     private void retireSpider(String key, Spider spider) {
-        Throwable failure = closeSpider(spider, null);
+        Throwable failure = runSpider(spider, null, Spider::close);
         boolean exiting;
         synchronized (this) {
             exiting = destroyed;
             if (!exiting) spiders.put(key, spider);
         }
         if (exiting) {
-            failure = destroySpider(spider, failure);
+            failure = runSpider(spider, failure, Spider::destroy);
             failure = clearReferences(failure);
         }
         CancellationException error = new CancellationException("Crawler loader is closed");
@@ -141,19 +153,9 @@ abstract class SpiderLoader {
         throw error;
     }
 
-    private Throwable closeSpider(Spider spider, Throwable failure) {
+    private Throwable runSpider(Spider spider, Throwable failure, Consumer<Spider> action) {
         try {
-            spider.close();
-        } catch (RuntimeException | Error error) {
-            if (failure == null) failure = error;
-            else if (failure != error) failure.addSuppressed(error);
-        }
-        return failure;
-    }
-
-    private Throwable destroySpider(Spider spider, Throwable failure) {
-        try {
-            spider.destroy();
+            action.accept(spider);
         } catch (RuntimeException | Error error) {
             if (failure == null) failure = error;
             else if (failure != error) failure.addSuppressed(error);

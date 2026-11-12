@@ -5,21 +5,17 @@ import android.text.TextUtils;
 
 import androidx.collection.ArrayMap;
 
-import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.bean.Danmaku;
 import com.fongmi.android.tv.impl.ApiCallback;
 import com.fongmi.android.tv.setting.DanmakuSetting;
-import com.fongmi.android.tv.utils.ResUtil;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Trans;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import okhttp3.Call;
-import okhttp3.Response;
 
 public class DanmakuApi {
 
@@ -41,7 +37,7 @@ public class DanmakuApi {
 
     public static void search(String name, String episode, Consumer<List<Danmaku>> success, Consumer<Exception> error) {
         int requestId = begin();
-        newCall(name, episode).enqueue(new ApiCallback<>(requestId, REQUEST_ID, response -> Danmaku.arrayFrom(read(response)), success, error));
+        newCall(name, episode).enqueue(new ApiCallback<>(requestId, REQUEST_ID, response -> Danmaku.arrayFrom(ApiCallback.read(response)), success, error));
     }
 
     private static int begin() {
@@ -65,12 +61,5 @@ public class DanmakuApi {
         params.put("name", name);
         params.put("episode", episode);
         return OkHttp.newCall(url, OkHttp.toBody(params), TAG);
-    }
-
-    private static String read(Response response) throws IOException {
-        String text = response.body().string();
-        if (!response.isSuccessful()) throw new IOException("HTTP " + response.code() + " " + response.message());
-        if (TextUtils.isEmpty(text)) throw new IOException(ResUtil.getString(R.string.error_empty));
-        return text;
     }
 }

@@ -12,8 +12,12 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDialogFragment;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
 import androidx.viewbinding.ViewBinding;
 
+import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.Util;
 import com.google.android.material.sidesheet.SideSheetDialog;
 
@@ -21,7 +25,16 @@ public abstract class BaseSideSheetDialog extends AppCompatDialogFragment {
 
     protected abstract ViewBinding getBinding(@NonNull LayoutInflater inflater, @Nullable ViewGroup container);
 
-    protected abstract int getWidth();
+    protected int getWidth() {
+        return Math.min(ResUtil.dp2px(420), ResUtil.getScreenWidth() / 2);
+    }
+
+    public void show(FragmentActivity activity) {
+        FragmentManager manager = activity.getSupportFragmentManager();
+        if (manager.isStateSaved()) return;
+        for (Fragment fragment : manager.getFragments()) if (fragment.getClass() == getClass()) return;
+        show(manager, null);
+    }
 
     @NonNull
     @Override

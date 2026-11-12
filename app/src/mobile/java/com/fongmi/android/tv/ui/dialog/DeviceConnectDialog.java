@@ -9,9 +9,10 @@ import com.fongmi.android.tv.utils.Notify;
 
 public class DeviceConnectDialog extends DeviceDialog implements DeviceAdapter.OnConnectListener {
 
-    public static void show(FragmentActivity activity) {
+    @Override
+    public void show(FragmentActivity activity) {
         if (activity.getSupportFragmentManager().isStateSaved() || activity.getSupportFragmentManager().findFragmentByTag(DeviceConnectDialog.class.getSimpleName()) != null) return;
-        new DeviceConnectDialog().show(activity.getSupportFragmentManager(), DeviceConnectDialog.class.getSimpleName());
+        show(activity.getSupportFragmentManager(), DeviceConnectDialog.class.getSimpleName());
     }
 
     @Override

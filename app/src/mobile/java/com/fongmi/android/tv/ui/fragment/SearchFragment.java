@@ -224,12 +224,6 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
     }
 
     @Override
-    public void onHiddenChanged(boolean hidden) {
-        if (hidden) requireActivity().removeMenuProvider(this);
-        else initMenu();
-    }
-
-    @Override
     public void onDestroyView() {
         super.onDestroyView();
         requireActivity().removeMenuProvider(this);

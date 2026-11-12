@@ -7,9 +7,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogPlayerEngineBinding;
@@ -30,13 +28,6 @@ public final class PlayerEngineDialog extends BaseBottomSheetDialog {
 
     public static void setText(TextView view, PlayerManager player) {
         PlaybackAction.setPlaybackMode(player, view);
-    }
-
-    public static void show(FragmentActivity activity) {
-        FragmentManager manager = activity.getSupportFragmentManager();
-        if (manager.isStateSaved()) return;
-        for (Fragment fragment : manager.getFragments()) if (fragment instanceof PlayerEngineDialog) return;
-        new PlayerEngineDialog().show(manager, null);
     }
 
     @Override

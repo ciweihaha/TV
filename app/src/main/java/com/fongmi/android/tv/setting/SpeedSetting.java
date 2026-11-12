@@ -59,12 +59,6 @@ public class SpeedSetting {
         Prefers.put("speed_skip_silence", enabled);
     }
 
-    public static float next(float speed) {
-        float value = clamp(speed);
-        for (float preset : PRESETS) if (preset > value + EPSILON) return preset;
-        return MIN;
-    }
-
     public static String format(float speed) {
         return formatValue(speed) + "x";
     }

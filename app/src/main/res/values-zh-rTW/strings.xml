@@ -9,7 +9,6 @@
     <string name="live_line">來源 <xliff:g name="name">%s</xliff:g></string>
 
     <!-- Detail -->
-    <string name="detail_title"><xliff:g name="name">%s</xliff:g>：<xliff:g name="name">%s</xliff:g></string>
     <string name="detail_site">站源：<xliff:g name="name">%s</xliff:g></string>
     <string name="detail_year">年份：<xliff:g name="name">%s</xliff:g></string>
     <string name="detail_area">地區：<xliff:g name="name">%s</xliff:g></string>
@@ -61,7 +60,6 @@
     <string name="play_backward_hint">已切換倒序播放</string>
     <string name="play_switch_flag">正在切換線路至「<xliff:g name="name">%s</xliff:g>」</string>
     <string name="play_switch_site">正在切換站源至「<xliff:g name="name">%s</xliff:g>」</string>
-    <string name="play_switch_parse">正在切换解析至「<xliff:g name="name">%s</xliff:g>」</string>
 
     <!-- Playback Setting -->
     <string name="setting_tab_offset">偏移</string>
@@ -274,7 +272,6 @@
     <string name="setting_custom">自訂</string>
     <string name="setting_size">圖片尺寸</string>
     <string name="setting_doh">DoH</string>
-    <string name="setting_proxy">Proxy</string>
     <string name="setting_cache">暫存</string>
     <string name="setting_backup">備份</string>
     <string name="setting_restore">還原</string>
@@ -288,7 +285,6 @@
     <string name="module_installing">安裝中…</string>
     <string name="module_cancelling">取消中…</string>
     <string name="module_cancelled">已取消</string>
-    <string name="module_complete">已安裝</string>
     <string name="module_failed">失敗：%1$s</string>
     <string name="module_cancel">取消</string>
     <string name="module_failed_title">操作失敗</string>
@@ -319,7 +315,6 @@
     <string name="module_remove">移除</string>
     <string name="module_removing">移除中…</string>
     <string name="module_confirm_remove">請在系統畫面確認移除</string>
-    <string name="module_removed">已移除</string>
 
     <!-- Backup & Restore -->
     <string name="restore_select">選擇備份</string>
@@ -329,15 +324,12 @@
     <string name="backup_fail">備份失敗</string>
 
     <!-- Player -->
-    <string name="player">播放核心</string>
     <string name="player_engine">播放引擎</string>
     <string name="player_debug">偵錯</string>
     <string name="player_render">視訊輸出</string>
     <string name="player_libass">字幕特效</string>
     <string name="player_background">背景播放</string>
     <string name="player_audio_pass_through">音訊直通</string>
-    <string name="player_audio_decode">音訊軟解</string>
-    <string name="player_video_decode">視訊軟解</string>
     <string name="player_dolby_vision_output">杜比視界</string>
     <string name="player_aac_track">AAC優先</string>
     <string name="player_adblock">智慧去廣</string>
@@ -402,16 +394,11 @@
     <string name="error_play_next">已經是最後一集了！</string>
     <string name="error_play_prev">已經是第一集了！</string>
     <string name="error_play_parse">播放網址解析失敗</string>
-    <string name="error_play_drm">本設備不支援所需的 DRM scheme</string>
     <string name="error_play_url">播放網址載入失敗</string>
     <string name="error_episode_missing">無法恢復上次的播放項目，請重新選集</string>
     <string name="error_episode_not_found">找不到指定的播放項目，請重新選集</string>
-    <string name="error_play_flag">暫無線路資料</string>
     <string name="error_play_timeout">連線逾時</string>
-    <string name="bdj_preparing">正在準備 BD-J 選單</string>
-    <string name="error_bdj_prepare">ISO 選單檢查或 BD-J 準備失敗：%1$s</string>
     <string name="error_audio_effect_unsupported">目前播放方式不支援音質設定</string>
-    <string name="error_audio_effect_tunnel">Tunnel 模式下不支援音質設定</string>
     <string name="error_audio_effect_passthrough">音訊直通音軌不支援音質設定</string>
     <string name="error_audio_effect_apply">音質設定套用失敗</string>
     <string name="error_video_effect_unsupported">目前播放方式不支援畫質設定</string>
@@ -450,7 +437,6 @@
     <string name="yes">有</string>
     <string name="none">無</string>
     <string name="times">倍</string>
-    <string name="lines">行</string>
 
     <string-array name="select_dolby_vision_output">
         <item>自動</item>
@@ -575,7 +561,6 @@
     <string name="mpv_script_loaded">已載入</string>
 
     <string name="phone_input">遠端輸入</string>
-    <string name="log_action">日誌</string>
     <string name="device_open_web">操作</string>
     <string name="device_view_logs">日誌</string>
     <string name="device_rename">命名裝置</string>

@@ -144,7 +144,7 @@ public class SettingFragment extends BaseFragment implements ConfigListener, Sit
 
     private boolean onMenuItemClick(MenuItem item) {
         if (item.getItemId() != R.id.deviceConnect) return false;
-        DeviceConnectDialog.show(requireActivity());
+        new DeviceConnectDialog().show(requireActivity());
         return true;
     }
 

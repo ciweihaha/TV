@@ -12,9 +12,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.bean.Danmaku;
@@ -34,13 +32,6 @@ public final class DanmakuDialog extends BaseBottomSheetDialog implements Danmak
 
     public static DanmakuDialog create() {
         return new DanmakuDialog();
-    }
-
-    public void show(FragmentActivity activity) {
-        FragmentManager manager = activity.getSupportFragmentManager();
-        if (manager.isStateSaved()) return;
-        for (Fragment fragment : manager.getFragments()) if (fragment instanceof DanmakuDialog) return;
-        show(manager, null);
     }
 
     @Override

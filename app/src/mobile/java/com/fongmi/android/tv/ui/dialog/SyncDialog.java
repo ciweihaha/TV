@@ -5,8 +5,6 @@ import android.os.Bundle;
 import android.view.View;
 
 import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.Constant;
@@ -52,11 +50,6 @@ public class SyncDialog extends DeviceDialog {
 
     public SyncDialog keep() {
         return type("keep");
-    }
-
-    public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof SyncDialog) return;
-        show(activity.getSupportFragmentManager(), null);
     }
 
     private SyncDialog type(String type) {

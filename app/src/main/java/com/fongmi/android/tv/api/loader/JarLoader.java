@@ -42,7 +42,6 @@ public class JarLoader extends SpiderLoader {
     private final ConcurrentHashMap<String, DexClassLoader> loaders;
     private final ConcurrentHashMap<String, Method> methods;
     private final ConcurrentHashMap<String, Object> locks;
-    private volatile String recent;
 
     public JarLoader() {
         loaders = new ConcurrentHashMap<>();
@@ -56,11 +55,6 @@ public class JarLoader extends SpiderLoader {
         methods.clear();
         locks.clear();
         recent = null;
-    }
-
-    public synchronized void setRecent(String recent) {
-        checkOpen();
-        this.recent = recent;
     }
 
     private void load(String key, File file) {

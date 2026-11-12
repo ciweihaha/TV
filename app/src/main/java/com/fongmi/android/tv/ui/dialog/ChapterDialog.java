@@ -6,9 +6,6 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
 import androidx.media3.common.MediaChapter;
 import androidx.viewbinding.ViewBinding;
 
@@ -25,13 +22,6 @@ public final class ChapterDialog extends BaseBottomSheetDialog implements Chapte
 
     public static ChapterDialog create() {
         return new ChapterDialog();
-    }
-
-    public void show(FragmentActivity activity) {
-        FragmentManager manager = activity.getSupportFragmentManager();
-        if (manager.isStateSaved()) return;
-        for (Fragment fragment : manager.getFragments()) if (fragment instanceof ChapterDialog) return;
-        show(manager, null);
     }
 
     @Override

@@ -12,9 +12,6 @@ import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
 import androidx.media3.common.MediaMetadata;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
@@ -59,13 +56,6 @@ public final class SubtitleSearchDialog extends BaseBottomSheetDialog implements
 
     public static SubtitleSearchDialog create() {
         return new SubtitleSearchDialog();
-    }
-
-    public void show(FragmentActivity activity) {
-        FragmentManager manager = activity.getSupportFragmentManager();
-        if (manager.isStateSaved()) return;
-        for (Fragment fragment : manager.getFragments()) if (fragment instanceof SubtitleSearchDialog) return;
-        show(manager, null);
     }
 
     @Override

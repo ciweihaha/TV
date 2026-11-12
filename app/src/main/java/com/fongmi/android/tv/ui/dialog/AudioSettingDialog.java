@@ -5,15 +5,12 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogAudioSettingBinding;
 import com.fongmi.android.tv.player.PlayerManager;
 import com.fongmi.android.tv.utils.ResUtil;
-import com.fongmi.android.tv.utils.Util;
 
 public final class AudioSettingDialog {
 
@@ -22,11 +19,7 @@ public final class AudioSettingDialog {
     }
 
     public void show(FragmentActivity activity) {
-        FragmentManager manager = activity.getSupportFragmentManager();
-        if (manager.isStateSaved()) return;
-        for (Fragment fragment : manager.getFragments()) if (fragment instanceof BottomSheet || fragment instanceof SideSheet) return;
-        if (Util.isFullscreenLand(activity) || Util.isLeanback()) new SideSheet().show(manager, null);
-        else new BottomSheet().show(manager, null);
+        PlaybackDialog.showSheet(activity, new BottomSheet(), new SideSheet());
     }
 
     public static final class BottomSheet extends BaseBottomSheetDialog {
@@ -71,11 +64,6 @@ public final class AudioSettingDialog {
 
         private DialogAudioSettingBinding binding;
         private AudioSettingPanel panel;
-
-        @Override
-        protected int getWidth() {
-            return Math.min(ResUtil.dp2px(420), ResUtil.getScreenWidth() / 2);
-        }
 
         @Override
         protected ViewBinding getBinding(@NonNull LayoutInflater inflater, @Nullable ViewGroup container) {

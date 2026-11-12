@@ -12,9 +12,6 @@ import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
 import androidx.media3.common.MediaMetadata;
 import androidx.viewbinding.ViewBinding;
 
@@ -47,13 +44,6 @@ public final class DanmakuSearchDialog extends BaseBottomSheetDialog implements 
 
     public static DanmakuSearchDialog create() {
         return new DanmakuSearchDialog();
-    }
-
-    public void show(FragmentActivity activity) {
-        FragmentManager manager = activity.getSupportFragmentManager();
-        if (manager.isStateSaved()) return;
-        for (Fragment fragment : manager.getFragments()) if (fragment instanceof DanmakuSearchDialog) return;
-        show(manager, null);
     }
 
     @Override

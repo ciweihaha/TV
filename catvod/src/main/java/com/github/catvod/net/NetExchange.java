@@ -123,15 +123,19 @@ final class NetExchange extends WebSocketListener {
         if (failure instanceof Error error) throw error;
     }
 
-    private Throwable cancelSocket(Throwable failure) {
-        WebSocket current = socket;
+    private static Throwable run(Throwable failure, Runnable action) {
         try {
-            if (current != null) current.cancel();
+            action.run();
         } catch (RuntimeException | Error error) {
             if (failure == null) failure = error;
             else if (failure != error) failure.addSuppressed(error);
         }
         return failure;
+    }
+
+    private Throwable cancelSocket(Throwable failure) {
+        WebSocket current = socket;
+        return run(failure, () -> { if (current != null) current.cancel(); });
     }
 
     void finish(Net.Result result) {
@@ -146,25 +150,16 @@ final class NetExchange extends WebSocketListener {
 
     private Throwable closeSocket() {
         WebSocket current = socket;
-        try {
+        return run(null, () -> {
             if (current != null) {
                 if (closing) current.close(1000, null);
                 else current.cancel();
             }
-            return null;
-        } catch (RuntimeException | Error error) {
-            return error;
-        }
+        });
     }
 
     private Throwable completeResult(Net.Result result, Throwable failure) {
-        try {
-            complete.accept(result);
-        } catch (RuntimeException | Error error) {
-            if (failure == null) failure = error;
-            else if (failure != error) failure.addSuppressed(error);
-        }
-        return failure;
+        return run(failure, () -> complete.accept(result));
     }
 
     private void release() {

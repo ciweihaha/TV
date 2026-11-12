@@ -69,33 +69,26 @@ public class Nano extends NanoHTTPD {
         if (failure instanceof Error error) throw error;
     }
 
-    private Throwable closeCrawlerSessions() {
+    private static Throwable run(Throwable failure, Runnable action) {
         try {
-            spiderTest.close();
-            return null;
+            action.run();
         } catch (RuntimeException | Error error) {
-            return error;
+            if (failure == null) failure = error;
+            else if (failure != error) failure.addSuppressed(error);
         }
+        return failure;
+    }
+
+    private Throwable closeCrawlerSessions() {
+        return run(null, spiderTest::close);
     }
 
     private Throwable closeFetches(Throwable failure) {
-        try {
-            fetch.close();
-        } catch (RuntimeException | Error error) {
-            if (failure == null) failure = error;
-            else if (failure != error) failure.addSuppressed(error);
-        }
-        return failure;
+        return run(failure, fetch::close);
     }
 
     private Throwable stopServer(Throwable failure) {
-        try {
-            super.stop();
-        } catch (RuntimeException | Error error) {
-            if (failure == null) failure = error;
-            else if (failure != error) failure.addSuppressed(error);
-        }
-        return failure;
+        return run(failure, () -> super.stop());
     }
 
     public static Response ok() {

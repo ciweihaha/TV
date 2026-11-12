@@ -56,10 +56,6 @@ public class PlaySpec {
         return danmakus;
     }
 
-    public static PlaySpec from(String key, String url, Map<String, String> headers, MediaMetadata metadata) {
-        return new PlaySpec(key, url, headers, null, null, null, null, metadata);
-    }
-
     public static PlaySpec from(Result result, String key, MediaMetadata metadata) {
         PlaySpec spec = new PlaySpec(key, result.getRealUrl(), result.getHeader(), result.getFormat(), result.getDrm(), result.getSubs(), result.getDanmaku(), metadata);
         spec.auth = result.getAuth();

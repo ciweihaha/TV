@@ -6,7 +6,6 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
@@ -46,11 +45,6 @@ public class EpisodeGridDialog extends BaseBottomSheetDialog {
     public EpisodeGridDialog episodes(List<Episode> episodes) {
         this.episodes = episodes;
         return this;
-    }
-
-    public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof EpisodeGridDialog) return;
-        show(activity.getSupportFragmentManager(), null);
     }
 
     @Override

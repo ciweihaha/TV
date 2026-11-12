@@ -75,7 +75,7 @@ public class SettingDanmakuActivity extends BaseActivity implements DanmakuListe
     }
 
     private void onDanmakuApi(View view) {
-        DanmakuApiDialog.show(this);
+        new DanmakuApiDialog().show(this);
     }
 
     @Override

@@ -1,6 +1,5 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogBufferBinding;
@@ -8,24 +7,14 @@ import com.fongmi.android.tv.impl.BufferListener;
 import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.utils.KeyUtil;
 import com.fongmi.android.tv.utils.SliderUtil;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class BufferDialog extends BaseAlertDialog {
 
     private DialogBufferBinding binding;
 
-    public static void show(FragmentActivity activity) {
-        new BufferDialog().show(activity.getSupportFragmentManager(), null);
-    }
-
     @Override
     protected ViewBinding getBinding() {
         return binding = DialogBufferBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected MaterialAlertDialogBuilder getBuilder() {
-        return builder().setView(getBinding().getRoot());
     }
 
     @Override
