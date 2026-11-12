@@ -1,0 +1,38 @@
+name: Sync upstream
+
+# 上游同步说明：
+# - 本仓库是 FongMi/TV 的 fork，默认分支 fongmi，本地没有独有提交
+#   （2026-11-12 核对：ahead 0、behind 57），所以同步就是把上游
+#   fongmi 快进到最新，不会产生冲突。
+# - 触发：每天定时 + 手动 dispatch。只做快进合并（--ff-only），
+#   一旦出现本地提交导致无法快进，工作流直接失败报错，绝不强推、
+#   绝不自动解决冲突，等人工处理。
+# - 同步推上去后，Build Android APK 工作流会自动跑，验证新代码能构建。
+# - 上游地址写死为 https://github.com/FongMi/TV.git（公开仓库，只读拉取）。
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 代码迁出
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 快进同步上游
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/FongMi/TV.git
+          git fetch upstream fongmi
+          git checkout fongmi
+          git merge --ff-only upstream/fongmi
+          git push origin fongmi
