@@ -66,6 +66,15 @@ jobs:
       # `exo_duration` and javac fails on every androidx.media3 import.
       # Build those AARs from source here, pinned to the commits the
       # 5.6.8-era build was validated against (Media3 1.11.0 based).
+      # Round 137 (2026-11-12): 3c2cbe8 is the newest FongMi-customized
+      # commit — head of FongMi/media branch release-1.11.0-fongmi.
+      # The default branch `release` head 2bc2078 (2026-08-07) is pure
+      # upstream Media3 1.11.0 with NO FongMi customizations: no
+      # mpvplayer, no ui_danmaku, no move.txt, and the stock audio-only
+      # decoder_ffmpeg (no ffvideo/libplacebo video renderer). Bumping
+      # the ref to it would delete the MPV player, danmaku and FongMi
+      # FFmpeg video decode, so the pin stays until FongMi cuts a newer
+      # -fongmi branch.
       - name: Checkout FongMi Media3 source
         uses: actions/checkout@v7.0.1
         with:
@@ -226,7 +235,7 @@ jobs:
           # not apply to the wrapper download). Fetch it with curl (retries
           # + resume + stall detection) and invoke the extracted binary
           # directly instead of the wrappers.
-          # Round 126: the app wrapper pins Gradle 9.9.0-bin and hit the
+          # Round 126: the app wrapper pins Gradle 9.9.1-bin and hit the
           # same timeout in run 42569584589, so pre-download it the same way.
           # Round 127: services.gradle.org itself returned HTTP 504 from the
           # runner in run 42570731659 (6 attempts, exit 22) even for the
@@ -262,14 +271,14 @@ jobs:
           fi
           "$GRADLE_HOME/gradle-9.1.0/bin/gradle" --version
           echo "GRADLE_BIN=$GRADLE_HOME/gradle-9.1.0/bin/gradle" >> "$GITHUB_ENV"
-          APP_GRADLE_ZIP="$RUNNER_TEMP/gradle-9.9.0-bin.zip"
-          APP_GRADLE_HOME="$RUNNER_TEMP/gradle-9.9.0"
-          if [ ! -x "$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" ]; then
-            download_gradle "gradle-9.9.0-bin.zip" "$APP_GRADLE_ZIP"
+          APP_GRADLE_ZIP="$RUNNER_TEMP/gradle-9.9.1-bin.zip"
+          APP_GRADLE_HOME="$RUNNER_TEMP/gradle-9.9.1"
+          if [ ! -x "$APP_GRADLE_HOME/gradle-9.9.1/bin/gradle" ]; then
+            download_gradle "gradle-9.9.1-bin.zip" "$APP_GRADLE_ZIP"
             unzip -q -o "$APP_GRADLE_ZIP" -d "$APP_GRADLE_HOME"
           fi
-          "$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" --version
-          echo "GRADLE_BIN_APP=$APP_GRADLE_HOME/gradle-9.9.0/bin/gradle" >> "$GITHUB_ENV"
+          "$APP_GRADLE_HOME/gradle-9.9.1/bin/gradle" --version
+          echo "GRADLE_BIN_APP=$APP_GRADLE_HOME/gradle-9.9.1/bin/gradle" >> "$GITHUB_ENV"
 
       - name: Prefer Google Maven mirror for dependency downloads
         run: |
