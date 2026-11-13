@@ -49,10 +49,9 @@ public class ControlDialog extends BaseBottomSheetDialog implements ParseAdapter
         return this;
     }
 
-    public ControlDialog show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof ControlDialog) return this;
+    public void show(FragmentActivity activity) {
+        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof ControlDialog) return;
         show(activity.getSupportFragmentManager(), null);
-        return this;
     }
 
     @Override

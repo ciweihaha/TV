@@ -37,7 +37,7 @@ public record TorrentUrl(String id, String name, int index) {
         if (name == null || index == null) return null;
         try {
             return new TorrentUrl(id, name, Integer.parseInt(index));
-        } catch (NumberFormatException | IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             // 旧版 magnet 链接的 index 不是数字或为负数时按“不是有效旧链接”处理，调用方继续走其他恢复路径
             return null;
         }

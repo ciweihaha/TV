@@ -185,7 +185,12 @@ public class Updater {
     private void show(FragmentActivity activity) {
         if (activity == null || activity.isFinishing() || activity.isDestroyed() || activity.getSupportFragmentManager().isStateSaved() || dialog.get() != null) return;
         UpdateDialog restored = (UpdateDialog) activity.getSupportFragmentManager().findFragmentByTag(UpdateDialog.TAG);
-        dialog = new WeakReference<>(restored != null ? restored : UpdateDialog.create().title(ResUtil.getString(R.string.update_version, update.version())).desc(desc).show(activity));
+        UpdateDialog target = restored;
+        if (target == null) {
+            target = UpdateDialog.create().title(ResUtil.getString(R.string.update_version, update.version())).desc(desc);
+            target.show(activity);
+        }
+        dialog = new WeakReference<>(target);
     }
 
     public void attach(UpdateDialog dialog) {

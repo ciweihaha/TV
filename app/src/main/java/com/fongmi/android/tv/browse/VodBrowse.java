@@ -165,12 +165,12 @@ class VodBrowse {
         VodConfig.get().ensureLoaded();
         boolean builtin = SiteApi.PUSH.equals(search.siteKey) && Source.isBuiltin(search.vodId);
         CompletableFuture<Vod> future = new CompletableFuture<>();
-        CompletableFuture<Vod> existing;
+        CompletableFuture<Vod> inFlight;
         synchronized (VodBrowse.class) {
             if (generation != cacheGeneration) return null;
-            existing = detailRequests.putIfAbsent(historyKey, future);
+            inFlight = detailRequests.putIfAbsent(historyKey, future);
         }
-        if (existing != null) return awaitSearchResult(historyKey, generation, existing);
+        if (inFlight != null) return awaitSearchResult(historyKey, generation, inFlight);
         Vod vod;
         try {
             vod = SiteApi.detailContent(search.siteKey, search.vodId, builtin).getVod();

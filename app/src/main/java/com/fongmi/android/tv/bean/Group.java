@@ -136,6 +136,17 @@ public class Group {
         return isKeep();
     }
 
+    public int find(int number) {
+        List<Channel> items = getChannel();
+        for (int i = items.size() - 1; i >= 0; i--) {
+            try {
+                if (Integer.parseInt(items.get(i).getNumber()) == number) return i;
+            } catch (NumberFormatException e) {
+            }
+        }
+        return -1;
+    }
+
     public int find(String name) {
         return getChannel().lastIndexOf(Channel.create(name));
     }

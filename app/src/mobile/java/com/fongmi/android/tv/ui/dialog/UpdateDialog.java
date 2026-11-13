@@ -36,9 +36,8 @@ public class UpdateDialog extends BaseAlertDialog {
         return this;
     }
 
-    public UpdateDialog show(FragmentActivity activity) {
+    public void show(FragmentActivity activity) {
         show(activity.getSupportFragmentManager(), TAG);
-        return this;
     }
 
     @Override
