@@ -73,7 +73,7 @@ public class SiteViewModel extends ViewModel {
     }
 
     public void searchContent(List<Site> sites, String keyword, boolean quick) {
-        searches.start(sites, site -> new SearchTask(site, keyword, quick, "1"), search::postValue);
+        searches.start(sites, site -> new SearchTask(site, keyword, quick, "1"), search::postValue, quick);
     }
 
     private void execute(TaskType type, MutableLiveData<Result> liveData, Callable<Result> callable) {
