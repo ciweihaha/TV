@@ -20,6 +20,11 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
+      - name: Check out repo (gh CLI needs a git context)
+        uses: actions/checkout@v4
+        with:
+          ref: fongmi
+
       - name: Download build artifact
         uses: actions/download-artifact@v5
         with:
@@ -38,5 +43,5 @@ jobs:
           NAME="TV-${{ inputs.tag }}-leanback-arm64-v8a.apk"
           cp "$APK" "$NAME"
           sha256sum "$NAME"
-          gh release upload "${{ inputs.tag }}" "$NAME" --clobber
-          gh release view "${{ inputs.tag }}" --json assets --jq '.assets[] | "\(.name) \(.size)"'
+          gh release upload "${{ inputs.tag }}" "$NAME" --clobber --repo ciweihaha/TV
+          gh release view "${{ inputs.tag }}" --json assets --jq '.assets[] | "\(.name) \(.size)"' --repo ciweihaha/TV
