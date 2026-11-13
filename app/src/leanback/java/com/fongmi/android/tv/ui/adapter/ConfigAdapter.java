@@ -7,19 +7,24 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.api.config.LiveConfig;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.api.config.WallConfig;
 import com.fongmi.android.tv.bean.Config;
 import com.fongmi.android.tv.databinding.AdapterConfigBinding;
+import com.github.catvod.utils.Task;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ConfigAdapter extends RecyclerView.Adapter<ConfigAdapter.ViewHolder> {
 
     private final OnClickListener listener;
-    private List<Config> mItems;
+    private List<Config> mItems = new ArrayList<>();
     private boolean readOnly;
+    private boolean loaded;
+    private Runnable onLoaded;
 
     public ConfigAdapter(OnClickListener listener) {
         this.listener = listener;
@@ -37,9 +42,26 @@ public class ConfigAdapter extends RecyclerView.Adapter<ConfigAdapter.ViewHolder
         return this;
     }
 
+    public ConfigAdapter setOnLoaded(Runnable onLoaded) {
+        this.onLoaded = onLoaded;
+        return this;
+    }
+
+    public boolean isLoaded() {
+        return loaded;
+    }
+
     public ConfigAdapter addAll(int type) {
-        mItems = Config.getAll(type);
-        if (!readOnly) mItems.remove(getCurrentConfig(type));
+        Task.executeSerial(() -> {
+            List<Config> items = Config.getAll(type);
+            App.post(() -> {
+                mItems = items;
+                if (!readOnly) mItems.remove(getCurrentConfig(type));
+                loaded = true;
+                notifyDataSetChanged();
+                if (onLoaded != null) onLoaded.run();
+            });
+        });
         return this;
     }
 
@@ -55,7 +77,7 @@ public class ConfigAdapter extends RecyclerView.Adapter<ConfigAdapter.ViewHolder
     public int remove(Config item) {
         int position = mItems.indexOf(item);
         if (position == -1) return -1;
-        item.delete();
+        Task.executeSerial(item::delete);
         mItems.remove(position);
         notifyItemRemoved(position);
         return getItemCount();

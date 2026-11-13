@@ -1,5 +1,6 @@
 package com.fongmi.android.tv.api.config;
 
+import android.os.Looper;
 import android.text.TextUtils;
 
 import com.fongmi.android.tv.App;
@@ -94,7 +95,9 @@ abstract class BaseConfig {
     }
 
     public Config getConfig() {
-        return config == null ? defaultConfig() : config;
+        if (config != null) return config;
+        if (Looper.myLooper() == Looper.getMainLooper()) return new Config();
+        return defaultConfig();
     }
 
     protected void setHeaders(List<Header> headers) {

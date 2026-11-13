@@ -1,5 +1,7 @@
 package com.fongmi.android.tv.browse;
 
+import android.os.Looper;
+
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
@@ -9,6 +11,7 @@ import com.fongmi.android.tv.bean.Keep;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.playback.vod.VodHistoryPolicy;
 import com.fongmi.android.tv.setting.Setting;
+import com.github.catvod.utils.Task;
 
 public final class BrowsePlayback {
 
@@ -19,6 +22,10 @@ public final class BrowsePlayback {
     private final History history;
     private final String channelName;
     private final long resumePositionMs;
+    /** Cached favorite state (P3): loaded once at construction (all call
+     * sites run on background threads), so isKept()/toggleKeep() never
+     * touch the database from the main thread. */
+    private volatile Boolean kept;
 
     BrowsePlayback(String mediaId, Result result, @Nullable History history, @Nullable String channelName) {
         this.mediaId = mediaId;
@@ -26,6 +33,14 @@ public final class BrowsePlayback {
         this.history = history;
         this.channelName = channelName;
         this.resumePositionMs = history != null && history.getPosition() > 0 ? history.getPosition() : C.TIME_UNSET;
+        if (Looper.myLooper() == Looper.getMainLooper()) Task.executeSerial(() -> kept = loadKept());
+        else kept = loadKept();
+    }
+
+    @Nullable
+    private Boolean loadKept() {
+        if (history != null) return Keep.find(history.getCid(), history.getKey()) != null;
+        return channelName == null ? null : Keep.exist(channelName);
     }
 
     @Nullable
@@ -71,8 +86,7 @@ public final class BrowsePlayback {
 
     @Nullable
     public Boolean isKept() {
-        if (history != null) return Keep.find(history.getCid(), history.getKey()) != null;
-        return channelName == null ? null : Keep.exist(channelName);
+        return kept;
     }
 
     public boolean toggleKeep() {
@@ -83,30 +97,37 @@ public final class BrowsePlayback {
     }
 
     private void toggleVodKeep() {
-        Keep keep = Keep.find(history.getCid(), history.getKey());
-        if (keep != null) {
-            keep.delete();
-        } else {
-            keep = new Keep();
-            keep.setKey(history.getKey());
-            keep.setCid(history.getCid());
-            keep.setVodName(history.getVodName());
-            keep.setVodPic(history.getVodPic());
-            keep.setSiteName(history.getSiteName());
-            keep.setCreateTime(System.currentTimeMillis());
-            keep.save();
-        }
+        boolean remove = kept != null && kept;
+        kept = !remove;
+        Task.executeSerial(() -> {
+            if (remove) {
+                Keep keep = Keep.find(history.getCid(), history.getKey());
+                if (keep != null) keep.delete();
+            } else if (Keep.find(history.getCid(), history.getKey()) == null) {
+                Keep keep = new Keep();
+                keep.setKey(history.getKey());
+                keep.setCid(history.getCid());
+                keep.setVodName(history.getVodName());
+                keep.setVodPic(history.getVodPic());
+                keep.setSiteName(history.getSiteName());
+                keep.setCreateTime(System.currentTimeMillis());
+                keep.save();
+            }
+        });
     }
 
     private void toggleLiveKeep() {
-        if (Keep.exist(channelName)) {
-            Keep.delete(channelName);
-        } else {
-            Keep keep = new Keep();
-            keep.setKey(channelName);
-            keep.setType(1);
-            keep.save();
-        }
+        boolean remove = kept != null && kept;
+        kept = !remove;
+        Task.executeSerial(() -> {
+            if (remove) Keep.delete(channelName);
+            else if (!Keep.exist(channelName)) {
+                Keep keep = new Keep();
+                keep.setKey(channelName);
+                keep.setType(1);
+                keep.save();
+            }
+        });
     }
 
     public void activate(long startPositionMs) {

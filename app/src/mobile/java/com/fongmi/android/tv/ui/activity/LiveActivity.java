@@ -38,6 +38,7 @@ import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.databinding.ActivityLiveBinding;
 import com.fongmi.android.tv.event.RefreshEvent;
 import com.fongmi.android.tv.impl.Callback;
+import com.github.catvod.utils.Task;
 import com.fongmi.android.tv.impl.ConfigListener;
 import com.fongmi.android.tv.impl.CustomTarget;
 import com.fongmi.android.tv.impl.LiveListener;
@@ -101,6 +102,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     private List<Group> mHides;
     private Group mGroup;
     private Channel mChannel;
+    private boolean mKept;
     private String mPlaybackKey;
     private boolean rotate;
     private int count;
@@ -264,8 +266,12 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     }
 
     private void checkLive() {
-        if (isEmpty()) LiveConfig.get().init().load(getCallback());
-        else getLive();
+        if (isEmpty()) {
+            Task.submit(() -> {
+                LiveConfig.get().init();
+                App.post(() -> LiveConfig.get().load(getCallback()));
+            });
+        } else getLive();
     }
 
     private Callback getCallback() {
@@ -600,11 +606,16 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     @Override
     public boolean onLongClick(Channel item) {
         if (mGroup.isHidden()) return false;
-        boolean exist = Keep.exist(item.getName());
-        Notify.show(exist ? R.string.keep_del : R.string.keep_add);
-        if (exist) delKeep(item);
-        else addKeep(item);
-        RefreshEvent.keep();
+        Task.submit(() -> {
+            boolean exist = Keep.exist(item.getName());
+            App.post(() -> {
+                if (item.equals(mChannel)) mKept = !exist;
+                Notify.show(exist ? R.string.keep_del : R.string.keep_add);
+                if (exist) delKeep(item);
+                else addKeep(item);
+                RefreshEvent.keep();
+            });
+        });
         return true;
     }
 
@@ -615,16 +626,18 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
 
     private void addKeep(Channel item) {
         getKeep().add(item);
-        Keep keep = new Keep();
-        keep.setKey(item.getName());
-        keep.setType(1);
-        keep.save();
+        Task.executeSerial(() -> {
+            Keep keep = new Keep();
+            keep.setKey(item.getName());
+            keep.setType(1);
+            keep.save();
+        });
     }
 
     private void delKeep(Channel item) {
         if (mGroup.isKeep()) mChannelAdapter.remove(item);
         getKeep().getChannel().remove(item);
-        Keep.delete(item.getName());
+        Task.executeSerial(() -> Keep.delete(item.getName()));
     }
 
     private void setInfo() {
@@ -756,6 +769,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     public void renderChannelSelection(Channel channel) {
         if (mGroup != null) mGroup.setPosition(mChannelAdapter.setSelected(channel.group(mGroup)));
         mChannel = channel;
+        refreshKeepState();
         setArtwork();
         showInfo();
         hideUI();
@@ -801,6 +815,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
         mGroupAdapter.clear();
         mHides.clear();
         mChannel = null;
+        mKept = false;
         mGroup = null;
     }
 
@@ -813,7 +828,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
 
         @Override
         public Boolean isKept() {
-            return mChannel == null || mGroup == null || mGroup.isHidden() ? null : Keep.exist(mChannel.getName());
+            return mChannel == null || mGroup == null || mGroup.isHidden() ? null : mKept;
         }
 
         @Override
@@ -994,13 +1009,32 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
         }
     }
 
+    /** Reload the current channel's favorite state on a background thread (P3). */
+    private void refreshKeepState() {
+        if (mChannel == null) {
+            mKept = false;
+            return;
+        }
+        String name = mChannel.getName();
+        Task.submit(() -> {
+            boolean kept = Keep.exist(name);
+            App.post(() -> {
+                if (mChannel != null && name.equals(mChannel.getName())) mKept = kept;
+            });
+        });
+    }
+
     private void refreshKeeps() {
         if (mGroupAdapter.getItemCount() == 0 || !getKeep().isKeep()) return;
         List<Group> groups = new ArrayList<>();
         for (int i = 0; i < mGroupAdapter.getItemCount(); i++) groups.add(mGroupAdapter.get(i));
         getKeep().getChannel().clear();
-        LiveConfig.get().applyKeepsToGroups(groups);
-        if (mGroup != null && mGroup.isKeep()) mChannelAdapter.addAll(getKeep().getChannel());
+        Task.submit(() -> {
+            LiveConfig.get().applyKeepsToGroups(groups);
+            App.post(() -> {
+                if (mGroup != null && mGroup.isKeep()) mChannelAdapter.addAll(getKeep().getChannel());
+            });
+        });
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

@@ -5,7 +5,10 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.fongmi.android.tv.Constant;
 import com.fongmi.android.tv.api.SiteApi;
+import com.fongmi.android.tv.api.config.VodConfig;
+import com.fongmi.android.tv.bean.History;
 import com.fongmi.android.tv.bean.Result;
+import com.fongmi.android.tv.db.AppDatabase;
 import com.fongmi.android.tv.playback.PlaybackResult;
 import com.fongmi.android.tv.playback.vod.VodDataSource;
 import com.fongmi.android.tv.playback.vod.VodDetailResult;
@@ -57,9 +60,28 @@ public class VideoViewModel extends SiteViewModel implements VodDataSource {
         requestTasks.execute(
                 TaskType.DETAIL,
                 Constant.TIMEOUT_VOD,
-                () -> new VodDetailResult(key, id, SiteApi.detailContent(key, id, builtin)),
+                () -> {
+                    Result result = SiteApi.detailContent(key, id, builtin);
+                    return new VodDetailResult(key, id, result, preloadHistory(key, id, result));
+                },
                 detail::postValue,
-                error -> detail.postValue(new VodDetailResult(key, id, handleError(error))));
+                error -> detail.postValue(new VodDetailResult(key, id, handleError(error), null)));
+    }
+
+    /** Load the playback history on the background thread (P3) so the
+     * detail observer on the main thread never touches the database.
+     * Falls back to a same-name history, as VodHistoryPolicy used to. */
+    private History preloadHistory(String key, String id, Result result) {
+        if (result.getVod() == null) return null;
+        String historyKey = key + AppDatabase.SYMBOL + id + AppDatabase.SYMBOL + VodConfig.getCid();
+        History history = History.find(historyKey);
+        if (history != null) return history;
+        history = new History();
+        history.setKey(historyKey);
+        history.setCid(VodConfig.getCid());
+        history.setVodName(result.getVod().getName());
+        history.findEpisode(result.getVod().getFlags());
+        return history;
     }
 
     @Override

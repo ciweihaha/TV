@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fongmi.android.tv.bean.Keep;
 import com.fongmi.android.tv.databinding.AdapterVodBinding;
 import com.fongmi.android.tv.utils.ImgUtil;
+import com.github.catvod.utils.Task;
 
 public class KeepAdapter extends BaseDiffAdapter<Keep, KeepAdapter.ViewHolder> {
 
@@ -48,7 +49,7 @@ public class KeepAdapter extends BaseDiffAdapter<Keep, KeepAdapter.ViewHolder> {
     public void clear() {
         super.clear();
         setDelete(false);
-        Keep.deleteAll();
+        Task.executeSerial(Keep::deleteAll);
     }
 
     @NonNull

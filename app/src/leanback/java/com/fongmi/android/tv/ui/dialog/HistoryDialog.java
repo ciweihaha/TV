@@ -50,7 +50,9 @@ public class HistoryDialog extends BaseAlertDialog implements ConfigAdapter.OnCl
         binding.recycler.setItemAnimator(null);
         binding.recycler.setHasFixedSize(false);
         binding.recycler.addItemDecoration(new SpaceItemDecoration(1, 16));
-        binding.recycler.setAdapter(adapter.readOnly(readOnly).addAll(type));
+        binding.recycler.setAdapter(adapter.readOnly(readOnly).setOnLoaded(() -> {
+            if (adapter.getItemCount() == 0) dismiss();
+        }).addAll(type));
     }
 
     @Override
@@ -67,7 +69,6 @@ public class HistoryDialog extends BaseAlertDialog implements ConfigAdapter.OnCl
     @Override
     public void onStart() {
         super.onStart();
-        if (adapter.getItemCount() == 0) dismiss();
-        else setWidth(0.4f);
+        setWidth(0.4f);
     }
 }

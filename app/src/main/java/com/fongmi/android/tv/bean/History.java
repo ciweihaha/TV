@@ -116,6 +116,11 @@ public class History implements Diffable<History> {
         AppDatabase.get().getHistoryDao().delete(cid);
     }
 
+    public static void delete(int cid, String key) {
+        AppDatabase.get().getHistoryDao().delete(cid, key);
+        AppDatabase.get().getTrackDao().delete(key);
+    }
+
     public static void clear(int cid) {
         Task.executeSerial(() -> delete(cid));
     }

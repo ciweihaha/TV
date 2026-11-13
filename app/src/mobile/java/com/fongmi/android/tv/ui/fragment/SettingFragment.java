@@ -12,6 +12,7 @@ import androidx.viewbinding.ViewBinding;
 import com.fongmi.android.tv.BuildConfig;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.Updater;
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.api.config.LiveConfig;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.api.config.WallConfig;
@@ -43,6 +44,7 @@ import com.fongmi.android.tv.utils.PermissionUtil;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.github.catvod.bean.Doh;
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.utils.Task;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.greenrobot.eventbus.EventBus;
@@ -352,9 +354,16 @@ public class SettingFragment extends BaseFragment implements ConfigListener, Sit
     }
 
     private void initConfig() {
-        VodConfig.get().init().load(getCallback());
-        LiveConfig.get().init().load();
-        WallConfig.get().init().load();
+        Task.submit(() -> {
+            VodConfig.get().init();
+            LiveConfig.get().init();
+            WallConfig.get().init();
+            App.post(() -> {
+                VodConfig.get().load(getCallback());
+                LiveConfig.get().load();
+                WallConfig.get().load();
+            });
+        });
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

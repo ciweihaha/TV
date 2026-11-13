@@ -9,8 +9,8 @@ import androidx.media3.common.MediaItem;
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.Constant;
 import com.fongmi.android.tv.R;
+import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.bean.CastVideo;
-import com.fongmi.android.tv.bean.Config;
 import com.fongmi.android.tv.bean.Device;
 import com.fongmi.android.tv.bean.History;
 import com.fongmi.android.tv.dlna.DLNACast;
@@ -57,7 +57,7 @@ public class CastDialog extends DeviceDialog {
         Bundle args = new Bundle();
         args.putBoolean("app", dialog.fm);
         args.putString("video", App.gson().toJson(dialog.video));
-        args.putString("config", Config.vod().toString());
+        args.putString("config", VodConfig.get().getConfig().toString());
         dialog.setArguments(args);
         return dialog;
     }

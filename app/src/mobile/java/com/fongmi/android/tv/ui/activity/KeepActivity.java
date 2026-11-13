@@ -12,6 +12,7 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.viewbinding.ViewBinding;
 
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.Product;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.api.config.VodConfig;
@@ -24,10 +25,13 @@ import com.fongmi.android.tv.ui.adapter.KeepAdapter;
 import com.fongmi.android.tv.ui.base.BaseActivity;
 import com.fongmi.android.tv.ui.dialog.SyncDialog;
 import com.fongmi.android.tv.utils.Notify;
+import com.github.catvod.utils.Task;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.List;
 
 public class KeepActivity extends BaseActivity implements KeepAdapter.OnClickListener {
 
@@ -64,7 +68,10 @@ public class KeepActivity extends BaseActivity implements KeepAdapter.OnClickLis
     }
 
     private void getKeep() {
-        mAdapter.setItems(Keep.getVod(), () -> mBinding.progressLayout.showContent(true, mAdapter.getItemCount()));
+        Task.submit(() -> {
+            List<Keep> items = Keep.getVod();
+            App.post(() -> mAdapter.setItems(items, () -> mBinding.progressLayout.showContent(true, mAdapter.getItemCount())));
+        });
     }
 
     private void onSync() {
@@ -100,16 +107,23 @@ public class KeepActivity extends BaseActivity implements KeepAdapter.OnClickLis
 
     @Override
     public void onItemClick(Keep item) {
-        Config config = Config.find(item.getCid());
-        if (config == null) SearchActivity.start(this, item.getVodName());
-        else if (item.getCid() != VodConfig.getCid()) loadConfig(config, item);
-        else VideoActivity.start(this, item.getSiteKey(), item.getVodId(), item.getVodName(), item.getVodPic());
+        Task.submit(() -> {
+            Config config = Config.find(item.getCid());
+            App.post(() -> {
+                if (config == null) SearchActivity.start(this, item.getVodName());
+                else if (item.getCid() != VodConfig.getCid()) loadConfig(config, item);
+                else VideoActivity.start(this, item.getSiteKey(), item.getVodId(), item.getVodName(), item.getVodPic());
+            });
+        });
     }
 
     @Override
     public void onItemDelete(Keep item) {
-        mAdapter.remove(item.delete(), () -> {
-            if (mAdapter.getItemCount() == 0) mAdapter.setDelete(false);
+        Task.executeSerial(() -> {
+            item.delete();
+            App.post(() -> mAdapter.remove(item, () -> {
+                if (mAdapter.getItemCount() == 0) mAdapter.setDelete(false);
+            }));
         });
     }
 

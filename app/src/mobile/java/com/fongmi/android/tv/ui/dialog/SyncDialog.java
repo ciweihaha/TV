@@ -118,8 +118,7 @@ public class SyncDialog extends DeviceDialog {
         if (id == 0) return;
         String url = String.format(Locale.getDefault(), "%s/action?do=sync&mode=%s&type=%s%s", item.getIp(), mode, type, force ? "&force=true" : "");
         Runnable request = () -> OkHttp.newCall(client, url, buildBody()).enqueue(getCallback(id));
-        if (type.equals("history")) Task.executeSerial(request);
-        else request.run();
+        Task.executeSerial(request);
     }
 
     private FormBody buildBody() {

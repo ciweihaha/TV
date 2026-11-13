@@ -70,6 +70,7 @@ import com.fongmi.android.tv.utils.PermissionUtil;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.Util;
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.utils.Task;
 import com.google.common.collect.Lists;
 
 import org.greenrobot.eventbus.Subscribe;
@@ -229,9 +230,15 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void initConfig() {
-        VodConfig.get().init().load(getCallback());
-        LiveConfig.get().init().load();
-        WallConfig.get().init();
+        Task.submit(() -> {
+            VodConfig.get().init();
+            LiveConfig.get().init();
+            WallConfig.get().init();
+            App.post(() -> {
+                VodConfig.get().load(getCallback());
+                LiveConfig.get().load();
+            });
+        });
     }
 
     private Callback getCallback() {
@@ -268,18 +275,24 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
     private void loadLive(String url) {
         if (isFinishing() || isDestroyed()) return;
-        LiveConfig.load(Config.find(url, 1), new Callback() {
-            @Override
-            public void success() {
-                if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) startActivityForResult(new Intent(HomeActivity.this, LiveActivity.class).putExtra("empty", LiveConfig.isEmpty()), ExternalPlayback.REQUEST_CODE);
-                else LiveActivity.start(getActivity());
-            }
+        Task.submit(() -> {
+            Config config = Config.find(url, 1);
+            App.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                LiveConfig.load(config, new Callback() {
+                    @Override
+                    public void success() {
+                        if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) startActivityForResult(new Intent(HomeActivity.this, LiveActivity.class).putExtra("empty", LiveConfig.isEmpty()), ExternalPlayback.REQUEST_CODE);
+                        else LiveActivity.start(getActivity());
+                    }
 
-            @Override
-            public void error(String msg) {
-                Notify.show(msg);
-                if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) finish();
-            }
+                    @Override
+                    public void error(String msg) {
+                        Notify.show(msg);
+                        if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) finish();
+                    }
+                });
+            });
         });
     }
 
@@ -334,14 +347,18 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void getHistory(boolean renew) {
-        List<History> items = History.get();
-        int historyIndex = getHistoryIndex();
-        int recommendIndex = getRecommendIndex();
-        boolean exist = recommendIndex - historyIndex == 2;
-        if (renew) mHistoryAdapter = new ArrayObjectAdapter(mPresenter = new HistoryPresenter(this));
-        if ((items.isEmpty() && exist) || (renew && exist)) mAdapter.removeItems(historyIndex, 1);
-        if ((!items.isEmpty() && !exist) || (renew && exist)) mAdapter.add(historyIndex, new ListRow(mHistoryAdapter));
-        mHistoryAdapter.setItems(items, new BaseDiffCallback<History>());
+        Task.submit(() -> {
+            List<History> items = History.get();
+            App.post(() -> {
+                int historyIndex = getHistoryIndex();
+                int recommendIndex = getRecommendIndex();
+                boolean exist = recommendIndex - historyIndex == 2;
+                if (renew) mHistoryAdapter = new ArrayObjectAdapter(mPresenter = new HistoryPresenter(this));
+                if ((items.isEmpty() && exist) || (renew && exist)) mAdapter.removeItems(historyIndex, 1);
+                if ((!items.isEmpty() && !exist) || (renew && exist)) mAdapter.add(historyIndex, new ListRow(mHistoryAdapter));
+                mHistoryAdapter.setItems(items, new BaseDiffCallback<History>());
+            });
+        });
     }
 
     private void setHistoryDelete(boolean delete) {
@@ -465,10 +482,15 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
     @Override
     public void onItemDelete(History item) {
-        mHistoryAdapter.remove(item.delete());
-        if (mHistoryAdapter.size() > 0) return;
-        mAdapter.removeItems(getHistoryIndex(), 1);
-        mPresenter.setDelete(false);
+        Task.executeSerial(() -> {
+            item.delete();
+            App.post(() -> {
+                mHistoryAdapter.remove(item);
+                if (mHistoryAdapter.size() > 0) return;
+                mAdapter.removeItems(getHistoryIndex(), 1);
+                mPresenter.setDelete(false);
+            });
+        });
     }
 
     @Override
