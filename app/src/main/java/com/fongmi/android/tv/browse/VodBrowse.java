@@ -21,8 +21,12 @@ import com.fongmi.android.tv.db.AppDatabase;
 import com.fongmi.android.tv.player.extractor.Source;
 import com.fongmi.android.tv.player.media.MediaItemFactory;
 import com.fongmi.android.tv.utils.ResUtil;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 import com.google.common.collect.ImmutableList;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -41,8 +45,22 @@ class VodBrowse {
     private static final char KEY_SEPARATOR = '|';
     private static final int MAX_VOD_CACHE = 50;
     private static final Map<String, CompletableFuture<Vod>> detailRequests = new ConcurrentHashMap<>();
-    private static final Map<String, Vod> vodCache = new ConcurrentHashMap<>();
+    /** True LRU (P7): Guava evicts the least-recently-used entry once the
+     * cache holds MAX_VOD_CACHE items, and the removal listener drops the
+     * evicted title's episode indexes. Previously a random entry was
+     * evicted (ConcurrentHashMap keySet().stream().findFirst()). */
+    /** The listener is typed separately because CacheBuilder.removalListener
+     * takes RemovalListener<? super K, ? super V>: an inline lambda would
+     * see getKey() as Object and not compile against evictRelated(String). */
+    private static final RemovalListener<String, Vod> evictionListener = notification -> {
+        if (notification.wasEvicted()) evictRelated(notification.getKey());
+    };
+    private static final Cache<String, Vod> vodCache = CacheBuilder.<String, Vod>newBuilder().maximumSize(MAX_VOD_CACHE).removalListener(evictionListener).build();
     private static final Map<String, String> epNavMap = new ConcurrentHashMap<>();
+    /** Per-title episode index (P5): each title's entries live in its own
+     * list, so rebuilding one title touches only that title instead of
+     * scanning every cached title's entries. */
+    private static final Map<String, List<EpEntry>> epIndexMap = new ConcurrentHashMap<>();
     private static final Map<String, EpEntry> epEntries = new ConcurrentHashMap<>();
     private static final Map<String, Integer> epCountMap = new ConcurrentHashMap<>();
     private static volatile int cacheGeneration;
@@ -51,10 +69,12 @@ class VodBrowse {
         cacheGeneration++;
         for (CompletableFuture<Vod> future : detailRequests.values()) future.complete(null);
         detailRequests.clear();
-        vodCache.clear();
+        vodCache.invalidateAll();
         epNavMap.clear();
         epEntries.clear();
+        epIndexMap.clear();
         epCountMap.clear();
+        SiteApi.clearCache();
     }
 
     @NonNull
@@ -89,7 +109,7 @@ class VodBrowse {
 
     private static MediaItem episodeItem(String key, Flag flag, int index, History history, Vod vod) {
         Episode episode = flag.getEpisodes().get(index);
-        boolean current = flag.getFlag().equals(history.getVodFlag()) && episode.getUrl().equals(history.getEpisodeUrl());
+        boolean current = flag.getFlag().equals(history.getVodFlag()) && (history.getEpisodeIndex() >= 0 ? index == history.getEpisodeIndex() : episode.getUrl().equals(history.getEpisodeUrl()));
         return BrowseTree.playable(VOD_EP + epNavKey(key, flag.getFlag(), index), episode.getName(), current ? ResUtil.getString(R.string.auto_current_episode) : vod.getName(history.getVodName()), history.getVodPic());
     }
 
@@ -239,30 +259,29 @@ class VodBrowse {
 
     private static synchronized int buildEpIndex(@NonNull String historyKey, @NonNull Flag flag, @NonNull History history, int generation) {
         if (generation != cacheGeneration) return C.INDEX_UNSET;
-        String prefix = historyKey + KEY_SEPARATOR;
-        epEntries.values().removeIf(entry -> entry.historyKey.equals(historyKey));
-        epNavMap.keySet().removeIf(key -> key.startsWith(prefix));
-        epCountMap.keySet().removeIf(key -> key.startsWith(prefix));
+        evictRelated(historyKey);
         String flagName = flag.getFlag();
         List<Episode> episodes = flag.getEpisodes();
         epCountMap.put(epCountKey(historyKey, flagName), episodes.size());
-        for (int i = 0; i < episodes.size(); i++) indexEpisode(historyKey, flagName, i, history);
-        return findCurrentIndex(flag, history);
+        String currentUrl = history.getEpisode() != null ? history.getEpisode().getUrl() : null;
+        int current = 0;
+        List<EpEntry> entries = new ArrayList<>(episodes.size());
+        for (int i = 0; i < episodes.size(); i++) {
+            if (!TextUtils.isEmpty(currentUrl) && episodes.get(i).getUrl().equals(currentUrl)) current = i;
+            entries.add(indexEpisode(historyKey, flagName, i, history));
+        }
+        epIndexMap.put(historyKey, entries);
+        history.setEpisodeIndex(current);
+        return current;
     }
 
-    private static void indexEpisode(@NonNull String historyKey, @NonNull String flagName, int index, @NonNull History history) {
+    private static EpEntry indexEpisode(@NonNull String historyKey, @NonNull String flagName, int index, @NonNull History history) {
         String key = epNavKey(historyKey, flagName, index);
         String id = VOD_EP + key;
-        epEntries.put(id, new EpEntry(historyKey, flagName, index, history.getSiteKey(), history.getVodPic(), history));
+        EpEntry entry = new EpEntry(historyKey, flagName, index, history.getSiteKey(), history.getVodPic(), history);
+        epEntries.put(id, entry);
         epNavMap.put(key, id);
-    }
-
-    private static int findCurrentIndex(@NonNull Flag flag, @NonNull History history) {
-        String currentUrl = history.getEpisode() != null ? history.getEpisode().getUrl() : null;
-        if (TextUtils.isEmpty(currentUrl)) return 0;
-        List<Episode> episodes = flag.getEpisodes();
-        for (int i = 0; i < episodes.size(); i++) if (episodes.get(i).getUrl().equals(currentUrl)) return i;
-        return 0;
+        return entry;
     }
 
     @Nullable
@@ -336,7 +355,7 @@ class VodBrowse {
     private static MediaItem getEpisodeItem(@NonNull String mediaId) throws Exception {
         EpEntry entry = findEntry(mediaId);
         if (entry == null) return null;
-        Vod vod = vodCache.get(entry.historyKey);
+        Vod vod = vodCache.getIfPresent(entry.historyKey);
         if (vod == null) return null;
         Flag flag = findFlag(vod, entry.flagName);
         if (flag == null || entry.index >= flag.getEpisodes().size()) return null;
@@ -346,7 +365,7 @@ class VodBrowse {
 
     @Nullable
     private static Vod getOrFetchVod(@NonNull String historyKey) throws Exception {
-        Vod vod = vodCache.get(historyKey);
+        Vod vod = vodCache.getIfPresent(historyKey);
         if (vod != null) return vod;
         return getOrFetchVod(historyKey, findHistory(historyKey));
     }
@@ -354,7 +373,7 @@ class VodBrowse {
     @Nullable
     private static Vod getOrFetchVod(@NonNull String historyKey, @Nullable History history) throws Exception {
         int generation = cacheGeneration;
-        Vod vod = vodCache.get(historyKey);
+        Vod vod = vodCache.getIfPresent(historyKey);
         if (vod != null) return vod;
         if (history == null) return null;
         CompletableFuture<Vod> future = new CompletableFuture<>();
@@ -383,19 +402,22 @@ class VodBrowse {
     }
 
     private static synchronized void putVod(String historyKey, Vod vod) {
-        if (!vodCache.containsKey(historyKey) && vodCache.size() >= MAX_VOD_CACHE) {
-            String oldest = vodCache.keySet().stream().findFirst().orElse(null);
-            if (oldest != null) evictVod(oldest);
-        }
         vodCache.put(historyKey, vod);
     }
 
     private static synchronized void evictVod(String historyKey) {
-        vodCache.remove(historyKey);
-        String prefix = historyKey + KEY_SEPARATOR;
-        epEntries.values().removeIf(entry -> entry.historyKey.equals(historyKey));
-        epNavMap.keySet().removeIf(key -> key.startsWith(prefix));
-        epCountMap.keySet().removeIf(key -> key.startsWith(prefix));
+        vodCache.invalidate(historyKey);
+        evictRelated(historyKey);
+    }
+
+    private static void evictRelated(String historyKey) {
+        List<EpEntry> old = epIndexMap.remove(historyKey);
+        if (old == null) return;
+        for (EpEntry entry : old) {
+            epEntries.remove(VOD_EP + epNavKey(entry.historyKey(), entry.flagName(), entry.index()));
+            epNavMap.remove(epNavKey(entry.historyKey(), entry.flagName(), entry.index()));
+        }
+        old.stream().map(EpEntry::flagName).distinct().forEach(flagName -> epCountMap.remove(epCountKey(historyKey, flagName)));
     }
 
     private static final long DETAIL_WAIT_MS = 10_000;
@@ -417,7 +439,7 @@ class VodBrowse {
             Vod vod = future.get(DETAIL_WAIT_MS, TimeUnit.MILLISECONDS);
             return generation != cacheGeneration ? null : vod;
         } catch (TimeoutException e) {
-            return generation != cacheGeneration ? null : vodCache.get(historyKey);
+            return generation != cacheGeneration ? null : vodCache.getIfPresent(historyKey);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;

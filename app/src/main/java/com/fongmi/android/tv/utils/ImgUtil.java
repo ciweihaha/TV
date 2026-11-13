@@ -9,6 +9,7 @@ import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
@@ -95,11 +96,32 @@ public class ImgUtil {
     private static void loadImage(String text, String url, ImageView view, boolean vod) {
         try {
             RequestBuilder<Drawable> builder = Glide.with(view).load(getUrl(url)).listener(getListener(text, url, view));
+            int[] size = getTargetSize(view);
+            if (size != null) builder.override(size[0], size[1]);
             if (vod) builder.centerCrop().into(view);
             else builder.fitCenter().into(view);
         } catch (Throwable e) {
             e.printStackTrace();
         }
+    }
+
+    /** Card's actual target size (P8): measured size if laid out, else the
+     * layout params the holder already set in px. Without an explicit
+     * override Glide falls back to full-size decode for wrap_content cards
+     * (e.g. the oval style) and only scales down afterwards. */
+    @Nullable
+    private static int[] getTargetSize(@NonNull ImageView view) {
+        int width = view.getWidth();
+        int height = view.getHeight();
+        if (width <= 0 || height <= 0) {
+            ViewGroup.LayoutParams params = view.getLayoutParams();
+            if (params != null) {
+                width = params.width;
+                height = params.height;
+            }
+        }
+        if (width <= 0 || height <= 0) return null;
+        return new int[]{width, height};
     }
 
     public static Object getUrl(String url) {

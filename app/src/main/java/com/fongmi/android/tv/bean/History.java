@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 import com.fongmi.android.tv.App;
@@ -67,6 +68,11 @@ public class History implements Diffable<History> {
 
     private transient long saveTime;
 
+    /** Current episode index within the episode list (P5). Transient: it is
+     * derived from the episode list at index time, never persisted. */
+    @Ignore
+    private int episodeIndex = C.INDEX_UNSET;
+
     public History() {
         this.speed = 1;
         this.scale = -1;
@@ -108,6 +114,11 @@ public class History implements Diffable<History> {
 
     public static void delete(int cid) {
         AppDatabase.get().getHistoryDao().delete(cid);
+    }
+
+    public static void delete(int cid, String key) {
+        AppDatabase.get().getHistoryDao().delete(cid, key);
+        AppDatabase.get().getTrackDao().delete(key);
     }
 
     public static void clear(int cid) {
@@ -175,6 +186,14 @@ public class History implements Diffable<History> {
 
     public void setEpisodeUrl(String episodeUrl) {
         this.episodeUrl = episodeUrl;
+    }
+
+    public int getEpisodeIndex() {
+        return episodeIndex;
+    }
+
+    public void setEpisodeIndex(int episodeIndex) {
+        this.episodeIndex = episodeIndex;
     }
 
     public boolean isRevSort() {
@@ -341,6 +360,7 @@ public class History implements Diffable<History> {
         item.speed = speed;
         item.scale = scale;
         item.cid = cid;
+        item.episodeIndex = episodeIndex;
         return item;
     }
 

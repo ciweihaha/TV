@@ -116,6 +116,7 @@ import com.fongmi.android.tv.utils.Sniffer;
 import com.fongmi.android.tv.utils.Timer;
 import com.fongmi.android.tv.utils.Traffic;
 import com.fongmi.android.tv.utils.Util;
+import com.github.catvod.utils.Task;
 import com.github.catvod.utils.UriUtil;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -144,6 +145,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     private Runnable mR3;
     private Runnable mR4;
     private History mHistory;
+    private boolean mKept;
     private boolean fullscreen;
     private boolean webFullscreen;
     private boolean externalPlaybackCompleted;
@@ -701,7 +703,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
         renderFallbackName(item.getName());
         App.removeCallbacks(mR4);
         setArtwork(item.getPic());
-        checkKeepImg();
+        refreshKeepState();
         setText(item);
         updateKeep();
     }
@@ -1004,10 +1006,15 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     }
 
     private void onKeep() {
-        Keep keep = Keep.find(getHistoryKey());
-        Notify.show(keep != null ? R.string.keep_del : R.string.keep_add);
-        if (keep != null) keep.delete();
-        else createKeep();
+        boolean remove = mKept;
+        mKept = !remove;
+        Notify.show(remove ? R.string.keep_del : R.string.keep_add);
+        Task.executeSerial(() -> {
+            if (remove) {
+                Keep keep = Keep.find(getHistoryKey());
+                if (keep != null) keep.delete();
+            } else createKeep();
+        });
         checkKeepImg();
         RefreshEvent.keep();
     }
@@ -1387,7 +1394,18 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     }
 
     private void checkKeepImg() {
-        mBinding.control.keep.setImageResource(Keep.find(getHistoryKey()) == null ? R.drawable.ic_control_keep_off : R.drawable.ic_control_keep_on);
+        mBinding.control.keep.setImageResource(mKept ? R.drawable.ic_control_keep_on : R.drawable.ic_control_keep_off);
+    }
+
+    /** Reload the favorite state from the database on a background thread (P3). */
+    private void refreshKeepState() {
+        Task.submit(() -> {
+            boolean kept = Keep.find(getHistoryKey()) != null;
+            App.post(() -> {
+                mKept = kept;
+                checkKeepImg();
+            });
+        });
     }
 
     private void checkLockImg() {
@@ -1410,19 +1428,22 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     }
 
     private void updateKeep() {
-        Keep keep = Keep.find(getHistoryKey());
-        if (keep != null) {
-            keep.setVodName(mHistory.getVodName());
-            keep.setVodPic(mHistory.getVodPic());
-            keep.save();
-        }
+        if (!mKept) return;
+        Task.executeSerial(() -> {
+            Keep keep = Keep.find(getHistoryKey());
+            if (keep != null) {
+                keep.setVodName(mHistory.getVodName());
+                keep.setVodPic(mHistory.getVodPic());
+                keep.save();
+            }
+        });
     }
 
     private final PlaybackService.NavigationCallback mNavigationCallback = new PlaybackService.NavigationCallback() {
 
         @Override
         public Boolean isKept() {
-            return mHistory == null ? null : Keep.find(getHistoryKey()) != null;
+            return mHistory == null ? null : mKept;
         }
 
         @Override
@@ -1627,7 +1648,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
         if (isRedirect()) return;
         if (event.getType() == RefreshEvent.Type.DETAIL) mVod.requestDetail();
         else if (event.getType() == RefreshEvent.Type.PLAYER) mVod.refresh();
-        else if (event.getType() == RefreshEvent.Type.KEEP) checkKeepImg();
+        else if (event.getType() == RefreshEvent.Type.KEEP) refreshKeepState();
         else if (event.getType() == RefreshEvent.Type.SUBTITLE) player().setSub(Sub.from(event.getPath()));
         else if (event.getType() == RefreshEvent.Type.DANMAKU) player().setDanmaku(Danmaku.from(event.getPath()));
     }

@@ -18,14 +18,16 @@ public class VodHistoryPolicy {
 
     public History findOrCreate(String key, String mark, Vod item, History history) {
         if (history == null) {
-            history = History.find(key);
+            history = create(key, item);
         } else if (!key.equals(history.getKey())) {
             history.setKey(key);
             history.setCid(VodConfig.getCid());
         }
-        history = history == null ? create(key, item) : history;
         if (!TextUtils.isEmpty(mark)) history.setVodRemarks(mark);
-        if (Setting.isIncognito()) history.delete();
+        if (Setting.isIncognito()) {
+            History target = history;
+            Task.executeSerial(target::delete);
+        }
         item.checkName(history.getVodName());
         history.setVodName(item.getName());
         return history;
@@ -36,7 +38,10 @@ public class VodHistoryPolicy {
         history.setKey(key);
         history.setCid(VodConfig.getCid());
         history.setVodName(item.getName());
-        history.findEpisode(item.getFlags());
+        if (!item.getFlags().isEmpty()) {
+            history.setVodFlag(item.getFlags().get(0).getFlag());
+            if (!item.getFlags().get(0).getEpisodes().isEmpty()) history.setVodRemarks(item.getFlags().get(0).getEpisodes().get(0).getName());
+        }
         return history;
     }
 

@@ -20,6 +20,7 @@ import com.fongmi.android.tv.utils.UrlUtil;
 import com.github.catvod.bean.Header;
 import com.github.catvod.bean.Proxy;
 import com.github.catvod.utils.Auth;
+import com.github.catvod.utils.Task;
 import com.github.catvod.utils.Decoder;
 import com.github.catvod.utils.Json;
 import com.github.catvod.utils.UriUtil;
@@ -194,7 +195,10 @@ public class LiveConfig extends BaseConfig {
     }
 
     public void setKeep(Channel channel) {
-        if (home != null && !channel.getGroup().isHidden()) home.keep(channel).save();
+        if (home != null && !channel.getGroup().isHidden()) {
+            Live live = home.keep(channel);
+            Task.executeSerial(live::save);
+        }
     }
 
     public void applyKeepsToGroups(List<Group> items) {

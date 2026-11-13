@@ -10,6 +10,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.viewbinding.ViewBinding;
 
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.api.config.LiveConfig;
 import com.fongmi.android.tv.api.config.VodConfig;
@@ -21,6 +22,7 @@ import com.fongmi.android.tv.impl.ConfigListener;
 import com.fongmi.android.tv.ui.custom.CustomTextListener;
 import com.fongmi.android.tv.utils.FileChooser;
 import com.fongmi.android.tv.utils.UrlUtil;
+import com.github.catvod.utils.Task;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -120,11 +122,19 @@ public class ConfigDialog extends BaseEventDialog {
     private void onPositive(View view) {
         String name = binding.name.getText().toString().trim();
         String text = binding.text.getText().toString().trim();
-        if (edit) Config.find(url, type).url(text).update();
-        if (text.isEmpty()) Config.delete(url, type);
-        if (name.isEmpty()) ((ConfigListener) requireActivity()).setConfig(Config.find(text, type));
-        else ((ConfigListener) requireActivity()).setConfig(Config.find(text, name, type));
-        dismiss();
+        Task.executeSerial(() -> {
+            if (edit) {
+                Config existing = Config.find(url, type);
+                if (existing != null) existing.url(text).update();
+            }
+            if (text.isEmpty()) Config.delete(url, type);
+            Config found = name.isEmpty() ? Config.find(text, type) : Config.find(text, name, type);
+            App.post(() -> {
+                if (!isAdded()) return;
+                ((ConfigListener) requireActivity()).setConfig(found);
+                dismiss();
+            });
+        });
     }
 
     private void onNegative(View view) {
@@ -143,7 +153,13 @@ public class ConfigDialog extends BaseEventDialog {
 
     private void setConfig(Uri uri) {
         if (!isAdded()) return;
-        ((ConfigListener) requireActivity()).setConfig(Config.find(UrlUtil.toLocalUrl(uri), type));
-        dismiss();
+        Task.executeSerial(() -> {
+            Config found = Config.find(UrlUtil.toLocalUrl(uri), type);
+            App.post(() -> {
+                if (!isAdded()) return;
+                ((ConfigListener) requireActivity()).setConfig(found);
+                dismiss();
+            });
+        });
     }
 }

@@ -58,6 +58,7 @@ import com.fongmi.android.tv.setting.PreloadSetting;
 import com.fongmi.android.tv.setting.SpeedSetting;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
+import com.github.catvod.utils.Task;
 import com.fongmi.android.tv.utils.Util;
 import com.google.common.net.HttpHeaders;
 import com.google.gson.JsonObject;
@@ -489,11 +490,14 @@ public class PlayerManager implements ParseCallback {
         engine.setSecondarySubtitleSelection(selection);
         clearPendingTrackRestore(C.TRACK_TYPE_TEXT, Track.ROLE_SECONDARY);
         if (selection == null) {
-            Track.delete(getKey(), C.TRACK_TYPE_TEXT, Track.ROLE_SECONDARY);
+            Task.executeSerial(() -> Track.delete(getKey(), C.TRACK_TYPE_TEXT, Track.ROLE_SECONDARY));
             return;
         }
         Track track = TrackUtil.fromSelection(player.getCurrentTracks(), selection, Track.ROLE_SECONDARY);
-        if (track != null) track.key(getKey()).save();
+        if (track != null) {
+            track.key(getKey());
+            Task.executeSerial(track::save);
+        }
     }
 
     public void sendDanmaku(String text) {
@@ -549,7 +553,8 @@ public class PlayerManager implements ParseCallback {
         TrackSelectionOverride selection = track.isSelected() ? TrackUtil.findSelection(player, track) : null;
         if (track.isSelected() && selection == null) return;
         engine.restoreSecondarySubtitleSelection(selection);
-        track.key(getKey()).save();
+        track.key(getKey());
+        Task.executeSerial(track::save);
         clearPendingTrackRestore(track.getType(), track.getRole());
     }
 
@@ -561,13 +566,18 @@ public class PlayerManager implements ParseCallback {
         if (!TrackUtil.setTrackSelection(player, track)) return;
         if (promoted != null && secondaryOff != null) {
             secondaryOff.setSelected(false);
-            secondaryOff.key(getKey()).save();
-            promoted.key(getKey()).save();
+            secondaryOff.key(getKey());
+            promoted.key(getKey());
+            Task.executeSerial(() -> {
+                secondaryOff.save();
+                promoted.save();
+            });
             clearPendingTrackRestore(C.TRACK_TYPE_TEXT, Track.ROLE_PRIMARY);
             clearPendingTrackRestore(C.TRACK_TYPE_TEXT, Track.ROLE_SECONDARY);
             return;
         }
-        track.key(getKey()).save();
+        track.key(getKey());
+        Task.executeSerial(track::save);
         clearPendingTrackRestore(track.getType(), track.getRole());
     }
 
@@ -1008,7 +1018,15 @@ public class PlayerManager implements ParseCallback {
 
     private void restoreTrackSelection() {
         pendingTrackRestore.clear();
-        List<Track> tracks = Track.find(getKey());
+        String key = getKey();
+        Task.submit(() -> {
+            List<Track> tracks = Track.find(key);
+            App.post(() -> applyTrackSelection(tracks));
+        });
+    }
+
+    private void applyTrackSelection(List<Track> tracks) {
+        if (engine == null || player == null) return;
         Track secondary = tracks.stream().filter(Track::isSecondary).findFirst().orElse(null);
         if (secondary != null) engine.restoreSecondarySubtitleSelection(null);
         pendingTrackRestore.addAll(TrackUtil.setTrackSelection(player, tracks));

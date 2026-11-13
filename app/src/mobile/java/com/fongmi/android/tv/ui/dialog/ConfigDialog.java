@@ -13,6 +13,7 @@ import androidx.appcompat.widget.TooltipCompat;
 import androidx.fragment.app.Fragment;
 import androidx.viewbinding.ViewBinding;
 
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.api.config.LiveConfig;
 import com.fongmi.android.tv.api.config.VodConfig;
@@ -23,6 +24,7 @@ import com.fongmi.android.tv.impl.ConfigListener;
 import com.fongmi.android.tv.ui.custom.CustomTextListener;
 import com.fongmi.android.tv.utils.FileChooser;
 import com.fongmi.android.tv.utils.UrlUtil;
+import com.github.catvod.utils.Task;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class ConfigDialog extends BaseAlertDialog {
@@ -128,17 +130,32 @@ public class ConfigDialog extends BaseAlertDialog {
     private void onPositive(DialogInterface dialog, int which) {
         String url = binding.url.getText().toString().trim();
         String name = binding.name.getText().toString().trim();
-        if (edit) Config.find(ori, type).url(url).name(name).update();
-        if (url.isEmpty()) Config.delete(ori, type);
-        ((ConfigListener) requireParentFragment()).setConfig(Config.find(url, type));
-        dismiss();
+        Task.executeSerial(() -> {
+            if (edit) {
+                Config existing = Config.find(ori, type);
+                if (existing != null) existing.url(url).name(name).update();
+            }
+            if (url.isEmpty()) Config.delete(ori, type);
+            Config found = Config.find(url, type);
+            App.post(() -> {
+                if (!isAdded()) return;
+                ((ConfigListener) requireParentFragment()).setConfig(found);
+                dismiss();
+            });
+        });
     }
 
     private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> FileChooser.getFileUri(result, this::setConfig));
 
     private void setConfig(Uri uri) {
         if (!isAdded()) return;
-        ((ConfigListener) requireParentFragment()).setConfig(Config.find(UrlUtil.toLocalUrl(uri), type));
-        dismiss();
+        Task.executeSerial(() -> {
+            Config found = Config.find(UrlUtil.toLocalUrl(uri), type);
+            App.post(() -> {
+                if (!isAdded()) return;
+                ((ConfigListener) requireParentFragment()).setConfig(found);
+                dismiss();
+            });
+        });
     }
 }

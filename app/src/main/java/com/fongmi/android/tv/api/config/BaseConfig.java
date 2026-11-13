@@ -1,5 +1,6 @@
 package com.fongmi.android.tv.api.config;
 
+import android.os.Looper;
 import android.text.TextUtils;
 
 import com.fongmi.android.tv.App;
@@ -23,7 +24,10 @@ import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 abstract class BaseConfig {
@@ -54,6 +58,26 @@ abstract class BaseConfig {
         try {
             if (isLoaded()) return;
             if (config == null) config = defaultConfig();
+            Future<?> inFlight = future;
+            if (inFlight != null && !inFlight.isDone()) {
+                // An async load is already running: wait for it instead of
+                // starting a second, synchronous download (P4). If it
+                // finishes but still did not load, fall through to the
+                // synchronous load below; if it is still running after the
+                // wait, leave it alone and return.
+                try {
+                    inFlight.get(30, TimeUnit.SECONDS);
+                } catch (CancellationException | TimeoutException e) {
+                    return;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (ExecutionException e) {
+                    // Async load failed; fall through to synchronous load.
+                }
+                if (isLoaded()) return;
+                if (!inFlight.isDone()) return;
+            }
             Server.get().start();
             load(config);
         } catch (Throwable e) {
@@ -71,7 +95,9 @@ abstract class BaseConfig {
     }
 
     public Config getConfig() {
-        return config == null ? defaultConfig() : config;
+        if (config != null) return config;
+        if (Looper.myLooper() == Looper.getMainLooper()) return new Config();
+        return defaultConfig();
     }
 
     protected void setHeaders(List<Header> headers) {

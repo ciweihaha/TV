@@ -50,6 +50,7 @@ import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.PermissionUtil;
 import com.fongmi.android.tv.utils.Util;
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.utils.Task;
 import com.google.android.material.navigation.NavigationBarView;
 
 import org.greenrobot.eventbus.Subscribe;
@@ -162,9 +163,15 @@ public class HomeActivity extends BaseActivity implements NavigationBarView.OnIt
     }
 
     private void initConfig() {
-        VodConfig.get().init().load(getCallback());
-        LiveConfig.get().init().load();
-        WallConfig.get().init();
+        Task.submit(() -> {
+            VodConfig.get().init();
+            LiveConfig.get().init();
+            WallConfig.get().init();
+            App.post(() -> {
+                VodConfig.get().load(getCallback());
+                LiveConfig.get().load();
+            });
+        });
     }
 
     private Callback getCallback() {
@@ -185,18 +192,24 @@ public class HomeActivity extends BaseActivity implements NavigationBarView.OnIt
 
     private void loadLive(String url) {
         if (isFinishing() || isDestroyed()) return;
-        LiveConfig.load(Config.find(url, 1), new Callback() {
-            @Override
-            public void success() {
-                if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) startActivityForResult(new Intent(HomeActivity.this, LiveActivity.class).putExtra("empty", LiveConfig.isEmpty()), ExternalPlayback.REQUEST_CODE);
-                else openLive();
-            }
+        Task.submit(() -> {
+            Config config = Config.find(url, 1);
+            App.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                LiveConfig.load(config, new Callback() {
+                    @Override
+                    public void success() {
+                        if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) startActivityForResult(new Intent(HomeActivity.this, LiveActivity.class).putExtra("empty", LiveConfig.isEmpty()), ExternalPlayback.REQUEST_CODE);
+                        else openLive();
+                    }
 
-            @Override
-            public void error(String msg) {
-                Notify.show(msg);
-                if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) finish();
-            }
+                    @Override
+                    public void error(String msg) {
+                        Notify.show(msg);
+                        if (getIntent().getBooleanExtra(ExternalPlayback.FORWARD_RESULT, false)) finish();
+                    }
+                });
+            });
         });
     }
 

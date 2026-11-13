@@ -18,6 +18,7 @@ import com.fongmi.android.tv.playback.PlaybackResult;
 import com.fongmi.android.tv.player.extractor.Source;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.SourceUrl;
+import com.github.catvod.utils.Task;
 import com.github.catvod.utils.Trans;
 
 import java.util.ArrayList;
@@ -87,7 +88,7 @@ public class VodPlaybackController {
         if (detail == null || !detail.matches(host.getVodKey(), host.getVodId())) return;
         Result result = detail.result();
         if (result.getList().isEmpty()) detailEmpty(result.hasMsg());
-        else detailLoaded(result.getVod());
+        else detailLoaded(result.getVod(), detail.history());
         host.showDetailMessage(result.getMsg());
     }
 
@@ -125,8 +126,12 @@ public class VodPlaybackController {
         preloader.clear();
         host.setVodId(id);
         String newKey = host.getHistoryKey();
-        history.replace(newKey);
-        Keep.replace(oldKey, newKey);
+        int cid = history.getCid();
+        Task.executeSerial(() -> {
+            History.delete(cid, oldKey);
+            Keep.replace(oldKey, newKey);
+        });
+        history.setKey(newKey);
     }
 
     public void onPlaybackResult(PlaybackResult<VodPlayRequest> playback) {
@@ -605,21 +610,21 @@ public class VodPlaybackController {
         }
     }
 
-    private void detailLoaded(Vod item) {
+    private void detailLoaded(Vod item, History preloaded) {
         VodPlayRequest activeRequest = state.getActiveRequest();
-        History history = applyDetail(item);
+        History history = applyDetail(item, preloaded);
         if (state.hasFlags()) restoreDetail(activeRequest, history);
         else if (!host.getVodPlayId().isEmpty()) showMissingEpisode(history, R.string.error_episode_not_found);
         else fallbackPolicy.emptyFlag();
     }
 
-    private History applyDetail(Vod item) {
+    private History applyDetail(Vod item, History preloaded) {
         item.checkPic(host.getVodPic());
         item.checkName(host.getVodName());
         List<Flag> flags = item.getFlags();
         if (host.getVodPlayId().isEmpty()) for (Flag flag : flags) restoreExpandedEpisodes(flag);
         state.setFlags(flags);
-        History history = findHistory(item);
+        History history = findHistory(item, preloaded);
         state.setHistory(history);
         restoreSavedEpisode(history);
         lastHistory = history;
@@ -630,11 +635,12 @@ public class VodPlaybackController {
         return history;
     }
 
-    private History findHistory(Vod item) {
+    private History findHistory(Vod item, History preloaded) {
         String key = host.getHistoryKey();
         History history = host.takeCastHistory();
         History current = state.getHistory();
         if (history == null && current != null && key.equals(current.getKey())) history = current;
+        if (history == null && preloaded != null && key.equals(preloaded.getKey())) history = preloaded;
         String mark = host.getVodPlayId().isEmpty() ? host.getVodMark() : "";
         return historyPolicy.findOrCreate(key, mark, item, history);
     }
