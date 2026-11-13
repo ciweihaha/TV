@@ -23,6 +23,7 @@ import com.fongmi.android.tv.player.media.MediaItemFactory;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
@@ -48,9 +49,13 @@ class VodBrowse {
      * cache holds MAX_VOD_CACHE items, and the removal listener drops the
      * evicted title's episode indexes. Previously a random entry was
      * evicted (ConcurrentHashMap keySet().stream().findFirst()). */
-    private static final Cache<String, Vod> vodCache = CacheBuilder.newBuilder().maximumSize(MAX_VOD_CACHE).removalListener(notification -> {
+    /** The listener is typed separately because CacheBuilder.removalListener
+     * takes RemovalListener<? super K, ? super V>: an inline lambda would
+     * see getKey() as Object and not compile against evictRelated(String). */
+    private static final RemovalListener<String, Vod> evictionListener = notification -> {
         if (notification.wasEvicted()) evictRelated(notification.getKey());
-    }).build();
+    };
+    private static final Cache<String, Vod> vodCache = CacheBuilder.<String, Vod>newBuilder().maximumSize(MAX_VOD_CACHE).removalListener(evictionListener).build();
     private static final Map<String, String> epNavMap = new ConcurrentHashMap<>();
     /** Per-title episode index (P5): each title's entries live in its own
      * list, so rebuilding one title touches only that title instead of
