@@ -55,6 +55,7 @@ class VodBrowse {
         epNavMap.clear();
         epEntries.clear();
         epCountMap.clear();
+        SiteApi.clearCache();
     }
 
     @NonNull

@@ -31,6 +31,8 @@ import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Prefers;
 import com.github.catvod.utils.UriUtil;
 import com.github.catvod.utils.Util;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 import org.json.JSONObject;
 
@@ -45,6 +47,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import okhttp3.Call;
@@ -54,6 +57,21 @@ public class SiteApi {
 
     public static final String LOCAL = "local_file";
     public static final String PUSH = "push_agent";
+
+    /** Short-TTL in-memory cache for VOD API responses (P1). Home/category live 5 min, detail 10 min. */
+    private static final Cache<String, HomeEntry> homeCache = CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).maximumSize(64).build();
+    private static final Cache<String, String> categoryCache = CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).maximumSize(128).build();
+    private static final Cache<String, String> detailCache = CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).maximumSize(128).build();
+
+    private record HomeEntry(String home, String video) {
+    }
+
+    /** Drop all cached VOD responses, e.g. when the config changes. */
+    public static void clearCache() {
+        homeCache.invalidateAll();
+        categoryCache.invalidateAll();
+        detailCache.invalidateAll();
+    }
 
     public static String call(@NonNull Site site, @NonNull ArrayMap<String, String> params) throws IOException {
         if (!site.getExt().isEmpty()) params.put("extend", site.getExt());
@@ -85,30 +103,46 @@ public class SiteApi {
 
     @NonNull
     public static Result homeContent(@NonNull Site site) throws Exception {
-        Result result;
-        if (isSpider(site)) {
+        String cacheKey = VodConfig.getCid() + ":" + site.getKey();
+        boolean crash = Prefers.getBoolean("crash");
+        HomeEntry cached = crash ? null : homeCache.getIfPresent(cacheKey);
+        String home;
+        String video;
+        if (cached != null) {
+            home = cached.home();
+            video = cached.video();
+        } else if (isSpider(site)) {
             Spider spider = site.recent().spider();
-            boolean crash = Prefers.getBoolean("crash");
-            String home = crash ? "" : spider.homeContent(true);
-            String video = crash ? "" : spider.homeVideoContent();
+            home = crash ? "" : spider.homeContent(true);
+            video = crash ? "" : spider.homeVideoContent();
             Prefers.put("crash", false);
             SpiderDebug.log("home", home);
             SpiderDebug.log("homeVideo", video);
+            if (!crash) homeCache.put(cacheKey, new HomeEntry(home, video));
+        } else if (site.getType() == 4) {
+            ArrayMap<String, String> params = new ArrayMap<>();
+            params.put("filter", "true");
+            home = call(site.fetchExt(), params);
+            video = "";
+            SpiderDebug.log("home", home);
+            homeCache.put(cacheKey, new HomeEntry(home, video));
+        } else {
+            try (Response response = OkHttp.newCall(site.getApi(), site.getHeader()).execute()) {
+                home = response.body() == null ? "" : response.body().string();
+            }
+            video = "";
+            SpiderDebug.log("home", home);
+            homeCache.put(cacheKey, new HomeEntry(home, video));
+        }
+        Result result;
+        if (isSpider(site)) {
             result = Result.fromJson(home);
             List<Vod> list = Result.fromJson(video).getList();
             if (!list.isEmpty()) result.setList(list);
         } else if (site.getType() == 4) {
-            ArrayMap<String, String> params = new ArrayMap<>();
-            params.put("filter", "true");
-            String homeContent = call(site.fetchExt(), params);
-            SpiderDebug.log("home", homeContent);
-            result = Result.fromJson(homeContent);
+            result = Result.fromJson(home);
         } else {
-            try (Response response = OkHttp.newCall(site.getApi(), site.getHeader()).execute()) {
-                String homeContent = response.body() == null ? "" : response.body().string();
-                SpiderDebug.log("home", homeContent);
-                result = fetchPic(site, Result.fromType(site.getType(), homeContent));
-            }
+            result = fetchPic(site, Result.fromType(site.getType(), home));
         }
         setTypes(site, result);
         return result;
@@ -119,20 +153,29 @@ public class SiteApi {
         SpiderDebug.log("category", "key=%s,tid=%s,page=%s,filter=%s,extend=%s", key, tid, page, filter, extend);
         Site site = VodConfig.get().getSite(key);
         boolean spider = isSpider(site);
-        String categoryContent;
-        if (spider) {
-            categoryContent = site.recent().spider().categoryContent(tid, page, filter, extend);
-        } else {
-            ArrayMap<String, String> params = new ArrayMap<>();
-            if (site.getType() == 1 && !extend.isEmpty()) params.put("f", App.gson().toJson(extend));
-            if (site.getType() == 4) params.put("ext", Util.base64(App.gson().toJson(extend), Util.URL_SAFE));
-            params.put("ac", ac(site.getType()));
-            params.put("t", tid);
-            params.put("pg", page);
-            categoryContent = call(site, params);
+        String cacheKey = VodConfig.getCid() + ":cat:" + key + "|" + tid + "|" + page + "|" + filter + "|" + extendKey(extend);
+        String categoryContent = categoryCache.getIfPresent(cacheKey);
+        if (categoryContent == null) {
+            if (spider) {
+                categoryContent = site.recent().spider().categoryContent(tid, page, filter, extend);
+            } else {
+                ArrayMap<String, String> params = new ArrayMap<>();
+                if (site.getType() == 1 && !extend.isEmpty()) params.put("f", App.gson().toJson(extend));
+                if (site.getType() == 4) params.put("ext", Util.base64(App.gson().toJson(extend), Util.URL_SAFE));
+                params.put("ac", ac(site.getType()));
+                params.put("t", tid);
+                params.put("pg", page);
+                categoryContent = call(site, params);
+            }
+            categoryCache.put(cacheKey, categoryContent);
         }
         SpiderDebug.log("category", categoryContent);
         return spider ? Result.fromJson(categoryContent) : Result.fromType(site.getType(), categoryContent);
+    }
+
+    private static String extendKey(@NonNull HashMap<String, String> extend) {
+        if (extend.isEmpty()) return "";
+        return extend.entrySet().stream().sorted(Map.Entry.comparingByKey()).map(entry -> entry.getKey() + "=" + entry.getValue()).reduce((a, b) -> a + "&" + b).orElse("");
     }
 
     @NonNull
@@ -155,14 +198,18 @@ public class SiteApi {
         Site site = VodConfig.get().getSite(key);
         if (site.isEmpty() && PUSH.equals(key)) return directDetail(originalId, id, id, R.string.push);
         boolean spider = isSpider(site);
-        String detailContent;
-        if (spider) {
-            detailContent = site.recent().spider().detailContent(Arrays.asList(id));
-        } else {
-            ArrayMap<String, String> params = new ArrayMap<>();
-            params.put("ac", ac(site.getType()));
-            params.put("ids", id);
-            detailContent = call(site, params);
+        String cacheKey = VodConfig.getCid() + ":detail:" + key + "|" + id + "|" + builtin;
+        String detailContent = detailCache.getIfPresent(cacheKey);
+        if (detailContent == null) {
+            if (spider) {
+                detailContent = site.recent().spider().detailContent(Arrays.asList(id));
+            } else {
+                ArrayMap<String, String> params = new ArrayMap<>();
+                params.put("ac", ac(site.getType()));
+                params.put("ids", id);
+                detailContent = call(site, params);
+            }
+            detailCache.put(cacheKey, detailContent);
         }
         SpiderDebug.log("detail", detailContent);
         Result result = spider ? Result.fromJson(detailContent) : Result.fromType(site.getType(), detailContent);
