@@ -40,7 +40,8 @@ jobs:
           ls -la leanback/debug/
           APK="leanback/debug/app-leanback-arm64-v8a-debug.apk"
           test -f "$APK"
-          NAME="TV-${{ inputs.tag }}-leanback-arm64-v8a.apk"
+          TAG="${{ inputs.tag }}"
+          NAME="TV-${TAG#v}-leanback-arm64-v8a.apk"
           cp "$APK" "$NAME"
           sha256sum "$NAME"
           gh release upload "${{ inputs.tag }}" "$NAME" --clobber --repo ciweihaha/TV
