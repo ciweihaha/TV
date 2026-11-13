@@ -25,6 +25,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -51,6 +52,10 @@ class VodBrowse {
         if (notification.wasEvicted()) evictRelated(notification.getKey());
     }).build();
     private static final Map<String, String> epNavMap = new ConcurrentHashMap<>();
+    /** Per-title episode index (P5): each title's entries live in its own
+     * list, so rebuilding one title touches only that title instead of
+     * scanning every cached title's entries. */
+    private static final Map<String, List<EpEntry>> epIndexMap = new ConcurrentHashMap<>();
     private static final Map<String, EpEntry> epEntries = new ConcurrentHashMap<>();
     private static final Map<String, Integer> epCountMap = new ConcurrentHashMap<>();
     private static volatile int cacheGeneration;
@@ -62,6 +67,7 @@ class VodBrowse {
         vodCache.invalidateAll();
         epNavMap.clear();
         epEntries.clear();
+        epIndexMap.clear();
         epCountMap.clear();
         SiteApi.clearCache();
     }
@@ -98,7 +104,7 @@ class VodBrowse {
 
     private static MediaItem episodeItem(String key, Flag flag, int index, History history, Vod vod) {
         Episode episode = flag.getEpisodes().get(index);
-        boolean current = flag.getFlag().equals(history.getVodFlag()) && episode.getUrl().equals(history.getEpisodeUrl());
+        boolean current = flag.getFlag().equals(history.getVodFlag()) && (history.getEpisodeIndex() >= 0 ? index == history.getEpisodeIndex() : episode.getUrl().equals(history.getEpisodeUrl()));
         return BrowseTree.playable(VOD_EP + epNavKey(key, flag.getFlag(), index), episode.getName(), current ? ResUtil.getString(R.string.auto_current_episode) : vod.getName(history.getVodName()), history.getVodPic());
     }
 
@@ -248,30 +254,29 @@ class VodBrowse {
 
     private static synchronized int buildEpIndex(@NonNull String historyKey, @NonNull Flag flag, @NonNull History history, int generation) {
         if (generation != cacheGeneration) return C.INDEX_UNSET;
-        String prefix = historyKey + KEY_SEPARATOR;
-        epEntries.values().removeIf(entry -> entry.historyKey.equals(historyKey));
-        epNavMap.keySet().removeIf(key -> key.startsWith(prefix));
-        epCountMap.keySet().removeIf(key -> key.startsWith(prefix));
+        evictRelated(historyKey);
         String flagName = flag.getFlag();
         List<Episode> episodes = flag.getEpisodes();
         epCountMap.put(epCountKey(historyKey, flagName), episodes.size());
-        for (int i = 0; i < episodes.size(); i++) indexEpisode(historyKey, flagName, i, history);
-        return findCurrentIndex(flag, history);
+        String currentUrl = history.getEpisode() != null ? history.getEpisode().getUrl() : null;
+        int current = 0;
+        List<EpEntry> entries = new ArrayList<>(episodes.size());
+        for (int i = 0; i < episodes.size(); i++) {
+            if (!TextUtils.isEmpty(currentUrl) && episodes.get(i).getUrl().equals(currentUrl)) current = i;
+            entries.add(indexEpisode(historyKey, flagName, i, history));
+        }
+        epIndexMap.put(historyKey, entries);
+        history.setEpisodeIndex(current);
+        return current;
     }
 
-    private static void indexEpisode(@NonNull String historyKey, @NonNull String flagName, int index, @NonNull History history) {
+    private static EpEntry indexEpisode(@NonNull String historyKey, @NonNull String flagName, int index, @NonNull History history) {
         String key = epNavKey(historyKey, flagName, index);
         String id = VOD_EP + key;
-        epEntries.put(id, new EpEntry(historyKey, flagName, index, history.getSiteKey(), history.getVodPic(), history));
+        EpEntry entry = new EpEntry(historyKey, flagName, index, history.getSiteKey(), history.getVodPic(), history);
+        epEntries.put(id, entry);
         epNavMap.put(key, id);
-    }
-
-    private static int findCurrentIndex(@NonNull Flag flag, @NonNull History history) {
-        String currentUrl = history.getEpisode() != null ? history.getEpisode().getUrl() : null;
-        if (TextUtils.isEmpty(currentUrl)) return 0;
-        List<Episode> episodes = flag.getEpisodes();
-        for (int i = 0; i < episodes.size(); i++) if (episodes.get(i).getUrl().equals(currentUrl)) return i;
-        return 0;
+        return entry;
     }
 
     @Nullable
@@ -401,10 +406,13 @@ class VodBrowse {
     }
 
     private static void evictRelated(String historyKey) {
-        String prefix = historyKey + KEY_SEPARATOR;
-        epEntries.values().removeIf(entry -> entry.historyKey.equals(historyKey));
-        epNavMap.keySet().removeIf(key -> key.startsWith(prefix));
-        epCountMap.keySet().removeIf(key -> key.startsWith(prefix));
+        List<EpEntry> old = epIndexMap.remove(historyKey);
+        if (old == null) return;
+        for (EpEntry entry : old) {
+            epEntries.remove(VOD_EP + epNavKey(entry.historyKey(), entry.flagName(), entry.index()));
+            epNavMap.remove(epNavKey(entry.historyKey(), entry.flagName(), entry.index()));
+        }
+        old.stream().map(EpEntry::flagName).distinct().forEach(flagName -> epCountMap.remove(epCountKey(historyKey, flagName)));
     }
 
     private static final long DETAIL_WAIT_MS = 10_000;
