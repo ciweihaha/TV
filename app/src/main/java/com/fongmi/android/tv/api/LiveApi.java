@@ -16,11 +16,19 @@ import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.player.extractor.Source;
 import com.fongmi.android.tv.utils.Formatters;
 import com.github.catvod.net.OkHttp;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.concurrent.TimeUnit;
 
 public class LiveApi {
+
+    /** JSON EPG cache (P2): parsed data is valid for the whole day, so one
+     * download per (channel, date) is enough. The XMLTV path already has a
+     * 6h disk cache; this covers the JSON path (SCF output) which had none. */
+    private static final Cache<String, String> epgJsonCache = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.DAYS).maximumSize(512).build();
 
     public static void parse(@NonNull Live item) throws Exception {
         LiveParser.start(item.recent());
@@ -86,6 +94,13 @@ public class LiveApi {
         String date = LocalDate.now(zoneId).plusDays(offset).format(Formatters.DATE);
         String url = item.getEpg().replace("{date}", date);
         boolean need = url.startsWith("http") && item.getDataList().stream().noneMatch(epg -> epg.equal(date));
-        if (need) item.setData(Epg.objectFrom(OkHttp.string(url), item.getTvgId(), date, zoneId));
+        if (!need) return;
+        String cacheKey = item.getTvgId() + "|" + date;
+        String json = epgJsonCache.getIfPresent(cacheKey);
+        if (json == null) {
+            json = OkHttp.string(url);
+            epgJsonCache.put(cacheKey, json);
+        }
+        item.setData(Epg.objectFrom(json, item.getTvgId(), date, zoneId));
     }
 }
