@@ -19,6 +19,7 @@ import com.fongmi.android.tv.databinding.ActivityVodBinding;
 import com.fongmi.android.tv.event.RefreshEvent;
 import com.fongmi.android.tv.ui.adapter.TypeAdapter;
 import com.fongmi.android.tv.ui.fragment.FolderFragment;
+import com.fongmi.android.tv.utils.CategoryMerger;
 import com.fongmi.android.tv.utils.KeyUtil;
 import com.fongmi.android.tv.utils.ResUtil;
 
@@ -80,7 +81,8 @@ public class VodActivity extends BasePagerActivity implements TypeAdapter.OnClic
     }
 
     private void setTypes() {
-        mAdapter.addAll(getResult().getTypes());
+        // 分类归并：只显示电影 / 电视剧 / 动画片 / 综艺四个 tab，其余分类按名字规则并进这四个
+        mAdapter.addAll(CategoryMerger.merge(getKey(), getResult().getTypes()));
     }
 
     private void setPager() {

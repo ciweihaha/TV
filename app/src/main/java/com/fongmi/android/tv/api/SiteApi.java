@@ -73,6 +73,50 @@ public class SiteApi {
         detailCache.invalidateAll();
     }
 
+    /** Drop one site's cached home response so the next homeContent call really re-fetches it. */
+    public static void invalidateHome(@NonNull Site site) {
+        homeCache.invalidate(VodConfig.getCid() + ":" + site.getKey());
+    }
+
+    /**
+     * 有些站点的筛选值只给了显示名 n，没给 v：此时 Value.getV() 是空串，
+     * 同一行的芯片按 v 判等就全被当成同一个（点一个等于全行一起切换），
+     * 发给站点的 f 里也是空值，站点直接忽略、返回默认列表——点了筛选毫无反应。
+     * 这里把空 v 补成显示名 n（CMS 站点的过滤值本来就是显示名）；“全部/不限/所有”
+     * 表示不过滤，保持空值。
+     */
+    private static void normalizeFilters(List<Filter> filters) {
+        for (Filter filter : filters) {
+            for (com.fongmi.android.tv.bean.Value value : filter.getValue()) {
+                if (value.getV().isEmpty() && !value.getN().isEmpty() && !isAllValue(value.getN())) {
+                    value.setV(value.getN());
+                }
+            }
+        }
+    }
+
+    private static boolean isAllValue(String name) {
+        return "全部".equals(name) || "不限".equals(name) || "所有".equals(name);
+    }
+
+    /**
+     * 部分站点 home 返回的筛选键是中文名（地区/年份/类型/语言），CMS 接口只认英文字段名
+     * （area/year/class/lang），中文键发过去会被站点忽略、返回默认列表。
+     * 发请求前把已知的中文键映射成标准字段；英文键和未知键原样保留。
+     * 只用于 CMS 直连分支（type 1 的 f、type 4 的 ext），Spider 走站点自己的 JS，不动。
+     */
+    private static final Map<String, String> FILTER_KEYS = Map.of(
+            "地区", "area", "地域", "area",
+            "年份", "year", "年代", "year",
+            "类型", "class", "分类", "class",
+            "语言", "lang");
+
+    private static HashMap<String, String> normalizeExtend(HashMap<String, String> extend) {
+        HashMap<String, String> normalized = new HashMap<>();
+        extend.forEach((key, value) -> normalized.put(FILTER_KEYS.getOrDefault(key, key), value));
+        return normalized;
+    }
+
     public static String call(@NonNull Site site, @NonNull ArrayMap<String, String> params) throws IOException {
         if (!site.getExt().isEmpty()) params.put("extend", site.getExt());
         Call call = site.getExt().length() <= 1000 ? OkHttp.newCall(site.getApi(), site.getHeader(), params) : OkHttp.newCall(site.getApi(), site.getHeader(), OkHttp.toBody(params));
@@ -160,8 +204,9 @@ public class SiteApi {
                 categoryContent = site.recent().spider().categoryContent(tid, page, filter, extend);
             } else {
                 ArrayMap<String, String> params = new ArrayMap<>();
-                if (site.getType() == 1 && !extend.isEmpty()) params.put("f", App.gson().toJson(extend));
-                if (site.getType() == 4) params.put("ext", Util.base64(App.gson().toJson(extend), Util.URL_SAFE));
+                HashMap<String, String> normalized = normalizeExtend(extend);
+                if (site.getType() == 1 && !normalized.isEmpty()) params.put("f", App.gson().toJson(normalized));
+                if (site.getType() == 4) params.put("ext", Util.base64(App.gson().toJson(normalized), Util.URL_SAFE));
                 params.put("ac", ac(site.getType()));
                 params.put("t", tid);
                 params.put("pg", page);
@@ -171,6 +216,39 @@ public class SiteApi {
         }
         SpiderDebug.log("category", categoryContent);
         return spider ? Result.fromJson(categoryContent) : Result.fromType(site.getType(), categoryContent);
+    }
+
+    /**
+     * 分类归并后的拉取：一个主分类对应多个成员 typeId，逐个拉取后合并成一个结果。
+     * 主分类的视频排在前面，成员间按视频 id（无 id 时按名字）去重——主题合集里的
+     * 影片大多已在主分类里，去重后不重复出现；总页数取各成员的最大值，
+     * 任一成员还有下一页时“加载更多”就继续。单个 typeId 时直接走单分类路径。
+     * 各成员的单次请求本身走 5 分钟缓存，重复翻页不重复发请求。
+     */
+    @NonNull
+    public static Result categoryContent(@NonNull String key, @NonNull List<String> tids, @NonNull String page, boolean filter, @NonNull HashMap<String, String> extend) throws Exception {
+        if (tids.size() == 1) return categoryContent(key, tids.get(0), page, filter, extend);
+        List<Vod> merged = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
+        Set<String> seenNames = new HashSet<>();
+        int pageCount = 0;
+        for (String tid : tids) {
+            Result result = categoryContent(key, tid, page, filter, extend);
+            pageCount = Math.max(pageCount, result.getPageCount());
+            for (Vod vod : result.getList()) {
+                String id = vod.getId();
+                if (!id.isEmpty()) {
+                    if (!seenIds.add(id)) continue;
+                } else if (!vod.getName().isEmpty()) {
+                    if (!seenNames.add(vod.getName())) continue;
+                }
+                merged.add(vod);
+            }
+        }
+        Result result = new Result();
+        result.setList(merged);
+        result.setPageCount(pageCount);
+        return result;
     }
 
     private static String extendKey(@NonNull HashMap<String, String> extend) {
@@ -390,7 +468,11 @@ public class SiteApi {
 
     private static void setTypes(@NonNull Site site, @NonNull Result result) {
         LinkedHashMap<String, List<Filter>> filters = result.getFilters();
-        result.getTypes().stream().filter(type -> filters.containsKey(type.getTypeId())).forEach(type -> type.setFilters(filters.get(type.getTypeId())));
+        result.getTypes().stream().filter(type -> filters.containsKey(type.getTypeId())).forEach(type -> {
+            List<Filter> list = filters.get(type.getTypeId());
+            normalizeFilters(list);
+            type.setFilters(list);
+        });
         if (site.getCategories().isEmpty()) return;
         Map<String, Class> typeByName = new HashMap<>();
         result.getTypes().forEach(type -> typeByName.put(type.getTypeName(), type));

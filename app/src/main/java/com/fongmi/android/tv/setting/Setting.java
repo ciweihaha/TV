@@ -138,10 +138,11 @@ public class Setting {
     }
 
     public static int getKeyboardMode() {
-        return Math.clamp(Prefers.getInt("keyboard_mode", 1), 1, 3);
+        // 笔画键盘已删除：只剩拼音全键 1 / 拼音九键 2，旧的笔画值 3 回落到拼音全键
+        return Prefers.getInt("keyboard_mode", 1) == 2 ? 2 : 1;
     }
 
     public static void putKeyboardMode(int mode) {
-        Prefers.put("keyboard_mode", Math.clamp(mode, 1, 3));
+        Prefers.put("keyboard_mode", mode == 2 ? 2 : 1);
     }
 }

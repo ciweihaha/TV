@@ -362,6 +362,10 @@ public class Result implements Parcelable {
         return pagecount.intValue();
     }
 
+    public void setPageCount(int pageCount) {
+        this.pagecount = (long) pageCount;
+    }
+
     public Integer getParse() {
         return parse == null ? 0 : parse;
     }

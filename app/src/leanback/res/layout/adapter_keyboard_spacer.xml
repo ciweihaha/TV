@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 全键错列布局的占位键：不可见、不可聚焦，只占一列宽度 -->
+<View xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:focusable="false"
+    android:visibility="invisible" />

@@ -15,8 +15,10 @@ import com.fongmi.android.tv.bean.Class;
 import com.fongmi.android.tv.bean.Filter;
 import com.fongmi.android.tv.databinding.FragmentFolderBinding;
 import com.fongmi.android.tv.ui.activity.VodActivity;
+import com.fongmi.android.tv.utils.CategoryMerger;
 import com.fongmi.android.tv.ui.base.BaseFragment;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Optional;
 
@@ -58,7 +60,7 @@ public class FolderFragment extends BaseFragment {
     @Override
     protected void initView() {
         mType = getType();
-        getChildFragmentManager().beginTransaction().replace(R.id.container, TypeFragment.newInstance(getKey(), mType.getTypeId(), mType.getStyle(), getExtend(), mType.isFolder())).commit();
+        getChildFragmentManager().beginTransaction().replace(R.id.container, TypeFragment.newInstance(getKey(), mType.getTypeId(), mType.getStyle(), getExtend(), mType.isFolder(), new ArrayList<>(CategoryMerger.getMergedIds(getKey(), mType.getTypeId())))).commit();
     }
 
     private HashMap<String, String> getExtend() {

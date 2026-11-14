@@ -28,7 +28,7 @@ public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.ViewHolder
 
     public interface OnClickListener {
 
-        void onItemClick(String text);
+        void onRecordClick(String text);
 
         void onDataChanged(int size);
     }
@@ -65,7 +65,7 @@ public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.ViewHolder
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         String text = mItems.get(position);
         holder.binding.text.setText(text);
-        holder.binding.text.setOnClickListener(v -> listener.onItemClick(text));
+        holder.binding.text.setOnClickListener(v -> listener.onRecordClick(text));
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder implements View.OnLongClickListener {

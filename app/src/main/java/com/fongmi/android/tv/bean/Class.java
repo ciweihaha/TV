@@ -103,6 +103,21 @@ public class Class implements Parcelable, Diffable<Class> {
         this.filters = filters;
     }
 
+    /** 深拷贝（分类归并用：改桶的显示名不影响原分类）。 */
+    public Class copy() {
+        Class copy = new Class();
+        copy.typeId = this.typeId;
+        copy.typeName = this.typeName;
+        copy.typeFlag = this.typeFlag;
+        copy.filters = this.filters;
+        copy.land = this.land;
+        copy.circle = this.circle;
+        copy.ratio = this.ratio;
+        copy.filter = this.filter;
+        copy.selected = this.selected;
+        return copy;
+    }
+
     public int getLand() {
         return land == null ? 0 : land;
     }
