@@ -5,11 +5,35 @@ import com.fongmi.android.tv.databinding.ActivitySearchBinding;
 import com.fongmi.android.tv.ui.adapter.KeyboardAdapter;
 import com.fongmi.android.tv.utils.Util;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
+
+    // 拼音 9 键每组可循环的字符（数字排在组末，经典手机多击方式：按 2 一下是 A，两下是 B，三下是 C，四下是 2）
+    private static final Map<String, char[]> GROUPS = new HashMap<>();
+    private static final int MULTI_TAP_TIMEOUT = 1000;
+
+    static {
+        GROUPS.put("1", new char[]{'.', ',', '?', '!', '1'});
+        GROUPS.put("2", new char[]{'A', 'B', 'C', '2'});
+        GROUPS.put("3", new char[]{'D', 'E', 'F', '3'});
+        GROUPS.put("4", new char[]{'G', 'H', 'I', '4'});
+        GROUPS.put("5", new char[]{'J', 'K', 'L', '5'});
+        GROUPS.put("6", new char[]{'M', 'N', 'O', '6'});
+        GROUPS.put("7", new char[]{'P', 'Q', 'R', 'S', '7'});
+        GROUPS.put("8", new char[]{'T', 'U', 'V', '8'});
+        GROUPS.put("9", new char[]{'W', 'X', 'Y', 'Z', '9'});
+        GROUPS.put("0", new char[]{' ', '0'});
+    }
 
     private final ActivitySearchBinding binding;
     private final Callback callback;
     private KeyboardAdapter adapter;
+    private String lastDigit;
+    private int lastIndex;
+    private long lastTime;
+    private int lastPos;
 
     public static CustomKeyboard init(Callback callback, ActivitySearchBinding binding) {
         CustomKeyboard keyboard = new CustomKeyboard(callback, binding);
@@ -42,17 +66,36 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
     }
 
     @Override
-    public void onTextClick(String text) {
-        StringBuilder sb = new StringBuilder(binding.keyword.getText().toString());
+    public void onKeyClick(String digit) {
+        char[] group = GROUPS.get(digit);
+        if (group == null) return;
+        String text = binding.keyword.getText().toString();
         int cursor = binding.keyword.getSelectionStart();
-        if (binding.keyword.length() > 19) return;
-        sb.insert(cursor, text);
-        binding.keyword.setText(sb.toString());
-        binding.keyword.setSelection(cursor + 1);
+        if (cursor < 0) cursor = text.length();
+        long now = System.currentTimeMillis();
+        // 同一键 1 秒内连续按：替换光标前刚输入的字符为组内下一个（多击循环）
+        if (digit.equals(lastDigit) && now - lastTime < MULTI_TAP_TIMEOUT && cursor == lastPos && cursor > 0 && text.charAt(cursor - 1) == group[lastIndex]) {
+            lastIndex = (lastIndex + 1) % group.length;
+            StringBuilder sb = new StringBuilder(text);
+            sb.setCharAt(cursor - 1, group[lastIndex]);
+            binding.keyword.setText(sb.toString());
+            binding.keyword.setSelection(cursor);
+        } else {
+            if (binding.keyword.length() > 19) return;
+            StringBuilder sb = new StringBuilder(text);
+            sb.insert(cursor, group[0]);
+            binding.keyword.setText(sb.toString());
+            binding.keyword.setSelection(cursor + 1);
+            lastIndex = 0;
+        }
+        lastDigit = digit;
+        lastTime = now;
+        lastPos = binding.keyword.getSelectionStart();
     }
 
     @Override
     public void onIconClick(int resId) {
+        lastDigit = null;
         StringBuilder sb = new StringBuilder(binding.keyword.getText().toString());
         int cursor = binding.keyword.getSelectionStart();
         if (resId == R.drawable.ic_setting_home) callback.showDialog();
@@ -88,6 +131,7 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
     @Override
     public boolean onLongClick(int resId) {
         if (resId != R.drawable.ic_keyboard_back) return false;
+        lastDigit = null;
         binding.keyword.setText("");
         return true;
     }

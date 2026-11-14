@@ -62,9 +62,9 @@
             android:layout_marginTop="16dp"
             android:overScrollMode="never"
             app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-            app:spanCount="7"
-            tools:itemCount="36"
-            tools:listitem="@layout/adapter_keyboard_text" />
+            app:spanCount="3"
+            tools:itemCount="17"
+            tools:listitem="@layout/adapter_keyboard_9key" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 

@@ -312,6 +312,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         mBinding.mic.setFocusable(true);
         mBinding.keyword.requestFocus();
         if (mKeyboard != null && mKeyboard.isSystemMode()) mKeyboard.showSystemKeyboard();
+        else if (mKeyboard != null) mKeyboard.hideSystemKeyboard();
     }
 
     @Override
