@@ -10,9 +10,10 @@
     android:padding="24dp">
 
     <androidx.appcompat.widget.LinearLayoutCompat
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_marginEnd="24dp"
+        android:layout_weight="2"
         android:orientation="vertical">
 
         <androidx.appcompat.widget.LinearLayoutCompat
@@ -53,7 +54,7 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- 键盘模式切换：拼音全键 / 拼音九键 / 笔画键盘 -->
+        <!-- 键盘模式切换：拼音全键 / 拼音九键（笔画键盘已删除） -->
         <androidx.appcompat.widget.LinearLayoutCompat
             android:id="@+id/keyboardTabs"
             android:layout_width="match_parent"
@@ -85,20 +86,6 @@
                 android:focusableInTouchMode="true"
                 android:gravity="center"
                 android:text="@string/keyboard_nine"
-                android:textColor="@color/white"
-                android:textSize="16sp" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tabStroke"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:background="@drawable/selector_keyboard_tab"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:text="@string/keyboard_stroke"
                 android:textColor="@color/white"
                 android:textSize="16sp" />
 
@@ -190,17 +177,30 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
+        <!-- 拼写条：正在拼的拼音（全键一格字母串，九键为可切换的音节）；只在拼写时显示 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/composingBar"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:visibility="gone"
+            tools:itemCount="3"
+            tools:listitem="@layout/adapter_composing_syllable" />
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/keyboard"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:layout_marginTop="12dp"
             android:overScrollMode="never"
             app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-            app:spanCount="10"
-            tools:itemCount="29"
+            app:spanCount="20"
+            tools:itemCount="54"
             tools:listitem="@layout/adapter_keyboard_text" />
 
         <!-- 底部：使用系统输入法 / 完成 -->
@@ -243,8 +243,9 @@
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scroll"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="match_parent"
+        android:layout_weight="3"
         android:fillViewport="true"
         android:overScrollMode="never">
 

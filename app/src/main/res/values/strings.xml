@@ -377,7 +377,6 @@
     <string name="search_hot">Hot</string>
     <string name="keyboard_full">Full Pinyin</string>
     <string name="keyboard_nine">9-Key Pinyin</string>
-    <string name="keyboard_stroke">Stroke</string>
     <string name="keyboard_system">Use system input method</string>
     <string name="keyboard_custom">Use built-in keyboard</string>
     <string name="keyboard_done">Done</string>

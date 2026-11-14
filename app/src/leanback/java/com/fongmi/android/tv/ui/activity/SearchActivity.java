@@ -20,6 +20,7 @@ import com.fongmi.android.tv.bean.Word;
 import com.fongmi.android.tv.databinding.ActivitySearchBinding;
 import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.setting.Setting;
+import com.fongmi.android.tv.ui.adapter.KeyboardAdapter;
 import com.fongmi.android.tv.ui.adapter.RecordAdapter;
 import com.fongmi.android.tv.ui.adapter.WordAdapter;
 import com.fongmi.android.tv.ui.base.BaseActivity;
@@ -120,6 +121,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     private void setKeyword(String text) {
         mBinding.keyword.setText(text);
         mBinding.keyword.setSelection(text.length());
+        if (mKeyboard != null) mKeyboard.syncFromBox();
     }
 
     private void getWord(String text) {
@@ -157,6 +159,17 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     @Override
     public void onItemClick(String text) {
+        // 正在拼写时点候选词：把中文提交进搜索框，不立即搜索（手机输入法的行为）
+        if (mKeyboard != null && mKeyboard.isComposing()) {
+            mKeyboard.commitCandidate(text);
+            return;
+        }
+        setKeyword(text);
+        onSearch();
+    }
+
+    @Override
+    public void onRecordClick(String text) {
         setKeyword(text);
         onSearch();
     }
@@ -169,6 +182,8 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     @Override
     public void onSearch() {
+        // 正在拼写时先提交（首选候选，没有则提交拼音原文），再搜索
+        if (mKeyboard != null) mKeyboard.commitComposing();
         if (empty()) return;
         String keyword = mBinding.keyword.getText().toString().trim();
         App.post(() -> mRecordAdapter.add(keyword), 250);
@@ -187,6 +202,14 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     @Override
+    public String getFirstCandidate() {
+        // 只有当前显示的是联想候选（不是热搜词）时才返回首个候选，供完成/空格/标点时提交拼写
+        if (mWordAdapter == null || mWordAdapter.getItemCount() == 0) return null;
+        if (!mBinding.word.getText().toString().equals(getString(R.string.search_suggest))) return null;
+        return mWordAdapter.getItem(0).getTitle();
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (KeyUtil.isMenuKey(event)) showDialog();
         if (KeyUtil.isActionDown(event) && findFocus(event)) return true;
@@ -197,16 +220,22 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         View current = getCurrentFocus();
         if (current == mBinding.keyword) return handleKeywordKey(event);
         if (current == mBinding.mic) return handleMicKey(event);
-        if (current == mBinding.tabFull || current == mBinding.tabNine || current == mBinding.tabStroke) return handleTabKey(event, current);
+        if (current == mBinding.tabFull || current == mBinding.tabNine) return handleTabKey(event, current);
         if (current == mBinding.iconRemote || current == mBinding.iconLeft || current == mBinding.iconRight || current == mBinding.iconBack || current == mBinding.iconSearch || current == mBinding.iconKeyboard || current == mBinding.iconHome) return handleIconRowKey(event, current);
         if (current == mBinding.systemIme || current == mBinding.done) return handleBottomKey(event, current);
         View inKeyboard = mBinding.keyboard.findContainingItemView(current);
+        View inComposing = mBinding.composingBar.findContainingItemView(current);
         View inWord = mBinding.wordRecycler.findContainingItemView(current);
         View inRecord = mBinding.recordRecycler.findContainingItemView(current);
         if (inKeyboard != null) return handleKeyboardKey(event, inKeyboard);
+        if (inComposing != null) return handleComposingKey(event, inComposing);
         if (inRecord != null) return handleRecordKey(event, inRecord);
         if (inWord != null) return handleWordKey(event, inWord);
         return false;
+    }
+
+    private boolean isSpacer(View view) {
+        return view != null && KeyboardAdapter.TAG_SPACER.equals(view.getTag());
     }
 
     private View findNearestInLastRow(RecyclerView rv, int targetLeft) {
@@ -216,7 +245,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         int minDist = Integer.MAX_VALUE;
         for (int i = 0; i < rv.getChildCount(); i++) {
             View child = rv.getChildAt(i);
-            if (child.getTop() == lastTop) {
+            if (child.getTop() == lastTop && !isSpacer(child)) {
                 int dist = Math.abs(child.getLeft() - targetLeft);
                 if (dist < minDist) {
                     minDist = dist;
@@ -242,7 +271,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         int left = focused.getLeft();
         for (int i = 0; i < rv.getChildCount(); i++) {
             View child = rv.getChildAt(i);
-            if (child.getTop() == top && child.getLeft() < left) return false;
+            if (!isSpacer(child) && child.getTop() == top && child.getLeft() < left) return false;
         }
         return true;
     }
@@ -252,7 +281,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         int right = focused.getRight();
         for (int i = 0; i < rv.getChildCount(); i++) {
             View child = rv.getChildAt(i);
-            if (child.getTop() == top && child.getRight() > right) return false;
+            if (!isSpacer(child) && child.getTop() == top && child.getRight() > right) return false;
         }
         return true;
     }
@@ -281,7 +310,10 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
             mBinding.keyword.requestFocus();
             return true;
         }
-        if (KeyUtil.isDownKey(event)) return focusFirst(mBinding.keyboard);
+        if (KeyUtil.isDownKey(event)) {
+            if (mKeyboard.focusComposingFirst()) return true;
+            return focusFirst(mBinding.keyboard);
+        }
         if (KeyUtil.isLeftKey(event) && tab == mBinding.tabFull) return true;
         return false;
     }
@@ -292,6 +324,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
             return true;
         }
         if (KeyUtil.isDownKey(event)) {
+            if (mKeyboard.focusComposingFirst()) return true;
             if (mBinding.keyboard.getVisibility() == View.VISIBLE) return focusFirst(mBinding.keyboard);
             mBinding.systemIme.requestFocus();
             return true;
@@ -320,6 +353,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     private boolean handleKeyboardKey(KeyEvent event, View item) {
         if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.keyboard, item)) {
+            if (mKeyboard.focusComposingNearest(item.getLeft())) return true;
             mKeyboard.focusSelectedTab();
             return true;
         }
@@ -328,6 +362,19 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
             mBinding.systemIme.requestFocus();
             return true;
         }
+        return false;
+    }
+
+    private boolean handleComposingKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event)) {
+            mBinding.iconRemote.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event)) {
+            return focusFirst(mBinding.keyboard);
+        }
+        if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.composingBar, item)) return true;
+        if (KeyUtil.isRightKey(event) && isLastInRow(mBinding.composingBar, item)) return true;
         return false;
     }
 

@@ -375,7 +375,6 @@
     <string name="search_hot">热搜</string>
     <string name="keyboard_full">拼音全键</string>
     <string name="keyboard_nine">拼音九键</string>
-    <string name="keyboard_stroke">笔画键盘</string>
     <string name="keyboard_system">使用系统输入法</string>
     <string name="keyboard_custom">使用自带键盘</string>
     <string name="keyboard_done">完成</string>
