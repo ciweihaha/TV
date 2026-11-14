@@ -16,8 +16,11 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.viewbinding.ViewBinding;
 
+import com.fongmi.android.tv.App;
+import com.fongmi.android.tv.Constant;
 import com.fongmi.android.tv.Product;
 import com.fongmi.android.tv.R;
+import com.fongmi.android.tv.api.SiteApi;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.bean.Cache;
 import com.fongmi.android.tv.bean.Filter;
@@ -38,11 +41,15 @@ import com.fongmi.android.tv.ui.custom.CustomSelector;
 import com.fongmi.android.tv.ui.presenter.FilterPresenter;
 import com.fongmi.android.tv.ui.presenter.VodPresenter;
 import com.fongmi.android.tv.utils.ResUtil;
+import com.github.catvod.utils.Task;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 public class TypeFragment extends BaseFragment implements CustomScroller.Callback, VodPresenter.OnClickListener, SwipeRefreshLayout.OnRefreshListener {
 
@@ -56,6 +63,7 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     private List<Filter> mFilters;
     private boolean headerVisible;
     private boolean filterVisible;
+    private boolean filterRefreshing;
 
     public static TypeFragment newInstance(String key, String typeId, Style style, HashMap<String, String> extend, boolean folder) {
         Bundle args = new Bundle();
@@ -234,10 +242,67 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     }
 
     public void toggleFilter(boolean visible) {
-        if (mFilters.isEmpty()) return;
         this.filterVisible = visible;
-        if (visible) showFilter();
-        else hideFilter();
+        if (visible) {
+            if (!mFilters.isEmpty()) showFilter();
+            refreshFilters();
+        } else if (!mFilters.isEmpty()) {
+            hideFilter();
+        }
+    }
+
+    /**
+     * Refresh the site's filter definitions in the background.
+     *
+     * The filter Cache is only populated when the home page loads
+     * (HomeActivity.onResult -> Cache.clear().put(result)) and is never refreshed
+     * while the app runs, so if the site changes its filter keys/values the app keeps
+     * sending the stale keys: the site ignores the unknown extend keys and answers
+     * with the category's default list, i.e. tapping a filter visibly does nothing.
+     * Re-fetching home here makes the chips — and the extend keys sent — match the
+     * site's current schema. SiteApi.homeContent is cached for 5 minutes, so repeated
+     * opens are cheap, and the wall itself is never touched: only the Cache and the
+     * filter rows are rebuilt, and only when the definitions actually changed.
+     */
+    private void refreshFilters() {
+        if (filterRefreshing) return;
+        filterRefreshing = true;
+        Site site = getSite();
+        Futures.addCallback(Task.submit(() -> SiteApi.homeContent(site), Constant.TIMEOUT_VOD), Task.callback(
+                result -> App.post(() -> applyFilters(result)),
+                error -> {
+                    error.printStackTrace();
+                    App.post(() -> filterRefreshing = false);
+                }
+        ), MoreExecutors.directExecutor());
+    }
+
+    private void applyFilters(Result result) {
+        filterRefreshing = false;
+        if (mBinding == null || getView() == null || !isAdded() || result == null) return;
+        Cache.clear().put(result);
+        List<Filter> fresh = getFilter();
+        if (sameFilters(mFilters, fresh)) return;
+        if (filterVisible && !mFilters.isEmpty()) hideFilter();
+        mFilters = fresh;
+        setFilters();
+        mExtends.entrySet().removeIf(entry -> mFilters.stream()
+                .filter(filter -> filter.getKey().equals(entry.getKey()))
+                .flatMap(filter -> filter.getValue().stream())
+                .noneMatch(value -> value.getV().equals(entry.getValue())));
+        if (filterVisible && !mFilters.isEmpty()) showFilter();
+    }
+
+    private static boolean sameFilters(List<Filter> a, List<Filter> b) {
+        if (a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            Filter fa = a.get(i), fb = b.get(i);
+            if (!Objects.equals(fa.getKey(), fb.getKey())) return false;
+            List<Value> va = fa.getValue(), vb = fb.getValue();
+            if (va.size() != vb.size()) return false;
+            for (int j = 0; j < va.size(); j++) if (!Objects.equals(va.get(j).getV(), vb.get(j).getV())) return false;
+        }
+        return true;
     }
 
     private void checkFilter() {
