@@ -138,10 +138,10 @@ jobs:
           }
           download_asset "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-arm64_v8a.apk" 699104821 "$APK_DIR/mobile-arm64_v8a.apk"
           download_asset "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-armeabi_v7a.apk" 699104815 "$APK_DIR/mobile-armeabi_v7a.apk"
-          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-arm64-v8a.apk" 692807881 "$APK_DIR/runtime-mpv-1.1.0-arm64-v8a.apk"
-          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.0-armeabi-v7a.apk" 692807995 "$APK_DIR/runtime-mpv-1.1.0-armeabi-v7a.apk"
+          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.1-arm64-v8a.apk" 744167845 "$APK_DIR/runtime-mpv-1.1.1-arm64-v8a.apk"
+          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.1-armeabi-v7a.apk" 744167844 "$APK_DIR/runtime-mpv-1.1.1-armeabi-v7a.apk"
           sha256sum "$APK_DIR"/*.apk
-          for pair in "arm64-v8a:mobile-arm64_v8a.apk:runtime-mpv-1.1.0-arm64-v8a.apk" "armeabi-v7a:mobile-armeabi_v7a.apk:runtime-mpv-1.1.0-armeabi-v7a.apk"; do
+          for pair in "arm64-v8a:mobile-arm64_v8a.apk:runtime-mpv-1.1.1-arm64-v8a.apk" "armeabi-v7a:mobile-armeabi_v7a.apk:runtime-mpv-1.1.1-armeabi-v7a.apk"; do
             abi="${pair%%:*}"; rest="${pair#*:}"; apk="${rest%%:*}"; mpvapk="${rest##*:}"
             ffdir="media3/libraries/decoder_ffmpeg/src/main/jniLibs/$abi"
             mpvdir="media3/libraries/mpvplayer/src/main/jniLibs/$abi"
