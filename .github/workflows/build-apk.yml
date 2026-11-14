@@ -49,7 +49,7 @@ jobs:
           # "platforms;android-37.0" (minor-version id) and it is distributed
           # through the beta channel (channel 1 = stable + beta).
           yes | sdkmanager --licenses
-          # cmake 3.22.1 is for the FongMi/media native build below;
+          # cmake 3.22.1 is for the Media3 native build below;
           # cmake 4.1.2 is what the TV app's own native modules use.
           sdkmanager --channel=1 "platforms;android-37.0" "build-tools;37.0.0" "platform-tools" "ndk;29.0.14206865" "cmake;3.22.1" "cmake;4.1.2"
 
@@ -60,25 +60,26 @@ jobs:
           sudo apt-get install -y python3.10 python3.10-dev python3.10-venv autoconf automake autopoint gettext gperf libtool ninja-build pkg-config
 
       # The app's player (ExoPlayer + MPV + danmaku + libass + FFmpeg) comes
-      # from FongMi's custom Media3 fork, which is not published to Maven.
+      # from a custom Media3 fork (mirrored at ciweihaha/media), which is
+      # not published to Maven.
       # Upstream ships it as prebuilt AARs in app/libs (gitignored lib-*.aar),
       # so a clean checkout cannot compile: the data-binding step fails on
       # `exo_duration` and javac fails on every androidx.media3 import.
       # Build those AARs from source here, pinned to the commits the
       # 5.6.8-era build was validated against (Media3 1.11.0 based).
-      # Round 137 (2026-11-12): 3c2cbe8 is the newest FongMi-customized
-      # commit — head of FongMi/media branch release-1.11.0-fongmi.
+      # Round 137 (2026-11-12): 3c2cbe8 is the newest customized
+      # commit — head of the media fork branch release-1.11.0-fongmi.
       # The default branch `release` head 2bc2078 (2026-08-07) is pure
-      # upstream Media3 1.11.0 with NO FongMi customizations: no
+      # upstream Media3 1.11.0 with NO customizations: no
       # mpvplayer, no ui_danmaku, no move.txt, and the stock audio-only
       # decoder_ffmpeg (no ffvideo/libplacebo video renderer). Bumping
-      # the ref to it would delete the MPV player, danmaku and FongMi
-      # FFmpeg video decode, so the pin stays until FongMi cuts a newer
-      # -fongmi branch.
-      - name: Checkout FongMi Media3 source
+      # the ref to it would delete the MPV player, danmaku and custom
+      # FFmpeg video decode, so the pin stays until the mirror
+      # (ciweihaha/media) is updated with a newer -fongmi branch.
+      - name: Checkout Media3 source (mirrored fork)
         uses: actions/checkout@v7.0.1
         with:
-          repository: FongMi/media
+          repository: ciweihaha/media
           ref: 3c2cbe8ac742c2fe15eff52f03eeb3b1b648848d
           path: media3
           fetch-depth: 1
@@ -90,10 +91,10 @@ jobs:
           git config --global url."https://github.com/fontconfig/fontconfig".insteadOf https://gitlab.freedesktop.org/fontconfig/fontconfig
           git config --global url."https://github.com/freetype/freetype".insteadOf https://gitlab.freedesktop.org/freetype/freetype
 
-      - name: Checkout FongMi Media3 libass source
+      - name: Checkout Media3 libass source (mirrored fork)
         uses: actions/checkout@v7.0.1
         with:
-          repository: FongMi/media
+          repository: ciweihaha/media
           ref: 9dae39e9689ee305c83f94bd11cf3bcecb9d6171
           path: media3-ass
           fetch-depth: 1
@@ -102,44 +103,36 @@ jobs:
       # The Media3 checkout carries split FFmpeg libs (libavcodec.so etc.),
       # but the app's VerifyMpvNativeTask requires the unified libffmpeg.so
       # + libffmpegJNI.so, and the public libmpv.so lacks mpv's discnav
-      # command. Take the FFmpeg libs from the official 5.8.7 APKs and
-      # libmpv.so from the official runtime-mpv module APKs (the main APK
+      # command. Take the FFmpeg libs from the mirrored 5.8.7 mobile APKs and
+      # libmpv.so from the mirrored runtime-mpv module APKs (the main APK
       # no longer bundles libmpv.so in 5.8.7: MPV ships as a runtime module),
-      # all built from this same Media3 lineage.
+      # all built from this same Media3 lineage. The APKs are mirrored in
+      # ciweihaha/TV-runtime so the build no longer depends on
+      # FongMi/Release (upstream deleted runtime-mpv-1.1.0 assets once,
+      # breaking a build with 404s).
       - name: Restore unified FFmpeg libs and official libmpv.so
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          APK_DIR="$RUNNER_TEMP/fongmi-official-587"
+          APK_DIR="$RUNNER_TEMP/tv-runtime-587"
           mkdir -p "$APK_DIR"
-          # Round 123: github.com/.../releases/download/... intermittently
-          # returns HTTP 504 (2026-11-09: two consecutive CI failures on this
-          # step, and the same 504 reproduces from outside the runner). The
-          # GitHub API asset endpoint serves the same bytes via a signed
-          # storage URL, so fall back to it when the direct download fails.
-          # Asset ids are pinned to the frozen 5.8.7 release / module tag
-          # (api.github.com/repos/FongMi/Release/releases/tags/{5.8.7,module}).
+          # Mirror base: ciweihaha/TV-runtime, served by raw.githubusercontent.
+          # Fall back to the jsDelivr GitHub mirror if raw is unreachable.
           download_asset() {
-            local url="$1" asset_id="$2" out="$3"
+            local url="$1" fallback="$2" out="$3"
             if curl --fail --location --retry 3 --retry-all-errors \
                 --connect-timeout 20 --max-time 600 "$url" --output "$out"; then
               return 0
             fi
-            echo "Direct download failed for $out, trying the GitHub API asset endpoint..."
-            local auth=()
-            if [ -n "${GITHUB_TOKEN:-}" ]; then auth=(-H "Authorization: Bearer $GITHUB_TOKEN"); fi
+            echo "Direct download failed for $out, trying the jsDelivr mirror..."
             curl --fail --location --retry 3 --retry-all-errors \
               --connect-timeout 20 --max-time 600 \
-              -H "Accept: application/octet-stream" \
-              "${auth[@]}" \
-              "https://api.github.com/repos/FongMi/Release/releases/assets/$asset_id" \
+              "$fallback" \
               --output "$out"
           }
-          download_asset "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-arm64_v8a.apk" 699104821 "$APK_DIR/mobile-arm64_v8a.apk"
-          download_asset "https://github.com/FongMi/Release/releases/download/5.8.7/mobile-armeabi_v7a.apk" 699104815 "$APK_DIR/mobile-armeabi_v7a.apk"
-          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.1-arm64-v8a.apk" 744167845 "$APK_DIR/runtime-mpv-1.1.1-arm64-v8a.apk"
-          download_asset "https://github.com/FongMi/Release/releases/download/module/runtime-mpv-1.1.1-armeabi-v7a.apk" 744167844 "$APK_DIR/runtime-mpv-1.1.1-armeabi-v7a.apk"
+          download_asset "https://raw.githubusercontent.com/ciweihaha/TV-runtime/main/build/mobile-arm64_v8a.apk" "https://cdn.jsdelivr.net/gh/ciweihaha/TV-runtime@main/build/mobile-arm64_v8a.apk" "$APK_DIR/mobile-arm64_v8a.apk"
+          download_asset "https://raw.githubusercontent.com/ciweihaha/TV-runtime/main/build/mobile-armeabi_v7a.apk" "https://cdn.jsdelivr.net/gh/ciweihaha/TV-runtime@main/build/mobile-armeabi_v7a.apk" "$APK_DIR/mobile-armeabi_v7a.apk"
+          download_asset "https://raw.githubusercontent.com/ciweihaha/TV-runtime/main/module/runtime-mpv-1.1.1-arm64-v8a.apk" "https://cdn.jsdelivr.net/gh/ciweihaha/TV-runtime@main/module/runtime-mpv-1.1.1-arm64-v8a.apk" "$APK_DIR/runtime-mpv-1.1.1-arm64-v8a.apk"
+          download_asset "https://raw.githubusercontent.com/ciweihaha/TV-runtime/main/module/runtime-mpv-1.1.1-armeabi-v7a.apk" "https://cdn.jsdelivr.net/gh/ciweihaha/TV-runtime@main/module/runtime-mpv-1.1.1-armeabi-v7a.apk" "$APK_DIR/runtime-mpv-1.1.1-armeabi-v7a.apk"
           sha256sum "$APK_DIR"/*.apk
           for pair in "arm64-v8a:mobile-arm64_v8a.apk:runtime-mpv-1.1.1-arm64-v8a.apk" "armeabi-v7a:mobile-armeabi_v7a.apk:runtime-mpv-1.1.1-armeabi-v7a.apk"; do
             abi="${pair%%:*}"; rest="${pair#*:}"; apk="${rest%%:*}"; mpvapk="${rest##*:}"
@@ -186,7 +179,7 @@ jobs:
                       IMPORTED_LOCATION
                       ${ffmpeg_lib_file_path})
           endforeach()'''
-          new_loop = '''# FongMi official builds link the JNI wrapper against the unified
+          new_loop = '''# Official builds link the JNI wrapper against the unified
           # libffmpeg.so (the split libav*.so files are link-only inputs for the
           # stock build and the app rejects them in the AAR). The unified
           # library is staged into jniLibs by the workflow before this build.
@@ -220,7 +213,7 @@ jobs:
           print("patched", path)
           PY
 
-      - name: Install FongMi private-API shims and patches
+      - name: Install Media3 private-API shims and patches
         run: |
           set -euo pipefail
           python3 scripts/media3-stubs/install.py --media3 media3 --media3-ass media3-ass
@@ -316,7 +309,7 @@ jobs:
           EOF
           cat "$HOME/.gradle/init.d/maven-mirror.init.gradle"
 
-      - name: Build FongMi Media3 AARs
+      - name: Build Media3 AARs
         env:
           GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
         run: |
@@ -357,9 +350,9 @@ jobs:
           echo "== Media3 AARs copied to app/libs =="
           find app/libs -maxdepth 1 -type f -name 'lib-*-release.aar' -print | sort
 
-      # libass (ASS subtitle rendering) was removed from FongMi/media's
+      # libass (ASS subtitle rendering) was removed from the media fork's
       # release line; build it from the older checkout that still has it.
-      - name: Build FongMi libass AAR
+      - name: Build libass AAR
         env:
           GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
         run: |
