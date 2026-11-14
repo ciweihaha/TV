@@ -9,7 +9,7 @@ public class Github {
 
     private static final Pattern DIGITS_PATTERN = Pattern.compile("[0-9]+");
 
-    private static final String REPO = "FongMi/Release";
+    private static final String REPO = "ciweihaha/TV";
 
     public static String getReleases() {
         return "https://api.github.com/repos/" + REPO + "/releases?per_page=100";
@@ -80,10 +80,21 @@ public class Github {
     public static JSONObject getAsset(JSONObject release, String name) {
         JSONArray assets = release.optJSONArray("assets");
         if (assets == null) return null;
+        String expected = normalize(name);
         for (int i = 0; i < assets.length(); i++) {
             JSONObject asset = assets.optJSONObject(i);
-            if (asset != null && name.equals(asset.optString("name")) && "uploaded".equals(asset.optString("state"))) return asset;
+            if (asset == null || !"uploaded".equals(asset.optString("state"))) continue;
+            String actual = normalize(asset.optString("name"));
+            if (actual.equals(expected) || actual.endsWith(expected)) return asset;
         }
         return null;
+    }
+
+    // Asset names differ between publishers: the fork's CI names them
+    // "TV-5.9.1-leanback-arm64-v8a.apk" while the updater asks for
+    // "leanback-arm64_v8a.apk". Compare case-insensitively with "_" and "-"
+    // treated as equal, and accept a version-prefixed name as well.
+    private static String normalize(String name) {
+        return name.toLowerCase().replace('_', '-');
     }
 }
