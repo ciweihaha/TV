@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.ui.adapter;
 
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -20,6 +21,7 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     private final int maxWidth;
     private int nextFocusDown;
     private int nextFocusUp;
+    private float progress = -1f;
 
     public EpisodeAdapter(OnClickListener listener) {
         mListener = listener;
@@ -36,6 +38,16 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     public void clear() {
         mItems.clear();
         notifyDataSetChanged();
+    }
+
+    public void setProgress(float progress) {
+        this.progress = progress;
+        for (int i = 0; i < mItems.size(); i++) {
+            if (mItems.get(i).isSelected()) {
+                notifyItemChanged(i);
+                return;
+            }
+        }
     }
 
     public int getPosition() {
@@ -76,6 +88,9 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
         holder.binding.text.setNextFocusDownId(nextFocusDown);
         holder.binding.text.setSelected(item.isSelected());
         holder.binding.text.setText(item.getDesc().concat(item.getName()));
+        boolean showProgress = item.isSelected() && progress > 0f;
+        holder.binding.progress.setVisibility(showProgress ? View.VISIBLE : View.GONE);
+        if (showProgress) holder.binding.progress.setProgress(Math.round(progress * 100f));
         holder.binding.getRoot().setOnClickListener(v -> mListener.onItemClick(item));
     }
 
