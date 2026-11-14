@@ -53,18 +53,191 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
+        <!-- 键盘模式切换：拼音全键 / 拼音九键 / 笔画键盘 -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/keyboardTabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tabFull"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_keyboard_tab"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:text="@string/keyboard_full"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tabNine"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_keyboard_tab"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:text="@string/keyboard_nine"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tabStroke"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_keyboard_tab"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:text="@string/keyboard_stroke"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <!-- 功能键：遥控 / 左移 / 右移 / 删除 / 搜索 / 切换输入法 / 切换站点 -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/keyboardIcons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iconRemote"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="7dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_keyboard_remote" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iconLeft"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="7dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_keyboard_left" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iconRight"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="7dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_keyboard_right" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iconBack"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="7dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_keyboard_back" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iconSearch"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="7dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_keyboard_search" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iconKeyboard"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="7dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_keyboard" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iconHome"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_setting_home" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/keyboard"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:overScrollMode="never"
             app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-            app:spanCount="3"
-            tools:itemCount="17"
-            tools:listitem="@layout/adapter_keyboard_9key" />
+            app:spanCount="10"
+            tools:itemCount="29"
+            tools:listitem="@layout/adapter_keyboard_text" />
+
+        <!-- 底部：使用系统输入法 / 完成 -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/keyboardBottom"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/systemIme"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="12dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:text="@string/keyboard_system"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/done"
+                android:layout_width="96dp"
+                android:layout_height="48dp"
+                android:background="@drawable/selector_keyboard"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:text="@string/keyboard_done"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
