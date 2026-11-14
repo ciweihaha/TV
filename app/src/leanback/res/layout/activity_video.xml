@@ -8,8 +8,8 @@
 
     <FrameLayout
         android:id="@+id/video"
-        android:layout_width="400dp"
-        android:layout_height="225dp"
+        android:layout_width="480dp"
+        android:layout_height="270dp"
         android:layout_margin="24dp"
         android:background="@color/black"
         android:defaultFocusHighlightEnabled="false"
@@ -59,7 +59,7 @@
         android:layout_toEndOf="@+id/video"
         android:singleLine="true"
         android:textColor="@color/white"
-        android:textSize="24sp"
+        android:textSize="26sp"
         tools:text="慶餘年第二季" />
 
     <com.google.android.material.textview.MaterialTextView
@@ -68,11 +68,11 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/name"
         android:layout_alignStart="@+id/name"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="24dp"
         android:singleLine="true"
         android:textColor="@color/white"
-        android:textSize="16sp"
+        android:textSize="17sp"
         tools:text="更新到第二季" />
 
     <androidx.appcompat.widget.LinearLayoutCompat
@@ -81,7 +81,7 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/remark"
         android:layout_alignStart="@+id/remark"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="24dp"
         android:orientation="horizontal">
 
@@ -92,7 +92,7 @@
             android:layout_marginEnd="12dp"
             android:singleLine="true"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="17sp"
             tools:text="站源：泥巴" />
 
         <com.google.android.material.textview.MaterialTextView
@@ -102,7 +102,7 @@
             android:layout_marginEnd="12dp"
             android:singleLine="true"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="17sp"
             tools:text="年份：2022" />
 
         <com.google.android.material.textview.MaterialTextView
@@ -112,7 +112,7 @@
             android:layout_marginEnd="12dp"
             android:singleLine="true"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="17sp"
             tools:text="地區：台灣" />
 
         <com.google.android.material.textview.MaterialTextView
@@ -121,7 +121,7 @@
             android:layout_height="wrap_content"
             android:singleLine="true"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="17sp"
             tools:text="類型：科幻" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
@@ -132,7 +132,7 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/row1"
         android:layout_alignStart="@+id/name"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="24dp"
         android:nextFocusDown="@id/actor"
         android:singleLine="true"
@@ -146,7 +146,7 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/director"
         android:layout_alignStart="@+id/name"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="24dp"
         android:ellipsize="end"
         android:maxLines="2"
@@ -178,7 +178,7 @@
             android:singleLine="true"
             android:text="@string/detail_desc"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="17sp"
             app:drawableStartCompat="@drawable/ic_detail_desc" />
 
         <com.google.android.material.textview.MaterialTextView
@@ -196,7 +196,7 @@
             android:singleLine="true"
             android:text="@string/keep"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="17sp"
             app:drawableStartCompat="@drawable/ic_detail_keep_off" />
 
         <com.google.android.material.textview.MaterialTextView
@@ -214,7 +214,7 @@
             android:singleLine="true"
             android:text="@string/play_change"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="17sp"
             app:drawableStartCompat="@drawable/ic_detail_change" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
