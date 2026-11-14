@@ -196,6 +196,10 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     private boolean findFocus(KeyEvent event) {
         View current = getCurrentFocus();
         if (current == mBinding.keyword) return handleKeywordKey(event);
+        if (current == mBinding.mic) return handleMicKey(event);
+        if (current == mBinding.tabFull || current == mBinding.tabNine || current == mBinding.tabStroke) return handleTabKey(event, current);
+        if (current == mBinding.iconRemote || current == mBinding.iconLeft || current == mBinding.iconRight || current == mBinding.iconBack || current == mBinding.iconSearch || current == mBinding.iconKeyboard || current == mBinding.iconHome) return handleIconRowKey(event, current);
+        if (current == mBinding.systemIme || current == mBinding.done) return handleBottomKey(event, current);
         View inKeyboard = mBinding.keyboard.findContainingItemView(current);
         View inWord = mBinding.wordRecycler.findContainingItemView(current);
         View inRecord = mBinding.recordRecycler.findContainingItemView(current);
@@ -254,19 +258,77 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     private boolean handleKeywordKey(KeyEvent event) {
+        if (KeyUtil.isDownKey(event)) {
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
         if (!KeyUtil.isRightKey(event)) return false;
         if (mBinding.keyword.getSelectionEnd() < mBinding.keyword.getText().length()) return false;
         boolean hasRecord = mBinding.recordLayout.getVisibility() == View.VISIBLE;
         return focusFirst(hasRecord ? mBinding.recordRecycler : mBinding.wordRecycler);
     }
 
-    private boolean handleKeyboardKey(KeyEvent event, View item) {
-        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.keyboard, item)) {
+    private boolean handleMicKey(KeyEvent event) {
+        if (KeyUtil.isDownKey(event)) {
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleTabKey(KeyEvent event, View tab) {
+        if (KeyUtil.isUpKey(event)) {
             mBinding.keyword.requestFocus();
             return true;
         }
+        if (KeyUtil.isDownKey(event)) return focusFirst(mBinding.keyboard);
+        if (KeyUtil.isLeftKey(event) && tab == mBinding.tabFull) return true;
+        return false;
+    }
+
+    private boolean handleIconRowKey(KeyEvent event, View icon) {
+        if (KeyUtil.isUpKey(event)) {
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event)) {
+            if (mBinding.keyboard.getVisibility() == View.VISIBLE) return focusFirst(mBinding.keyboard);
+            mBinding.systemIme.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isLeftKey(event) && icon == mBinding.iconRemote) return true;
+        return false;
+    }
+
+    private boolean handleBottomKey(KeyEvent event, View button) {
+        if (KeyUtil.isUpKey(event)) {
+            if (mBinding.keyboard.getVisibility() == View.VISIBLE) {
+                View child = findNearestInLastRow(mBinding.keyboard, button.getLeft());
+                if (child != null) {
+                    child.requestFocus();
+                    return true;
+                }
+            } else {
+                mBinding.iconRemote.requestFocus();
+                return true;
+            }
+        }
+        if (KeyUtil.isDownKey(event)) return true;
+        if (KeyUtil.isLeftKey(event) && button == mBinding.systemIme) return true;
+        return false;
+    }
+
+    private boolean handleKeyboardKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.keyboard, item)) {
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
         if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.keyboard, item)) return true;
-        return KeyUtil.isDownKey(event) && isLastRow(mBinding.keyboard, item);
+        if (KeyUtil.isDownKey(event) && isLastRow(mBinding.keyboard, item)) {
+            mBinding.systemIme.requestFocus();
+            return true;
+        }
+        return false;
     }
 
     private boolean handleWordKey(KeyEvent event, View item) {

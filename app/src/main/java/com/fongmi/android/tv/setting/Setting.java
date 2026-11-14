@@ -136,4 +136,12 @@ public class Setting {
     public static void putZhuyin(boolean zhuyin) {
         Prefers.put("zhuyin", zhuyin);
     }
+
+    public static int getKeyboardMode() {
+        return Math.clamp(Prefers.getInt("keyboard_mode", 1), 1, 3);
+    }
+
+    public static void putKeyboardMode(int mode) {
+        Prefers.put("keyboard_mode", Math.clamp(mode, 1, 3));
+    }
 }
