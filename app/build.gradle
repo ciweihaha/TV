@@ -19,8 +19,8 @@ android {
         applicationId "com.fongmi.android.tv"
         minSdk libs.versions.minSdk.get().toInteger()
         targetSdk libs.versions.targetSdk.get().toInteger()
-        versionCode 591
-        versionName "5.9.1"
+        versionCode 594
+        versionName "5.9.4"
         manifestPlaceholders.runtimeCatalog = providers.gradleProperty('tvRuntimeCatalog').getOrElse('https://raw.githubusercontent.com/ciweihaha/TV-runtime/main/catalog.json')
         javaCompileOptions {
             annotationProcessorOptions {
