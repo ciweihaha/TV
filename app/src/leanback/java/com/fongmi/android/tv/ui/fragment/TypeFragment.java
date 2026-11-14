@@ -66,12 +66,17 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     private boolean filterRefreshing;
 
     public static TypeFragment newInstance(String key, String typeId, Style style, HashMap<String, String> extend, boolean folder) {
+        return newInstance(key, typeId, style, extend, folder, new ArrayList<>());
+    }
+
+    public static TypeFragment newInstance(String key, String typeId, Style style, HashMap<String, String> extend, boolean folder, ArrayList<String> mergedIds) {
         Bundle args = new Bundle();
         args.putString("key", key);
         args.putString("typeId", typeId);
         args.putBoolean("folder", folder);
         args.putParcelable("style", style);
         args.putSerializable("extend", extend);
+        args.putStringArrayList("mergedIds", mergedIds);
         TypeFragment fragment = new TypeFragment();
         fragment.setArguments(args);
         return fragment;
@@ -83,6 +88,12 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
 
     private String getTypeId() {
         return getArguments().getString("typeId");
+    }
+
+    /** 分类归并后的成员 typeId（主分类自身排第一）；空表示未归并，走单分类路径。 */
+    private ArrayList<String> getMergedIds() {
+        ArrayList<String> ids = getArguments().getStringArrayList("mergedIds");
+        return ids == null ? new ArrayList<>() : ids;
     }
 
     private boolean isFolder() {
@@ -170,7 +181,10 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     }
 
     private void getVideo(String typeId, String page) {
-        mViewModel.categoryContent(getKey(), typeId, page, true, mExtends);
+        // 归并后的主分类：一次拉取全部成员 typeId 并合并去重；否则走单分类
+        List<String> mergedIds = getMergedIds();
+        if (mergedIds.size() > 1) mViewModel.categoryContent(getKey(), mergedIds, page, true, mExtends);
+        else mViewModel.categoryContent(getKey(), typeId, page, true, mExtends);
     }
 
     private void setAdapter(Result result) {
@@ -268,6 +282,9 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
         if (filterRefreshing) return;
         filterRefreshing = true;
         Site site = getSite();
+        // 先清掉本站 5 分钟的首页缓存，否则 homeContent 直接返回缓存、
+        // 所谓“重拉取”根本没发出请求，定义永远判“没变”（v5.9.5 的重拉取就是这么失效的）
+        SiteApi.invalidateHome(site);
         Futures.addCallback(Task.submit(() -> SiteApi.homeContent(site), Constant.TIMEOUT_VOD), Task.callback(
                 result -> App.post(() -> applyFilters(result)),
                 error -> {

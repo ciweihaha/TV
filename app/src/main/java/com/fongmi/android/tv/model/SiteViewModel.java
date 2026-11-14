@@ -60,6 +60,11 @@ public class SiteViewModel extends ViewModel {
         execute(TaskType.RESULT, result, () -> SiteApi.categoryContent(key, tid, page, filter, extend));
     }
 
+    /** 分类归并后的拉取：一个主分类对应多个成员 typeId，合并成一个结果返回。 */
+    public void categoryContent(String key, List<String> tids, String page, boolean filter, HashMap<String, String> extend) {
+        execute(TaskType.RESULT, result, () -> SiteApi.categoryContent(key, tids, page, filter, extend));
+    }
+
     public void action(String key, String act) {
         execute(TaskType.ACTION, action, () -> SiteApi.action(key, act));
     }
