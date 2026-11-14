@@ -117,6 +117,8 @@ jobs:
           mkdir -p "$APK_DIR"
           # Mirror base: ciweihaha/TV-runtime, served by raw.githubusercontent.
           # Fall back to the jsDelivr GitHub mirror if raw is unreachable.
+          # (jsDelivr caps files at 20 MB, so the fallback only covers the
+          # runtime-mpv modules; the mobile APKs rely on raw alone.)
           download_asset() {
             local url="$1" fallback="$2" out="$3"
             if curl --fail --location --retry 3 --retry-all-errors \
