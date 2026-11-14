@@ -76,6 +76,14 @@
             android:layout_marginEnd="8dp"
             android:text="@string/play_scale" />
 
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/danmaku"
+            style="@style/Control"
+            android:layout_marginEnd="8dp"
+            android:text="@string/danmaku"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
         <com.fongmi.android.tv.ui.custom.CustomUpDownView
             android:id="@+id/text"
             style="@style/Control"
@@ -96,14 +104,6 @@
             android:layout_marginEnd="8dp"
             android:tag="2"
             android:text="@string/play_track_video" />
-
-        <com.google.android.material.textview.MaterialTextView
-            android:id="@+id/danmaku"
-            style="@style/Control"
-            android:layout_marginEnd="8dp"
-            android:text="@string/danmaku"
-            android:visibility="gone"
-            tools:visibility="visible" />
 
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/edition"
