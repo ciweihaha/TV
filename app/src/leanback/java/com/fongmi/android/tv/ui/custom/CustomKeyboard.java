@@ -1,5 +1,6 @@
 package com.fongmi.android.tv.ui.custom;
 
+import android.text.Editable;
 import android.view.View;
 
 import androidx.core.content.ContextCompat;
@@ -30,7 +31,10 @@ import java.util.List;
  * 笔画键盘已删除：MODE_STROKE 不再有任何分支，旧的模式值由 Setting 容错为拼音全键。
  * <p>
  * 状态模型：搜索框内容 = 已提交文本（committed）+ 正在拼的拼音（composingDisplay），
- * 光标始终在末尾；外部改动搜索框（语音、历史记录、初始关键字）时由 syncFromBox 同步。
+ * 光标默认在末尾，顶部的左右键可移动光标，退格/输入都在光标处操作；
+ * 外部改动搜索框（语音、历史记录、初始关键字）时由 syncFromBox 同步。
+ * 系统键盘模式下搜索框归系统输入法管，CustomKeyboard 不回写自己的 committed：
+ * 进系统模式时先 syncFromBox 同步框内文本，退格直接删输入法缓冲区里的字符。
  */
 public class CustomKeyboard implements KeyboardAdapter.OnClickListener, SyllableAdapter.OnClickListener {
 
@@ -58,6 +62,33 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
     /** 1 键标点循环：上次输入的标点与时间。 */
     private String lastPunct = "";
     private long lastPunctTime;
+    /** 光标在已提交文本里的位置；-1 表示末尾（默认）。左右键移动光标，输入/退格在光标处操作。 */
+    private int cursorPos = -1;
+
+    /** 光标处的有效位置（夹在 [0, committed.length] 内）。 */
+    private int editPos() {
+        if (cursorPos < 0) return committed.length();
+        return Math.max(0, Math.min(cursorPos, committed.length()));
+    }
+
+    /** 在光标处插入已提交文本，光标移到插入内容之后；末尾时保持 -1。 */
+    private void insertCommitted(String text) {
+        int pos = editPos();
+        committed.insert(pos, text);
+        cursorPos = pos + text.length();
+        if (cursorPos >= committed.length()) cursorPos = -1;
+        renderBox();
+    }
+
+    /** 删掉光标前一个已提交字符，光标跟进一步。 */
+    private void deleteCommittedBeforeCursor() {
+        int pos = editPos();
+        if (pos <= 0) return;
+        committed.deleteCharAt(pos - 1);
+        cursorPos = pos - 1;
+        if (cursorPos >= committed.length()) cursorPos = -1;
+        renderBox();
+    }
 
     public static CustomKeyboard init(Callback callback, ActivitySearchBinding binding) {
         CustomKeyboard keyboard = new CustomKeyboard(callback, binding);
@@ -124,7 +155,9 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
 
     public void setMode(int mode) {
         if (mode == KeyboardAdapter.MODE_SYSTEM) {
-            clearComposingState();
+            // 进系统模式先同步搜索框的当前内容：系统输入法接管后框内文本可能已变，
+            // 不同步的话 committed 还是旧文本，之后按顶部 ⌫ 会把旧文本回写覆盖新输入
+            syncFromBox();
             adapter.setMode(KeyboardAdapter.MODE_SYSTEM);
             binding.keyboardTabs.setVisibility(View.GONE);
             binding.composingBar.setVisibility(View.GONE);
@@ -132,7 +165,7 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
             binding.systemIme.setText(R.string.keyboard_custom);
             showSystemKeyboard();
         } else if (mode == KeyboardAdapter.MODE_SYMBOL) {
-            // 符号盘是临时布局：不记入模式记忆，customMode 保持拼音全键
+            // 符号盘是临时布局：不记入模式记忆，customMode 保持进入符号盘前的模式（全键/九键），按 ABC 回到该模式
             adapter.setMode(KeyboardAdapter.MODE_SYMBOL);
             ((GridLayoutManager) binding.keyboard.getLayoutManager()).setSpanCount(adapter.getSpanCount());
             updateDecoration();
@@ -173,6 +206,8 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
     }
 
     public boolean focusComposingFirst() {
+        // 全键模式的拼写条只有不可点的字母串，不占焦点位：直接跳过
+        if (adapter == null || adapter.getMode() != KeyboardAdapter.MODE_PINYIN) return false;
         if (!isComposingBarVisible()) return false;
         View child = binding.composingBar.getChildAt(0);
         if (child == null) return false;
@@ -181,11 +216,14 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
     }
 
     public boolean focusComposingNearest(int targetLeft) {
+        // 全键模式的拼写条只有不可点的字母串，不占焦点位：直接跳过
+        if (adapter == null || adapter.getMode() != KeyboardAdapter.MODE_PINYIN) return false;
         if (!isComposingBarVisible()) return false;
         View nearest = null;
         int minDist = Integer.MAX_VALUE;
         for (int i = 0; i < binding.composingBar.getChildCount(); i++) {
             View child = binding.composingBar.getChildAt(i);
+            if (child == null || !child.isFocusable()) continue;
             int dist = Math.abs(child.getLeft() - targetLeft);
             if (dist < minDist) {
                 minDist = dist;
@@ -211,13 +249,15 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
     private void renderBox() {
         String text = committed.toString() + composingDisplay();
         binding.keyword.setText(text);
-        binding.keyword.setSelection(text.length());
+        // 正在拼写时光标在拼写串末尾；否则光标停在移动后的位置（默认末尾）
+        binding.keyword.setSelection(isComposing() ? text.length() : editPos());
     }
 
     /** 外部改动了搜索框（语音输入、历史记录、初始关键字、模式切换）：以框内文本为准，丢弃拼写状态。 */
     public void syncFromBox() {
         committed.setLength(0);
         committed.append(binding.keyword.getText().toString());
+        cursorPos = -1;
         clearComposingState();
     }
 
@@ -247,20 +287,26 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
         binding.composingBar.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    /** 把正在拼的拼音提交为中文（首选候选，没有则提交拼音原文），拼写状态清空。 */
+    /** 把正在拼的拼音提交为中文（首选候选，没有则提交拼音原文），拼写状态清空。提交到光标处。 */
     public void commitComposing() {
         if (!isComposing()) return;
         String candidate = callback.getFirstCandidate();
         String text = candidate != null && !candidate.isEmpty() ? candidate : composingDisplay();
-        committed.append(text);
+        int pos = editPos();
+        committed.insert(pos, text);
+        cursorPos = pos + text.length();
+        if (cursorPos >= committed.length()) cursorPos = -1;
         clearComposingState();
         renderBox();
     }
 
-    /** 点候选词：用选中的中文替换正在拼的拼音，不立即搜索。 */
+    /** 点候选词：用选中的中文替换正在拼的拼音，不立即搜索。提交到光标处。 */
     public void commitCandidate(String text) {
         if (!isComposing()) return;
-        committed.append(text);
+        int pos = editPos();
+        committed.insert(pos, text);
+        cursorPos = pos + text.length();
+        if (cursorPos >= committed.length()) cursorPos = -1;
         clearComposingState();
         renderBox();
     }
@@ -288,15 +334,13 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
     public void onKeyLongPress(KeyboardAdapter.KeyItem item) {
         if (item.kind == KeyboardAdapter.KIND_ACTION && item.action == KeyboardAdapter.ACTION_BACKSPACE) {
             committed.setLength(0);
+            cursorPos = -1;
             clearComposingState();
             renderBox();
-        } else if (item.kind == KeyboardAdapter.KIND_DIGIT && "0".equals(item.text)) {
-            // 长按 0 输入数字 0（短按 0 是空格）
+        } else if (item.kind == KeyboardAdapter.KIND_DIGIT) {
+            // 长按数字键直接输入数字本身（短按是 T9 拼音）：九键模式下 2–9 也能打出数字
             if (isComposing()) commitComposing();
-            if (binding.keyword.length() < MAX_LEN) {
-                committed.append('0');
-                renderBox();
-            }
+            if (binding.keyword.length() < MAX_LEN) insertCommitted(item.text);
         }
     }
 
@@ -319,6 +363,8 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
 
     private void onLetter(String letter) {
         if (binding.keyword.length() >= MAX_LEN) return;
+        // 拼写串始终显示在框末尾：从中间光标处开始拼写时光标先回末尾，避免拼写串显示位置与提交位置不一致
+        if (!isComposing()) cursorPos = -1;
         composing.append(letter);
         renderBox();
         updateComposingBar();
@@ -334,6 +380,8 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
             return;
         }
         if (binding.keyword.length() >= MAX_LEN) return;
+        // 同上：九键拼写串显示在框末尾，新起拼写时光标回末尾
+        if (!isComposing()) cursorPos = -1;
         digits.append(digit);
         resegment();
         renderBox();
@@ -343,8 +391,7 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
     private void onSymbol(String text) {
         if (isComposing()) commitComposing();
         if (binding.keyword.length() >= MAX_LEN) return;
-        committed.append(text);
-        renderBox();
+        insertCommitted(text);
     }
 
     private void onAction(int action) {
@@ -356,7 +403,8 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
             if (isComposing()) commitComposing();
             setMode(KeyboardAdapter.MODE_SYMBOL);
         } else if (action == KeyboardAdapter.ACTION_ABC) {
-            setMode(KeyboardAdapter.MODE_FULL);
+            // 回到进入符号盘前的模式：九键就回九键，全键就回全键，不写死全键
+            setMode(customMode);
         } else if (action == KeyboardAdapter.ACTION_SEARCH) {
             callback.onSearch();
         }
@@ -366,32 +414,43 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
     private void onSpaceKey() {
         if (isComposing()) commitComposing();
         if (binding.keyword.length() >= MAX_LEN) return;
-        committed.append(' ');
-        renderBox();
+        insertCommitted(" ");
     }
 
-    /** 1 键标点：先提交正在拼的拼音，再输入“.”；1 秒内再按则在 . , ? ! 间循环。 */
+    /** 1 键标点：先提交正在拼的拼音，再输入“.”；1 秒内再按则在 . , ? ! 间循环。循环改的是光标前一个标点。 */
     private void onPunctKey() {
         long now = System.currentTimeMillis();
-        if (!lastPunct.isEmpty() && now - lastPunctTime < PUNCT_TIMEOUT && committed.length() > 0
-                && committed.charAt(committed.length() - 1) == lastPunct.charAt(0)) {
+        int pos = editPos();
+        if (!lastPunct.isEmpty() && now - lastPunctTime < PUNCT_TIMEOUT && pos > 0
+                && committed.charAt(pos - 1) == lastPunct.charAt(0)) {
             int idx = 0;
             for (int i = 0; i < PUNCTS.length; i++) if (PUNCTS[i] == lastPunct.charAt(0)) idx = i;
             char next = PUNCTS[(idx + 1) % PUNCTS.length];
-            committed.setCharAt(committed.length() - 1, next);
+            committed.setCharAt(pos - 1, next);
             lastPunct = String.valueOf(next);
         } else {
             if (isComposing()) commitComposing();
             if (binding.keyword.length() >= MAX_LEN) return;
-            committed.append('.');
+            insertCommitted(".");
             lastPunct = ".";
         }
         lastPunctTime = now;
         renderBox();
     }
 
-    /** 退格：先删拼写中的最后一个字母/数字，再删已提交的字符。 */
+    /** 退格：先删拼写中的最后一个字母/数字，再删已提交的字符（光标前一个）。 */
     private void onBackspace() {
+        if (isSystemMode()) {
+            // 系统键盘模式：搜索框归系统输入法管，直接删输入法缓冲区光标前的字符；
+            // 绝不能用 renderBox() 把陈旧的 committed 回写，那会覆盖系统输入法刚打的字
+            Editable editable = binding.keyword.getText();
+            int pos = binding.keyword.getSelectionStart();
+            if (editable != null && pos > 0) editable.delete(pos - 1, pos);
+            committed.setLength(0);
+            committed.append(binding.keyword.getText().toString());
+            cursorPos = -1;
+            return;
+        }
         if (isComposing()) {
             if (adapter.getMode() == KeyboardAdapter.MODE_PINYIN) {
                 if (digits.length() > 0) digits.deleteCharAt(digits.length() - 1);
@@ -403,10 +462,7 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
             updateComposingBar();
             return;
         }
-        if (committed.length() > 0) {
-            committed.deleteCharAt(committed.length() - 1);
-            renderBox();
-        }
+        deleteCommittedBeforeCursor();
     }
 
     private void onIconClick(int resId) {
@@ -426,19 +482,29 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener, Syllable
 
     private void onMoveLeft() {
         if (isComposing()) commitComposing();
-        int cursor = binding.keyword.getSelectionStart();
-        binding.keyword.setSelection(--cursor < 0 ? 0 : cursor);
+        int next = Math.max(0, editPos() - 1);
+        cursorPos = next;
+        binding.keyword.setSelection(next);
     }
 
     private void onMoveRight() {
         if (isComposing()) commitComposing();
-        int cursor = binding.keyword.getSelectionStart();
-        binding.keyword.setSelection(++cursor > binding.keyword.length() ? binding.keyword.length() : cursor);
+        int next = Math.min(committed.length(), editPos() + 1);
+        cursorPos = next >= committed.length() ? -1 : next;
+        binding.keyword.setSelection(next);
     }
 
     private boolean onLongClick(int resId) {
         if (resId != R.drawable.ic_keyboard_back) return false;
+        if (isSystemMode()) {
+            // 系统模式：直接清空输入法缓冲区，不经过 committed
+            binding.keyword.setText("");
+            committed.setLength(0);
+            cursorPos = -1;
+            return true;
+        }
         committed.setLength(0);
+        cursorPos = -1;
         clearComposingState();
         renderBox();
         return true;
