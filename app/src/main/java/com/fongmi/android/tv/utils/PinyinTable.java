@@ -12,9 +12,12 @@ import java.util.Set;
 /**
  * 标准普通话拼音音节表（不带声调）与手机九键 T9 映射。
  * <p>
- * 音节表是汉语拼音的固定语言学集合（420 个，ü 记作 v，不含 ê、iai 等极罕见音节），不是编造的词库：
+ * 音节表是汉语拼音的固定语言学集合（423 个，ü 记作 v，不含 lo 等非音节），不是编造的词库：
  * 对照维基百科《汉语拼音音节列表》核对：补上 liang、mou、kei、tei、cei、sei、dia、din、diang、nia、nun、shong、biang、fiao、lvn，
  * 删掉非音节 lo、ra（r 声母不与 a 相拼，lo 只是语气词咯的罕见读法）。
+ * 极罕见音节也已补全：ê（欸）、yai（iai 韵母的零声母拼写，崖旧读）、lvan（lüan，孿，台湾国语读法）；
+ * 其中 ê 在九键上没有对应字母键，编码为 9（digitOf 对非 a–v 字母一律返回 9），单独占 9 号编码，
+ * 不影响任何已有音节的编码与默认切分。
  * 每个音节都由声母 + 韵母按普通话拼读规则组成。九键只按一次、
  * 数字序列按此表切分成音节，再走现有的 getSuggest → iQIYI 建议链出中文候选，
  * 本类不产生任何中文词。
@@ -25,7 +28,7 @@ public class PinyinTable {
 
     /** 标准拼音音节（不带声调），同一数字编码内按常用程度大致排序，排在前面的优先显示。 */
     private static final String[] SYLLABLES = {
-            "a", "ai", "an", "ang", "ao", "e", "ei", "en", "eng", "er", "o", "ou",
+            "a", "ai", "an", "ang", "ao", "e", "ê", "ei", "en", "eng", "er", "o", "ou",
             "ba", "bo", "bu", "bi", "bao", "ban", "bai", "bei", "ben", "beng", "bang", "bian", "biang", "biao", "bie", "bin", "bing",
             "pa", "po", "pu", "pi", "pao", "pan", "pai", "pei", "pen", "peng", "pang", "pian", "piao", "pie", "pin", "ping", "pou",
             "ma", "mo", "mou", "mu", "mi", "mao", "man", "mai", "mei", "men", "meng", "mang", "mian", "miao", "mie", "min", "ming", "miu", "me",
@@ -33,7 +36,7 @@ public class PinyinTable {
             "da", "de", "du", "di", "dia", "din", "dao", "dan", "dai", "dang", "deng", "dong", "dou", "dian", "diang", "diao", "die", "ding", "diu", "duan", "dui", "dun", "duo", "dei", "den",
             "ta", "te", "tei", "tu", "ti", "tao", "tan", "tai", "tang", "teng", "tong", "tou", "tian", "tiao", "tie", "ting", "tuan", "tui", "tun", "tuo",
             "na", "ni", "nia", "nu", "nun", "nv", "nao", "nan", "nai", "nang", "neng", "nian", "niao", "nie", "nin", "ning", "niu", "nong", "nou", "nuan", "nuo", "nve", "ne", "nei", "nen", "niang",
-            "la", "li", "lu", "lv", "lao", "lan", "lai", "lang", "leng", "lian", "liang", "liao", "lie", "lin", "ling", "liu", "long", "lou", "luan", "lun", "luo", "lvn", "lve", "le", "lei", "lia",
+            "la", "li", "lu", "lv", "lao", "lan", "lai", "lang", "leng", "lian", "liang", "liao", "lie", "lin", "ling", "liu", "long", "lou", "luan", "lvan", "lun", "luo", "lvn", "lve", "le", "lei", "lia",
             "ga", "ge", "gu", "gao", "gan", "gai", "geng", "gong", "gou", "gua", "guo", "guai", "gui", "guan", "guang", "gun", "gei", "gen", "gang",
             "ka", "ke", "kei", "ku", "kao", "kan", "kai", "keng", "kong", "kou", "kua", "kuo", "kuai", "kui", "kuan", "kuang", "kun", "ken", "kang",
             "ha", "he", "hu", "hao", "han", "hai", "hang", "heng", "hong", "hou", "hua", "huo", "huai", "hui", "huan", "huang", "hun", "hei", "hen",
@@ -47,7 +50,7 @@ public class PinyinTable {
             "za", "ze", "zi", "zu", "zao", "zan", "zai", "zang", "zeng", "zong", "zou", "zuo", "zui", "zuan", "zun", "zei", "zen",
             "ca", "ce", "cei", "ci", "cu", "cao", "can", "cai", "cang", "ceng", "cong", "cou", "cuo", "cui", "cuan", "cun", "cen",
             "sa", "se", "sei", "si", "su", "sao", "san", "sai", "sang", "seng", "song", "sou", "suo", "sui", "suan", "sun", "sen",
-            "ya", "yi", "yu", "yao", "yan", "yang", "ye", "yin", "ying", "you", "yuan", "yue", "yun", "yo", "yong",
+            "ya", "yai", "yi", "yu", "yao", "yan", "yang", "ye", "yin", "ying", "you", "yuan", "yue", "yun", "yo", "yong",
             "wa", "wu", "wo", "wai", "wan", "wang", "wei", "wen", "weng"
     };
 
@@ -100,7 +103,7 @@ public class PinyinTable {
             "zhu", "zhun", "zhuo", "zi", "zong", "zou", "zu", "zuan",
             "zun", "liang", "mou", "kei", "cei", "sei", "nun", "shong",
             "biang", "fiao", "lvn", "bei", "jiang", "lei", "nou", "nuo",
-            "pei", "qiong"
+            "pei", "qiong", "yai", "lvan"
     };
 
     private static final Map<String, List<String>> BY_DIGITS = new HashMap<>();

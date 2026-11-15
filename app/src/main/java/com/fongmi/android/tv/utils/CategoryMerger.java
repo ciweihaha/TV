@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.utils;
 
 import com.fongmi.android.tv.bean.Class;
+import com.fongmi.android.tv.bean.Filter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,7 +25,9 @@ import java.util.Map;
  * 未识别的名字也默认并进电影，保证没有任何分类的内容丢失。
  * <p>
  * 主分类的代表项优先取本站同名分类（电影取“电影”，动画片取“动漫/动画片”），
- * 没有同名分类时取该桶的第一个分类；主分类的筛选面板用代表项的筛选定义。
+ * 没有同名分类时取该桶的第一个分类；主分类的筛选面板用代表项的筛选定义，
+ * 但拉取时每个成员只发自己筛选定义里的键（见 SiteApi 的 per-member extend），
+ * 不把主分类同一份 extend 原样发给全部成员。
  */
 public class CategoryMerger {
 
@@ -35,13 +38,14 @@ public class CategoryMerger {
 
     private static final String[] ORDER = {MOVIE, TV, ANIME, VARIETY};
 
-    private static final String[] ANIME_KEYS = {"动漫", "动画", "卡通", "番剧", "国漫", "日漫", "動漫"};
-    private static final String[] VARIETY_KEYS = {"综艺", "真人秀", "选秀", "脱口秀", "晚会", "演唱会", "綜藝"};
-    private static final String[] MOVIE_KEYS = {"电影", "影片", "院线", "電影"};
+    private static final String[] ANIME_KEYS = {"动漫", "动画", "卡通", "番剧", "国漫", "日漫", "動漫", "少儿", "儿童", "幼儿"};
+    private static final String[] VARIETY_KEYS = {"综艺", "真人秀", "选秀", "脱口秀", "晚会", "演唱会", "綜藝", "体育", "运动", "赛事"};
+    private static final String[] MOVIE_KEYS = {"电影", "影片", "院线", "電影", "剧场版"};
     private static final String[] TV_KEYS = {"电视剧", "剧集", "国产剧", "韩剧", "美剧", "日剧", "港剧", "台剧", "泰剧", "英剧", "海外剧", "電視劇"};
     /** 电影体裁词：名字里含“剧”但实际是电影体裁（喜剧、剧情…），须先于裸“剧”判断。 */
     private static final String[] MOVIE_GENRE_KEYS = {"喜剧", "剧情", "悲剧", "闹剧", "歌剧", "舞剧"};
-    private static final String[] GENRE_KEYS = {"悬疑", "科幻", "动作", "喜剧", "爱情", "恐怖", "战争", "犯罪", "剧情", "冒险", "奇幻", "古装", "武侠", "青春", "家庭", "合家欢", "治愈", "经典", "纪录", "历史", "传记", "音乐", "歌舞", "体育", "运动", "儿童", "少儿", "网络大电影"};
+    /** 主题合集关键词：纪录片进电影；少儿/儿童已在前面归动画片，体育/运动已在前面归综艺，不再出现在这里。 */
+    private static final String[] GENRE_KEYS = {"悬疑", "科幻", "动作", "喜剧", "爱情", "恐怖", "战争", "犯罪", "剧情", "冒险", "奇幻", "古装", "武侠", "青春", "家庭", "合家欢", "治愈", "经典", "纪录", "历史", "传记", "音乐", "歌舞", "网络大电影"};
 
     private static final Map<String, List<String>> PRIMARY_NAMES = new HashMap<>();
 
@@ -52,8 +56,16 @@ public class CategoryMerger {
         PRIMARY_NAMES.put(VARIETY, Arrays.asList("综艺"));
     }
 
-    /** 站点 key + 主分类 typeId → 被并进来的全部成员 typeId（主分类自身排第一）。 */
-    private static final Map<String, List<String>> REGISTRY = new HashMap<>();
+    /** 站点 key + 主分类 typeId → 被并进来的全部成员 typeId（主分类自身排第一）。有上限、带同步。 */
+    private static final Map<String, List<String>> REGISTRY = new LinkedHashMap<>();
+    /** REGISTRY 最多保留 128 个主分类登记项，超了按登记顺序淘汰最旧的。 */
+    private static final int REGISTRY_MAX = 128;
+    /** 站点 key + 成员 typeId → 该成员的筛选定义（归并时从成员分类对象上登记）。
+     * leanback 有独立的筛选 Cache，mobile 没有：mobile 按成员拆 extend 时从这里取成员定义，
+     * 否则 mobile 只能拿到主分类的筛选定义、把同一份 extend 原样发给全部成员。 */
+    private static final Map<String, List<Filter>> MEMBER_FILTERS = new LinkedHashMap<>();
+    /** MEMBER_FILTERS 最多保留 256 个成员登记项，超了按登记顺序淘汰最旧的。 */
+    private static final int MEMBER_FILTERS_MAX = 256;
 
     private CategoryMerger() {
     }
@@ -77,10 +89,11 @@ public class CategoryMerger {
      * 本站没有的分类不显示空 tab），并登记各主分类的成员 typeId。
      * 返回的是拷贝，主分类显示名为标准名（动漫显示为动画片），原分类对象不动。
      */
-    public static List<Class> merge(String key, List<Class> types) {
+    public static synchronized List<Class> merge(String key, List<Class> types) {
         if (types == null) return new ArrayList<>();
         String prefix = key + "|";
         REGISTRY.keySet().removeIf(k -> k.startsWith(prefix));
+        MEMBER_FILTERS.keySet().removeIf(k -> k.startsWith(prefix));
         LinkedHashMap<String, List<Class>> buckets = new LinkedHashMap<>();
         for (String name : ORDER) buckets.put(name, new ArrayList<>());
         List<Class> folders = new ArrayList<>();
@@ -101,18 +114,31 @@ public class CategoryMerger {
             ids.add(primary.getTypeId());
             for (Class member : members) {
                 if (!member.getTypeId().isEmpty() && !ids.contains(member.getTypeId())) ids.add(member.getTypeId());
+                // 登记每个成员的筛选定义（深拷贝，调用方改了不影响登记表）；本站下次归并时先清掉旧登记
+                if (!member.getTypeId().isEmpty() && !member.getFilters().isEmpty()) {
+                    MEMBER_FILTERS.put(prefix + member.getTypeId(), member.getFilters().stream().filter(java.util.Objects::nonNull).map(Filter::copy).toList());
+                    while (MEMBER_FILTERS.size() > MEMBER_FILTERS_MAX) MEMBER_FILTERS.remove(MEMBER_FILTERS.keySet().iterator().next());
+                }
             }
             REGISTRY.put(prefix + primary.getTypeId(), ids);
+            while (REGISTRY.size() > REGISTRY_MAX) REGISTRY.remove(REGISTRY.keySet().iterator().next());
             merged.add(bucket);
         }
         merged.addAll(folders);
         return merged;
     }
 
-    /** 取回某主分类的成员 typeId（主分类自身排第一），未登记时返回空列表。 */
-    public static List<String> getMergedIds(String key, String typeId) {
+    /** 取回某主分类的成员 typeId（主分类自身排第一），未登记时返回空列表。返回的是拷贝，调用方改了不影响登记表。 */
+    public static synchronized List<String> getMergedIds(String key, String typeId) {
         List<String> ids = REGISTRY.get(key + "|" + typeId);
-        return ids == null ? Collections.emptyList() : ids;
+        return ids == null ? Collections.emptyList() : new ArrayList<>(ids);
+    }
+
+    /** 取回某成员分类的筛选定义（深拷贝）；未登记或该成员没有筛选定义时返回空列表。 */
+    public static synchronized List<Filter> getMemberFilters(String key, String typeId) {
+        List<Filter> filters = MEMBER_FILTERS.get(key + "|" + typeId);
+        if (filters == null) return Collections.emptyList();
+        return filters.stream().filter(java.util.Objects::nonNull).map(Filter::copy).toList();
     }
 
     private static Class pickPrimary(List<Class> members, String bucket) {
