@@ -220,7 +220,9 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
             mAutoRetried = false;
             addVideo(result);
         }
-        Cache.put(result, getHome().getKey());
+        // 空结果不写筛选缓存：Cache.put 会先清掉本站旧的筛选定义再写，失败/空结果
+        // 会把筛选定义整个抹掉（TypeFragment 的 applyFilters 对空结果也是回滚保留旧筛选）。
+        if (!result.getTypes().isEmpty()) Cache.put(result, getHome().getKey());
     }
 
     /** 在推荐区下方显示一行可聚焦的空状态（“首页加载失败，按确定重试”），按确定重新拉取。 */
