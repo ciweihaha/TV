@@ -39,9 +39,11 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -84,8 +86,13 @@ public class SiteApi {
      * 发给站点的 f 里也是空值，站点直接忽略、返回默认列表——点了筛选毫无反应。
      * 这里把空 v 补成显示名 n（CMS 站点的过滤值本来就是显示名）；“全部/不限/所有”
      * 表示不过滤，保持空值。
+     * <p>
+     * 只对走 CMS 接口的站生效（type 0/1/2/4）：Spider 站（type 3）走站点自己的 JS，
+     * 它的筛选值语义由 Spider 决定，补 n 可能把 Spider 的空值约定改成错误过滤值，
+     * 所以 Spider 站不补。
      */
-    private static void normalizeFilters(List<Filter> filters) {
+    private static void normalizeFilters(List<Filter> filters, boolean cms) {
+        if (!cms) return;
         for (Filter filter : filters) {
             for (com.fongmi.android.tv.bean.Value value : filter.getValue()) {
                 if (value.getV().isEmpty() && !value.getN().isEmpty() && !isAllValue(value.getN())) {
@@ -95,8 +102,12 @@ public class SiteApi {
         }
     }
 
+    private static final Set<String> ALL_VALUE_NAMES = Set.of(
+            "全部", "不限", "所有", "全部类型", "全部地区", "全部年份", "全部语言",
+            "全部影片", "全部视频", "全部内容", "全部频道", "无限制", "不限制", "任意", "默认", "全部的");
+
     private static boolean isAllValue(String name) {
-        return "全部".equals(name) || "不限".equals(name) || "所有".equals(name);
+        return name != null && ALL_VALUE_NAMES.contains(name.trim());
     }
 
     /**
@@ -111,9 +122,21 @@ public class SiteApi {
             "类型", "class", "分类", "class",
             "语言", "lang");
 
-    private static HashMap<String, String> normalizeExtend(HashMap<String, String> extend) {
-        HashMap<String, String> normalized = new HashMap<>();
-        extend.forEach((key, value) -> normalized.put(FILTER_KEYS.getOrDefault(key, key), value));
+    /**
+     * 中英文键冲突时英文键优先（CMS 只认英文字段名），其余按输入键排序后依次写入，
+     * 两个中文键映射到同一英文字段时排在前面的胜出；结果用 LinkedHashMap 固定顺序，
+     * 同一份 extend 每次归一化得到同样的键序和同样的值，可复现。
+     */
+    private static LinkedHashMap<String, String> normalizeExtend(HashMap<String, String> extend) {
+        LinkedHashMap<String, String> normalized = new LinkedHashMap<>();
+        List<String> keys = new ArrayList<>(extend.keySet());
+        Collections.sort(keys);
+        for (String key : keys) {
+            String mapped = FILTER_KEYS.getOrDefault(key, key);
+            // 中文键对应的英文键已在输入里出现：英文键优先，跳过中文键
+            if (FILTER_KEYS.containsKey(key) && extend.containsKey(mapped)) continue;
+            normalized.putIfAbsent(mapped, extend.get(key));
+        }
         return normalized;
     }
 
@@ -205,7 +228,9 @@ public class SiteApi {
             } else {
                 ArrayMap<String, String> params = new ArrayMap<>();
                 HashMap<String, String> normalized = normalizeExtend(extend);
-                if (site.getType() == 1 && !normalized.isEmpty()) params.put("f", App.gson().toJson(normalized));
+                // type 0/1/2 都是 CMS 接口：筛选以 f（JSON）发出；type 4 用 ext（base64 JSON）。
+                // 以前 type 0/2 从来不发 extend，点了筛选等于没点。
+                if ((site.getType() == 0 || site.getType() == 1 || site.getType() == 2) && !normalized.isEmpty()) params.put("f", App.gson().toJson(normalized));
                 if (site.getType() == 4) params.put("ext", Util.base64(App.gson().toJson(normalized), Util.URL_SAFE));
                 params.put("ac", ac(site.getType()));
                 params.put("t", tid);
@@ -224,19 +249,73 @@ public class SiteApi {
      * 影片大多已在主分类里，去重后不重复出现；总页数取各成员的最大值，
      * 任一成员还有下一页时“加载更多”就继续。单个 typeId 时直接走单分类路径。
      * 各成员的单次请求本身走 5 分钟缓存，重复翻页不重复发请求。
+     * <p>
+     * 成员容错：每个成员单独 try/catch，某个成员超时/失败只跳过该成员（记日志），
+     * 其余成员的结果照常合并返回；全部成员都失败时返回空结果而不是抛错，
+     * 不让一次成员失败把整个主分类 tab 变成空白/报错。
+     * <p>
+     * 分页：pageCount 只取本次实际拉到的成员的最大值；已知已耗尽的成员（上次拉到的
+     * pageCount 小于当前页）不再请求。跨页去重：第 1 页清空已见集合，之后各页
+     * 用同一集合去重，已在前页出现过的视频不再重复出现。
+     * <p>
+     * 各成员的筛选：extend 按成员分别传入（见带 extendsByTid 的重载），每个成员
+     * 只收到自己筛选定义里的键，不再把主分类同一份 extend 原样发给全部成员。
      */
     @NonNull
     public static Result categoryContent(@NonNull String key, @NonNull List<String> tids, @NonNull String page, boolean filter, @NonNull HashMap<String, String> extend) throws Exception {
-        if (tids.size() == 1) return categoryContent(key, tids.get(0), page, filter, extend);
+        return categoryContent(key, tids, page, filter, extend, null);
+    }
+
+    @NonNull
+    public static Result categoryContent(@NonNull String key, @NonNull List<String> tids, @NonNull String page, boolean filter, @NonNull HashMap<String, String> extend, Map<String, HashMap<String, String>> extendsByTid) throws Exception {
+        if (tids.size() == 1) return categoryContent(key, tids.get(0), page, filter, extendsByTid != null && extendsByTid.containsKey(tids.get(0)) ? extendsByTid.get(tids.get(0)) : extend);
+        int pageNum = 1;
+        try {
+            pageNum = Math.max(1, Integer.parseInt(page));
+        } catch (NumberFormatException ignored) {
+        }
+        String mergeKey = key + "|" + String.join(",", tids);
+        Set<String> seen = mergedSeen(mergeKey, extend);
+        if (pageNum == 1) {
+            synchronized (seen) {
+                seen.clear();
+            }
+        }
         List<Vod> merged = new ArrayList<>();
         Set<String> seenIds = new HashSet<>();
         Set<String> seenNames = new HashSet<>();
         int pageCount = 0;
         for (String tid : tids) {
-            Result result = categoryContent(key, tid, page, filter, extend);
+            // 已耗尽的成员不再请求：上次拉到的总页数小于当前页
+            Integer knownPages = mergedPageCount(mergeKey, tid);
+            if (knownPages != null && knownPages > 0 && pageNum > knownPages) continue;
+            HashMap<String, String> memberExtend = extendsByTid != null && extendsByTid.containsKey(tid) ? extendsByTid.get(tid) : extend;
+            Result result;
+            try {
+                result = categoryContent(key, tid, page, filter, memberExtend);
+            } catch (Exception e) {
+                SpiderDebug.log("category", "merged member failed, skipped: key=%s,tid=%s,page=%s,error=%s", key, tid, page, e.toString());
+                continue;
+            }
+            mergedPageCount(mergeKey, tid, result.getPageCount());
             pageCount = Math.max(pageCount, result.getPageCount());
             for (Vod vod : result.getList()) {
                 String id = vod.getId();
+                String dedupKey = !id.isEmpty() ? "id:" + id : (!vod.getName().isEmpty() ? "name:" + vod.getName() : null);
+                if (dedupKey == null) {
+                    merged.add(vod);
+                    continue;
+                }
+                synchronized (seen) {
+                    if (seen.size() >= 5000) {
+                        java.util.Iterator<String> it = seen.iterator();
+                        if (it.hasNext()) {
+                            it.next();
+                            it.remove();
+                        }
+                    }
+                    if (!seen.add(dedupKey)) continue;
+                }
                 if (!id.isEmpty()) {
                     if (!seenIds.add(id)) continue;
                 } else if (!vod.getName().isEmpty()) {
@@ -249,6 +328,29 @@ public class SiteApi {
         result.setList(merged);
         result.setPageCount(pageCount);
         return result;
+    }
+
+    /** 某次归并拉取已知的各成员总页数（用于跳过已耗尽成员），上限 64 个归并键。 */
+    private static final Map<String, Map<String, Integer>> mergedPageCounts = new java.util.concurrent.ConcurrentHashMap<>();
+    /** 某次归并拉取跨页已见的视频去重键，第 1 页清空；上限 64 个归并键，每键最多 5000 条。 */
+    private static final Map<String, Set<String>> mergedSeenSets = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static Integer mergedPageCount(String mergeKey, String tid) {
+        Map<String, Integer> counts = mergedPageCounts.get(mergeKey);
+        return counts == null ? null : counts.get(tid);
+    }
+
+    private static void mergedPageCount(String mergeKey, String tid, int pageCount) {
+        if (pageCount <= 0) return; // 0 表示站点没给总页数，不是“已耗尽”，不记录
+        if (mergedPageCounts.size() >= 64 && !mergedPageCounts.containsKey(mergeKey)) mergedPageCounts.clear();
+        mergedPageCounts.computeIfAbsent(mergeKey, k -> new java.util.concurrent.ConcurrentHashMap<>()).put(tid, pageCount);
+    }
+
+    private static Set<String> mergedSeen(String mergeKey, HashMap<String, String> extend) {
+        // extend 变化等于换了一组筛选，旧的已见集合不再适用
+        String seenKey = mergeKey + "|" + extendKey(extend);
+        if (mergedSeenSets.size() >= 64 && !mergedSeenSets.containsKey(seenKey)) mergedSeenSets.clear();
+        return mergedSeenSets.computeIfAbsent(seenKey, k -> Collections.synchronizedSet(new LinkedHashSet<>()));
     }
 
     private static String extendKey(@NonNull HashMap<String, String> extend) {
@@ -470,7 +572,7 @@ public class SiteApi {
         LinkedHashMap<String, List<Filter>> filters = result.getFilters();
         result.getTypes().stream().filter(type -> filters.containsKey(type.getTypeId())).forEach(type -> {
             List<Filter> list = filters.get(type.getTypeId());
-            normalizeFilters(list);
+            normalizeFilters(list, !isSpider(site));
             type.setFilters(list);
         });
         if (site.getCategories().isEmpty()) return;
