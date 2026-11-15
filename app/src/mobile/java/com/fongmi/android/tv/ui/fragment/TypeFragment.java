@@ -28,10 +28,15 @@ import com.fongmi.android.tv.ui.activity.WebActivity;
 import com.fongmi.android.tv.ui.adapter.VodAdapter;
 import com.fongmi.android.tv.ui.base.BaseFragment;
 import com.fongmi.android.tv.ui.custom.CustomScroller;
+import com.fongmi.android.tv.utils.CategoryMerger;
 import com.fongmi.android.tv.utils.ResUtil;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class TypeFragment extends BaseFragment implements CustomScroller.Callback, VodAdapter.OnClickListener, SwipeRefreshLayout.OnRefreshListener {
 
@@ -42,6 +47,10 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     private VodAdapter mAdapter;
 
     public static TypeFragment newInstance(String key, String typeId, Style style, HashMap<String, String> extend, boolean folder, int y) {
+        return newInstance(key, typeId, style, extend, folder, y, new ArrayList<>());
+    }
+
+    public static TypeFragment newInstance(String key, String typeId, Style style, HashMap<String, String> extend, boolean folder, int y, ArrayList<String> mergedIds) {
         Bundle args = new Bundle();
         args.putInt("y", y);
         args.putString("key", key);
@@ -49,6 +58,7 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
         args.putBoolean("folder", folder);
         args.putParcelable("style", style);
         args.putSerializable("extend", extend);
+        args.putStringArrayList("mergedIds", mergedIds);
         TypeFragment fragment = new TypeFragment();
         fragment.setArguments(args);
         return fragment;
@@ -60,6 +70,12 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
 
     private String getTypeId() {
         return getArguments().getString("typeId");
+    }
+
+    /** 分类归并后的成员 typeId（主分类自身排第一）；空表示未归并，走单分类路径。 */
+    private ArrayList<String> getMergedIds() {
+        ArrayList<String> ids = getArguments().getStringArrayList("mergedIds");
+        return ids == null ? new ArrayList<>() : ids;
     }
 
     private Style getStyle() {
@@ -142,7 +158,32 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     }
 
     private void getVideo(String typeId, String page) {
-        mViewModel.categoryContent(getKey(), typeId, page, true, mExtends);
+        // 归并后的主分类：一次拉取全部成员 typeId 并合并去重；否则走单分类。
+        // 每个成员只发自己筛选定义里的 extend，不共用主分类同一份（与 leanback M23 一致；
+        // mobile 没有 leanback 的筛选 Cache，成员定义取自 CategoryMerger 归并时登记的定义）。
+        List<String> mergedIds = getMergedIds();
+        if (mergedIds.size() > 1) mViewModel.categoryContent(getKey(), mergedIds, page, true, mExtends, getMemberExtends(mergedIds));
+        else mViewModel.categoryContent(getKey(), typeId, page, true, mExtends);
+    }
+
+    /** 按成员拆 extend：只保留该成员筛选定义里有的键；成员没有登记定义时回退到主分类的 extend。 */
+    private HashMap<String, HashMap<String, String>> getMemberExtends(List<String> tids) {
+        HashMap<String, HashMap<String, String>> map = new HashMap<>();
+        for (String tid : tids) {
+            List<Filter> memberFilters = CategoryMerger.getMemberFilters(getKey(), tid);
+            HashMap<String, String> memberExtend = new HashMap<>();
+            if (memberFilters.isEmpty()) {
+                memberExtend.putAll(mExtends);
+            } else {
+                Set<String> keys = new HashSet<>();
+                for (Filter filter : memberFilters) keys.add(filter.getKey());
+                for (Map.Entry<String, String> entry : mExtends.entrySet()) {
+                    if (keys.contains(entry.getKey())) memberExtend.put(entry.getKey(), entry.getValue());
+                }
+            }
+            map.put(tid, memberExtend);
+        }
+        return map;
     }
 
     private void setAdapter(Result result) {
