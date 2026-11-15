@@ -28,11 +28,13 @@ import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderDebug;
 import com.github.catvod.utils.Trans;
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.utils.Task;
 import com.github.catvod.utils.Prefers;
 import com.github.catvod.utils.UriUtil;
 import com.github.catvod.utils.Util;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import org.json.JSONObject;
 
@@ -49,6 +51,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -66,6 +69,10 @@ public class SiteApi {
     private static final Cache<String, String> detailCache = CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).maximumSize(128).build();
 
     private record HomeEntry(String home, String video) {
+    }
+
+    /** 归并成员的一次拉取：result 非空是 Spider 内联已取回，future 非空是 CMS 并发待取回，两者都空是已跳过/已失败。 */
+    private record MemberFetch(String tid, HashMap<String, String> extend, Result result, ListenableFuture<Result> future) {
     }
 
     /** Drop all cached VOD responses, e.g. when the config changes. */
@@ -244,7 +251,7 @@ public class SiteApi {
     }
 
     /**
-     * 分类归并后的拉取：一个主分类对应多个成员 typeId，逐个拉取后合并成一个结果。
+     * 分类归并后的拉取：一个主分类对应多个成员 typeId，并发拉取后按成员顺序合并成一个结果。
      * 主分类的视频排在前面，成员间按视频 id（无 id 时按名字 + 年份）去重——主题合集里的
      * 影片大多已在主分类里，去重后不重复出现；同名不同年份的片是不同的片，不会被误去重。
      * 总页数取各成员的最大值，任一成员还有下一页时“加载更多”就继续。单个 typeId 时直接走单分类路径。
@@ -265,6 +272,13 @@ public class SiteApi {
      * <p>
      * 各成员的筛选：extend 按成员分别传入（见带 extendsByTid 的重载），每个成员
      * 只收到自己筛选定义里的键，不再把主分类同一份 extend 原样发给全部成员。
+     * <p>
+     * 并发：CMS 站（type 0/1/2/4，纯 HTTP 请求、无共享状态）的成员全部并发发出，
+     * 等待时间从各成员串行相加变成只取最慢的一个——慢网下不再因为累加撞上
+     * 30 秒总超时（TIMEOUT_VOD，见 SiteViewModel 的 tasks.execute）。
+     * Spider 站（type 3）同一站点共用一个 JS 引擎实例，并发调用不安全，
+     * 仍顺序拉取。收集时严格按成员顺序合并，去重、总页数、容错语义与串行时
+     * 完全一致；外层超时取消本线程时，未跑完的成员请求一并取消。
      */
     @NonNull
     public static Result categoryContent(@NonNull String key, @NonNull List<String> tids, @NonNull String page, boolean filter, @NonNull HashMap<String, String> extend) throws Exception {
@@ -293,57 +307,100 @@ public class SiteApi {
         boolean anySuccess = false;
         boolean anyFailed = false;
         boolean anySkippedExhausted = false;
+        // 分发：CMS 成员（纯 HTTP 请求、无共享状态）先全部并发发出，Spider 成员
+        // （同一站点共用一个 JS 引擎实例，并发调用不安全）仍顺序拉取；收集时
+        // 严格按成员顺序合并，去重与容错语义和串行时完全一致。
+        boolean spider = isSpider(VodConfig.get().getSite(key));
+        List<MemberFetch> fetches = new ArrayList<>();
         for (String tid : tids) {
             // 已耗尽的成员不再请求：上次拉到的总页数小于当前页
             Integer knownPages = mergedPageCount(mergeKey, tid);
             if (knownPages != null && knownPages > 0 && pageNum > knownPages) {
                 anySkippedExhausted = true;
+                fetches.add(new MemberFetch(tid, null, null, null));
                 continue;
             }
             HashMap<String, String> memberExtend = extendsByTid != null && extendsByTid.containsKey(tid) ? extendsByTid.get(tid) : extend;
             // 30 秒内刚失败过的成员不再重复发请求（失败请求不进 5 分钟缓存，不记就会滑到底部再发一次）
             if (isRecentlyFailed(mergeKey, tid, page, memberExtend)) {
                 anyFailed = true;
+                fetches.add(new MemberFetch(tid, null, null, null));
                 continue;
             }
-            Result result;
-            try {
-                result = categoryContent(key, tid, page, filter, memberExtend);
-                anySuccess = true;
-            } catch (Exception e) {
-                markFailed(mergeKey, tid, page, memberExtend);
-                anyFailed = true;
-                SpiderDebug.log("category", "merged member failed, skipped: key=%s,tid=%s,page=%s,error=%s", key, tid, page, e.toString());
-                continue;
+            if (spider) {
+                try {
+                    Result result = categoryContent(key, tid, page, filter, memberExtend);
+                    fetches.add(new MemberFetch(tid, memberExtend, result, null));
+                } catch (Exception e) {
+                    markFailed(mergeKey, tid, page, memberExtend);
+                    anyFailed = true;
+                    SpiderDebug.log("category", "merged member failed, skipped: key=%s,tid=%s,page=%s,error=%s", key, tid, page, e.toString());
+                    fetches.add(new MemberFetch(tid, memberExtend, null, null));
+                }
+            } else {
+                // CMS 站是纯 HTTP 请求：8 个成员同时发，等最慢的一个回来即可，
+                // 不再串行累加、撞 30 秒总超时。
+                ListenableFuture<Result> future = Task.largeExecutor().submit(() -> categoryContent(key, tid, page, filter, memberExtend));
+                fetches.add(new MemberFetch(tid, memberExtend, null, future));
             }
-            mergedPageCount(mergeKey, tid, result.getPageCount());
-            pageCount = Math.max(pageCount, result.getPageCount());
-            for (Vod vod : result.getList()) {
-                String id = vod.getId();
-                // 无 id 时用“名字 + 年份”去重：同名不同年份是不同的片，不能只按名字去重；
-                // 年份缺失时退化为只按名字，与以前一致，不比以前更差
-                String dedupKey = !id.isEmpty() ? "id:" + id : (!vod.getName().isEmpty() ? "name:" + vod.getName() + "|" + vod.getYear() : null);
-                if (dedupKey == null) {
-                    merged.add(vod);
+        }
+        // 收集：按成员顺序取结果再合并——主分类的视频排在前面、成员间去重，
+        // 与串行时完全一致；单个成员失败只跳过该成员，不影响其余成员。
+        List<ListenableFuture<Result>> pending = new ArrayList<>();
+        for (MemberFetch fetch : fetches) if (fetch.future() != null) pending.add(fetch.future());
+        try {
+            for (MemberFetch fetch : fetches) {
+                Result result;
+                if (fetch.result() != null) {
+                    result = fetch.result();
+                } else if (fetch.future() != null) {
+                    try {
+                        result = fetch.future().get();
+                    } catch (ExecutionException e) {
+                        markFailed(mergeKey, fetch.tid(), page, fetch.extend());
+                        anyFailed = true;
+                        Throwable cause = e.getCause() != null ? e.getCause() : e;
+                        SpiderDebug.log("category", "merged member failed, skipped: key=%s,tid=%s,page=%s,error=%s", key, fetch.tid(), page, cause.toString());
+                        continue;
+                    }
+                } else {
                     continue;
                 }
-                synchronized (seen) {
-                    if (seen.size() >= 5000) {
-                        java.util.Iterator<String> it = seen.iterator();
-                        if (it.hasNext()) {
-                            it.next();
-                            it.remove();
-                        }
+                anySuccess = true;
+                mergedPageCount(mergeKey, fetch.tid(), result.getPageCount());
+                pageCount = Math.max(pageCount, result.getPageCount());
+                for (Vod vod : result.getList()) {
+                    String id = vod.getId();
+                    // 无 id 时用“名字 + 年份”去重：同名不同年份是不同的片，不能只按名字去重；
+                    // 年份缺失时退化为只按名字，与以前一致，不比以前更差
+                    String dedupKey = !id.isEmpty() ? "id:" + id : (!vod.getName().isEmpty() ? "name:" + vod.getName() + "|" + vod.getYear() : null);
+                    if (dedupKey == null) {
+                        merged.add(vod);
+                        continue;
                     }
-                    if (!seen.add(dedupKey)) continue;
+                    synchronized (seen) {
+                        if (seen.size() >= 5000) {
+                            java.util.Iterator<String> it = seen.iterator();
+                            if (it.hasNext()) {
+                                it.next();
+                                it.remove();
+                            }
+                        }
+                        if (!seen.add(dedupKey)) continue;
+                    }
+                    if (!id.isEmpty()) {
+                        if (!seenIds.add(id)) continue;
+                    } else if (!vod.getName().isEmpty()) {
+                        if (!seenNameKeys.add(dedupKey)) continue;
+                    }
+                    merged.add(vod);
                 }
-                if (!id.isEmpty()) {
-                    if (!seenIds.add(id)) continue;
-                } else if (!vod.getName().isEmpty()) {
-                    if (!seenNameKeys.add(dedupKey)) continue;
-                }
-                merged.add(vod);
             }
+        } catch (InterruptedException e) {
+            // 外层 30 秒超时取消了本线程：停掉还没跑完的成员请求，不再浪费流量
+            for (ListenableFuture<Result> future : pending) future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw e;
         }
         Result result = new Result();
         result.setList(merged);
