@@ -123,6 +123,10 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         });
         // “应用”即全部结果（默认选中）；游戏、影片置灰不可用，不接点击。
         mBinding.tabApp.setOnClickListener(v -> mBinding.tabApp.setSelected(true));
+        // v5.9.8 CI fix: android:selected is not a valid XML attribute (AAPT2 refuses
+        // to link it); initial selected state must be set in code so the
+        // state_selected pill background of selector_tab_dangbei lights up.
+        mBinding.tabApp.setSelected(true);
     }
 
     private void setRecyclerView() {

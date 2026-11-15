@@ -258,7 +258,6 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:gravity="center"
-                android:selected="true"
                 android:text="@string/search_tab_app"
                 android:textColor="@color/white"
                 android:textSize="18sp" />
