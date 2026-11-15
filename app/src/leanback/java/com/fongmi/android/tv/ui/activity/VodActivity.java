@@ -77,7 +77,7 @@ public class VodActivity extends BasePagerActivity implements TypeAdapter.OnClic
         mBinding.recycler.requestFocus();
         mBinding.recycler.setHorizontalSpacing(ResUtil.dp2px(16));
         mBinding.recycler.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
-        mBinding.recycler.setAdapter(mAdapter = new TypeAdapter(this));
+        mBinding.recycler.setAdapter(mAdapter = new TypeAdapter(this, getKey()));
     }
 
     private void setTypes() {

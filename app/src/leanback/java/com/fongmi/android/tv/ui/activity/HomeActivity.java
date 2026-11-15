@@ -201,7 +201,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     private void onResult(Result result) {
         mAdapter.remove("progress");
         addVideo(mResult = result);
-        Cache.clear().put(result);
+        Cache.put(result, getHome().getKey());
     }
 
     private void setAdapter() {

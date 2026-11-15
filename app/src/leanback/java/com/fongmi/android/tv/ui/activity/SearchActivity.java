@@ -48,6 +48,17 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     private CustomKeyboard mKeyboard;
     private RecordAdapter mRecordAdapter;
     private WordAdapter mWordAdapter;
+    /** 联想请求序号：每次输入变化 +1，只有最新一次请求的响应能进候选列表，慢到的过期响应直接丢弃。 */
+    private int suggestSeq;
+    /** 已实际发出的联想请求序号（防抖后才发出）。 */
+    private int suggestRequestedSeq;
+    /** 已应用到候选列表的联想响应序号。 */
+    private int suggestAppliedSeq;
+    /** 待执行的防抖任务（只有一个实例）：每次输入先取消上一个再发新的，
+     * Activity 销毁时取消，避免销毁后任务仍执行、发起联想请求。 */
+    private Runnable suggestTask;
+    /** 输入变化防抖：300ms 内连续输入只发最后一次联想请求。 */
+    private static final long SUGGEST_DEBOUNCE_MS = 300;
 
     public static void start(Activity activity) {
         activity.startActivity(new Intent(activity, SearchActivity.class));
@@ -125,33 +136,54 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     private void getWord(String text) {
-        if (text.isEmpty()) getHot();
-        else getSuggest(text);
+        suggestSeq++;
+        int seq = suggestSeq;
+        if (text.isEmpty()) {
+            getHot(seq);
+            return;
+        }
+        // 防抖：连续输入时只发最后一次请求，中间的请求连发都不发；
+        // 任务是同一个字段持有的实例，销毁时能取消（以前每次新建 lambda，App.post 里的
+        // removeCallbacks 根本取消不到上一个，销毁后任务仍会执行并发起联想请求）
+        if (suggestTask != null) App.removeCallbacks(suggestTask);
+        suggestTask = () -> {
+            if (isDestroyed() || isFinishing() || seq != suggestSeq) return;
+            getSuggest(text, seq);
+        };
+        App.post(suggestTask, SUGGEST_DEBOUNCE_MS);
     }
 
-    private void getHot() {
+    private void getHot(int seq) {
+        suggestRequestedSeq = seq;
         mBinding.word.setText(R.string.search_hot);
         mWordAdapter.setItems(Word.objectFrom(Setting.getHot()).getData());
-        OkHttp.newCall("https://api.web.360kan.com/v1/rank?cat=1", Map.of(HttpHeaders.REFERER, "https://www.360kan.com/rank/general")).enqueue(getCallback(true));
+        OkHttp.newCall("https://api.web.360kan.com/v1/rank?cat=1", Map.of(HttpHeaders.REFERER, "https://www.360kan.com/rank/general")).enqueue(getCallback(true, seq));
     }
 
-    private void getSuggest(String text) {
+    private void getSuggest(String text, int seq) {
+        suggestRequestedSeq = seq;
         mBinding.word.setText(R.string.search_suggest);
-        OkHttp.newCall("https://suggest.video.iqiyi.com/?if=mobile&key=" + Uri.encode(ZhuToPin.get(text))).enqueue(getCallback(false));
+        OkHttp.newCall("https://suggest.video.iqiyi.com/?if=mobile&key=" + Uri.encode(ZhuToPin.get(text))).enqueue(getCallback(false, seq));
     }
 
-    private Callback getCallback(boolean hot) {
+    private Callback getCallback(boolean hot, int seq) {
         return new Callback() {
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                 String result = response.body().string();
                 if (TextUtils.isEmpty(result)) return;
-                App.post(() -> setAdapter(result, hot));
+                App.post(() -> setAdapter(result, hot, seq));
             }
         };
     }
 
-    private void setAdapter(String result, boolean save) {
+    private void setAdapter(String result, boolean save, int seq) {
+        // 销毁后到达的响应直接丢弃：不再碰已销毁 Activity 的视图
+        if (isDestroyed() || isFinishing()) return;
+        // 过期响应丢弃：用户已经又输了字，这份候选是旧输入的，绝不能覆盖新候选，
+        // 否则 Done/空格/标点会把错词提交进搜索框
+        if (seq != suggestSeq) return;
+        suggestAppliedSeq = seq;
         if (!save && empty()) return;
         if (save) Setting.putHot(result);
         mWordAdapter.setItems(Word.objectFrom(result).getData());
@@ -206,6 +238,9 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         // 只有当前显示的是联想候选（不是热搜词）时才返回首个候选，供完成/空格/标点时提交拼写
         if (mWordAdapter == null || mWordAdapter.getItemCount() == 0) return null;
         if (!mBinding.word.getText().toString().equals(getString(R.string.search_suggest))) return null;
+        // 候选必须与当前输入对应：新输入还没发出请求、或请求响应还没回来时，
+        // 列表里还是上一轮输入的候选，返回 null 让调用方提交拼音原文，绝不提交错词
+        if (suggestSeq != suggestRequestedSeq || suggestSeq != suggestAppliedSeq) return null;
         return mWordAdapter.getItem(0).getTitle();
     }
 
@@ -426,6 +461,9 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     @Override
     protected void onDestroy() {
+        // 取消还没执行的防抖任务：否则销毁 300ms 后它仍会发起联想请求，
+        // 响应回来再碰已销毁的视图
+        if (suggestTask != null) App.removeCallbacks(suggestTask);
         super.onDestroy();
         mBinding.mic.destroy();
     }
