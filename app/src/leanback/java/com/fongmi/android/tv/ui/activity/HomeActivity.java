@@ -57,6 +57,7 @@ import com.fongmi.android.tv.ui.custom.CustomSelector;
 import com.fongmi.android.tv.ui.custom.CustomTitleView;
 import com.fongmi.android.tv.ui.dialog.LocalConnectDialog;
 import com.fongmi.android.tv.ui.dialog.SiteDialog;
+import com.fongmi.android.tv.ui.presenter.EmptyStatePresenter;
 import com.fongmi.android.tv.ui.presenter.FuncPresenter;
 import com.fongmi.android.tv.ui.presenter.HeaderPresenter;
 import com.fongmi.android.tv.ui.presenter.HistoryPresenter;
@@ -101,6 +102,10 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     private boolean actionReady;
     private Result mResult;
     private Clock mClock;
+    /** 首载失败后是否已自动重试过一次（只重试一次，避免死循环；手动刷新/点空状态行重试会重置）。 */
+    private boolean mAutoRetried;
+    /** 空状态行是否正在显示（防重复添加）。 */
+    private boolean mEmptyShown;
 
     private Site getHome() {
         return VodConfig.get().getHome();
@@ -187,6 +192,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         selector.addPresenter(Vod.class, new VodPresenter(this, Style.list()));
         selector.addPresenter(ListRow.class, new CustomRowPresenter(16), VodPresenter.class);
         selector.addPresenter(ListRow.class, new CustomRowPresenter(16), FuncPresenter.class);
+        selector.addPresenter(ListRow.class, new CustomRowPresenter(16), EmptyStatePresenter.class);
         selector.addPresenter(ListRow.class, new CustomRowPresenter(16, FocusHighlight.ZOOM_FACTOR_SMALL, HorizontalGridView.FOCUS_SCROLL_ALIGNED), HistoryPresenter.class);
         mBinding.recycler.setAdapter(new ItemBridgeAdapter(mAdapter = new ArrayObjectAdapter(selector)));
         mBinding.recycler.setVerticalSpacing(ResUtil.dp2px(16));
@@ -200,8 +206,30 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
     private void onResult(Result result) {
         mAdapter.remove("progress");
-        addVideo(mResult = result);
+        mResult = result;
+        if (result.getList().isEmpty()) {
+            // 首页空结果：以前只把进度条去掉、加 0 条，首页只剩两个空标题，看起来就是空白。
+            // 现在失败后先自动重试一次（agg 首载经常超时），还失败就显示可聚焦的空状态行，按确定重试。
+            if (!mAutoRetried) {
+                mAutoRetried = true;
+                App.post(this::fetchVideo, 2000);
+            } else {
+                showEmptyState();
+            }
+        } else {
+            mAutoRetried = false;
+            addVideo(result);
+        }
         Cache.put(result, getHome().getKey());
+    }
+
+    /** 在推荐区下方显示一行可聚焦的空状态（“首页加载失败，按确定重试”），按确定重新拉取。 */
+    private void showEmptyState() {
+        if (mEmptyShown) return;
+        mEmptyShown = true;
+        ArrayObjectAdapter adapter = new ArrayObjectAdapter(new EmptyStatePresenter(this::getVideo));
+        adapter.add(R.string.home_load_failed);
+        mAdapter.add(getRecommendIndex(), new ListRow(adapter));
     }
 
     private void setAdapter() {
@@ -303,6 +331,13 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void getVideo() {
+        mAutoRetried = false;
+        fetchVideo();
+    }
+
+    private void fetchVideo() {
+        if (isFinishing() || isDestroyed()) return;
+        mEmptyShown = false;
         mResult = Result.empty();
         int index = getRecommendIndex();
         boolean gone = mAdapter.indexOf("progress") == -1;
