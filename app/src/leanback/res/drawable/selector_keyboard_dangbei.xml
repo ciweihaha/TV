@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 当贝字母键背景：平时透明（字母直接印在蓝底上，无键框），焦点时淡蓝圆角块 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/shape_keyboard_dangbei_focused" android:state_focused="true" />
+    <item android:drawable="@android:color/transparent" />
+</selector>
