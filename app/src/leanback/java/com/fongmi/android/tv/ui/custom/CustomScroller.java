@@ -76,7 +76,10 @@ public class CustomScroller extends RecyclerView.OnScrollListener {
 
     public void endLoading(Result result) {
         if (result.getList().isEmpty()) page--;
-        setEnable(result.getPageCount());
+        // 全员失败（归并拉取打上的标记）：停掉“加载更多”，不再滑到底部反复重试；
+        // 与 pageCount 0 的“站点没给总页数、未知、可继续加载”区分开。手动下拉刷新仍可重试
+        if (result.isAllFailed()) enable = false;
+        else setEnable(result.getPageCount());
         setLoading(false);
     }
 
