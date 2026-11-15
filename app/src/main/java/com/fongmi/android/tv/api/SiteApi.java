@@ -245,14 +245,19 @@ public class SiteApi {
 
     /**
      * 分类归并后的拉取：一个主分类对应多个成员 typeId，逐个拉取后合并成一个结果。
-     * 主分类的视频排在前面，成员间按视频 id（无 id 时按名字）去重——主题合集里的
-     * 影片大多已在主分类里，去重后不重复出现；总页数取各成员的最大值，
-     * 任一成员还有下一页时“加载更多”就继续。单个 typeId 时直接走单分类路径。
+     * 主分类的视频排在前面，成员间按视频 id（无 id 时按名字 + 年份）去重——主题合集里的
+     * 影片大多已在主分类里，去重后不重复出现；同名不同年份的片是不同的片，不会被误去重。
+     * 总页数取各成员的最大值，任一成员还有下一页时“加载更多”就继续。单个 typeId 时直接走单分类路径。
      * 各成员的单次请求本身走 5 分钟缓存，重复翻页不重复发请求。
      * <p>
      * 成员容错：每个成员单独 try/catch，某个成员超时/失败只跳过该成员（记日志），
      * 其余成员的结果照常合并返回；全部成员都失败时返回空结果而不是抛错，
      * 不让一次成员失败把整个主分类 tab 变成空白/报错。
+     * <p>
+     * 全员失败不再反复重试：失败的成员记 30 秒负缓存（失败请求本来不进 5 分钟缓存，
+     * 不记就会滑到底部再发一次），30 秒内的重试直接跳过、不重复发请求；同时结果打上
+     * allFailed 标记，CustomScroller 见到它就停掉“加载更多”，与“站点没给总页数、
+     * pageCount 为 0 但可继续加载”区分开。手动下拉刷新仍可重试。
      * <p>
      * 分页：pageCount 只取本次实际拉到的成员的最大值；已知已耗尽的成员（上次拉到的
      * pageCount 小于当前页）不再请求。跨页去重：第 1 页清空已见集合，之后各页
@@ -283,17 +288,31 @@ public class SiteApi {
         }
         List<Vod> merged = new ArrayList<>();
         Set<String> seenIds = new HashSet<>();
-        Set<String> seenNames = new HashSet<>();
+        Set<String> seenNameKeys = new HashSet<>();
         int pageCount = 0;
+        boolean anySuccess = false;
+        boolean anyFailed = false;
+        boolean anySkippedExhausted = false;
         for (String tid : tids) {
             // 已耗尽的成员不再请求：上次拉到的总页数小于当前页
             Integer knownPages = mergedPageCount(mergeKey, tid);
-            if (knownPages != null && knownPages > 0 && pageNum > knownPages) continue;
+            if (knownPages != null && knownPages > 0 && pageNum > knownPages) {
+                anySkippedExhausted = true;
+                continue;
+            }
             HashMap<String, String> memberExtend = extendsByTid != null && extendsByTid.containsKey(tid) ? extendsByTid.get(tid) : extend;
+            // 30 秒内刚失败过的成员不再重复发请求（失败请求不进 5 分钟缓存，不记就会滑到底部再发一次）
+            if (isRecentlyFailed(mergeKey, tid, page, memberExtend)) {
+                anyFailed = true;
+                continue;
+            }
             Result result;
             try {
                 result = categoryContent(key, tid, page, filter, memberExtend);
+                anySuccess = true;
             } catch (Exception e) {
+                markFailed(mergeKey, tid, page, memberExtend);
+                anyFailed = true;
                 SpiderDebug.log("category", "merged member failed, skipped: key=%s,tid=%s,page=%s,error=%s", key, tid, page, e.toString());
                 continue;
             }
@@ -301,7 +320,9 @@ public class SiteApi {
             pageCount = Math.max(pageCount, result.getPageCount());
             for (Vod vod : result.getList()) {
                 String id = vod.getId();
-                String dedupKey = !id.isEmpty() ? "id:" + id : (!vod.getName().isEmpty() ? "name:" + vod.getName() : null);
+                // 无 id 时用“名字 + 年份”去重：同名不同年份是不同的片，不能只按名字去重；
+                // 年份缺失时退化为只按名字，与以前一致，不比以前更差
+                String dedupKey = !id.isEmpty() ? "id:" + id : (!vod.getName().isEmpty() ? "name:" + vod.getName() + "|" + vod.getYear() : null);
                 if (dedupKey == null) {
                     merged.add(vod);
                     continue;
@@ -319,7 +340,7 @@ public class SiteApi {
                 if (!id.isEmpty()) {
                     if (!seenIds.add(id)) continue;
                 } else if (!vod.getName().isEmpty()) {
-                    if (!seenNames.add(vod.getName())) continue;
+                    if (!seenNameKeys.add(dedupKey)) continue;
                 }
                 merged.add(vod);
             }
@@ -327,6 +348,14 @@ public class SiteApi {
         Result result = new Result();
         result.setList(merged);
         result.setPageCount(pageCount);
+        if (!anySuccess && anyFailed) {
+            // 全员失败：打上标记，CustomScroller 见到就停掉“加载更多”，不再滑到底部反复重试
+            result.setAllFailed(true);
+        } else if (!anySuccess && anySkippedExhausted) {
+            // 一个成员都没拉、且全是已知已耗尽：没有下一页了，把总页数收成当前页之前，
+            // 否则 pageCount 0 会被当成“未知总页数、可继续加载”，空转反复请求
+            result.setPageCount(Math.max(1, pageNum - 1));
+        }
         return result;
     }
 
@@ -334,6 +363,24 @@ public class SiteApi {
     private static final Map<String, Map<String, Integer>> mergedPageCounts = new java.util.concurrent.ConcurrentHashMap<>();
     /** 某次归并拉取跨页已见的视频去重键，第 1 页清空；上限 64 个归并键，每键最多 5000 条。 */
     private static final Map<String, Set<String>> mergedSeenSets = new java.util.concurrent.ConcurrentHashMap<>();
+    /** 归并成员失败的负缓存：键 → 失败时间戳，30 秒内不再对同一成员发同一请求。 */
+    private static final Map<String, Long> mergedFailedAt = new java.util.concurrent.ConcurrentHashMap<>();
+    /** 失败成员负缓存时长：30 秒，够拦住滑到底部反复重试，又不至于挡住用户手动刷新重试。 */
+    private static final long MERGED_FAIL_NEGATIVE_TTL = 30_000;
+
+    private static String mergedFailKey(String mergeKey, String tid, String page, HashMap<String, String> extend) {
+        return mergeKey + "|" + tid + "|" + page + "|" + extendKey(extend);
+    }
+
+    private static boolean isRecentlyFailed(String mergeKey, String tid, String page, HashMap<String, String> extend) {
+        Long failedAt = mergedFailedAt.get(mergedFailKey(mergeKey, tid, page, extend));
+        return failedAt != null && System.currentTimeMillis() - failedAt < MERGED_FAIL_NEGATIVE_TTL;
+    }
+
+    private static void markFailed(String mergeKey, String tid, String page, HashMap<String, String> extend) {
+        if (mergedFailedAt.size() >= 64) mergedFailedAt.clear();
+        mergedFailedAt.put(mergedFailKey(mergeKey, tid, page, extend), System.currentTimeMillis());
+    }
 
     private static Integer mergedPageCount(String mergeKey, String tid) {
         Map<String, Integer> counts = mergedPageCounts.get(mergeKey);
