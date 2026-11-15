@@ -40,6 +40,7 @@ import com.fongmi.android.tv.ui.custom.CustomScroller;
 import com.fongmi.android.tv.ui.custom.CustomSelector;
 import com.fongmi.android.tv.ui.presenter.FilterPresenter;
 import com.fongmi.android.tv.ui.presenter.VodPresenter;
+import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.github.catvod.utils.Task;
 import com.google.common.collect.Lists;
@@ -48,8 +49,11 @@ import com.google.common.util.concurrent.MoreExecutors;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public class TypeFragment extends BaseFragment implements CustomScroller.Callback, VodPresenter.OnClickListener, SwipeRefreshLayout.OnRefreshListener {
 
@@ -64,6 +68,11 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     private boolean headerVisible;
     private boolean filterVisible;
     private boolean filterRefreshing;
+    /** 筛选面板刷新节流：30 秒内重复打开不重复拉首页。 */
+    private static final long FILTER_REFRESH_INTERVAL = 30_000;
+    private long lastFilterRefreshTime;
+    /** 刷新前旧筛选的快照：新定义无效/空结果/失败时回滚用。 */
+    private Map<String, List<Filter>> filterBackup;
 
     public static TypeFragment newInstance(String key, String typeId, Style style, HashMap<String, String> extend, boolean folder) {
         return newInstance(key, typeId, style, extend, folder, new ArrayList<>());
@@ -110,8 +119,8 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
 
     private List<Filter> getFilter() {
         String typeId = getTypeId();
-        if (!Cache.contains(typeId)) typeId = getParent().getType().getTypeId();
-        return Cache.copy(typeId);
+        if (!Cache.contains(getKey(), typeId)) typeId = getParent().getType().getTypeId();
+        return Cache.copy(getKey(), typeId);
     }
 
     private Site getSite() {
@@ -181,10 +190,31 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     }
 
     private void getVideo(String typeId, String page) {
-        // 归并后的主分类：一次拉取全部成员 typeId 并合并去重；否则走单分类
+        // 归并后的主分类：一次拉取全部成员 typeId 并合并去重；否则走单分类。
+        // 每个成员只发自己筛选定义里的 extend，不共用主分类同一份（M23）。
         List<String> mergedIds = getMergedIds();
-        if (mergedIds.size() > 1) mViewModel.categoryContent(getKey(), mergedIds, page, true, mExtends);
+        if (mergedIds.size() > 1) mViewModel.categoryContent(getKey(), mergedIds, page, true, mExtends, getMemberExtends(mergedIds));
         else mViewModel.categoryContent(getKey(), typeId, page, true, mExtends);
+    }
+
+    /** 按成员拆 extend：只保留该成员筛选定义里有的键；成员没有缓存定义时回退到主分类的 extend。 */
+    private HashMap<String, HashMap<String, String>> getMemberExtends(List<String> tids) {
+        HashMap<String, HashMap<String, String>> map = new HashMap<>();
+        for (String tid : tids) {
+            List<Filter> memberFilters = Cache.copy(getKey(), tid);
+            HashMap<String, String> memberExtend = new HashMap<>();
+            if (memberFilters.isEmpty()) {
+                memberExtend.putAll(mExtends);
+            } else {
+                Set<String> keys = new HashSet<>();
+                for (Filter filter : memberFilters) keys.add(filter.getKey());
+                for (Map.Entry<String, String> entry : mExtends.entrySet()) {
+                    if (keys.contains(entry.getKey())) memberExtend.put(entry.getKey(), entry.getValue());
+                }
+            }
+            map.put(tid, memberExtend);
+        }
+        return map;
     }
 
     private void setAdapter(Result result) {
@@ -269,7 +299,7 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
      * Refresh the site's filter definitions in the background.
      *
      * The filter Cache is only populated when the home page loads
-     * (HomeActivity.onResult -> Cache.clear().put(result)) and is never refreshed
+     * (HomeActivity.onResult -> Cache.put(result, siteKey)) and is never refreshed
      * while the app runs, so if the site changes its filter keys/values the app keeps
      * sending the stale keys: the site ignores the unknown extend keys and answers
      * with the category's default list, i.e. tapping a filter visibly does nothing.
@@ -277,10 +307,18 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
      * site's current schema. SiteApi.homeContent is cached for 5 minutes, so repeated
      * opens are cheap, and the wall itself is never touched: only the Cache and the
      * filter rows are rebuilt, and only when the definitions actually changed.
+     * <p>
+     * 节流：30 秒内重复打开面板不重复拉首页；失败不计入节流（时间戳只在成功时记），
+     * 失败后可以立即重试。失败保护：拉取前先备份旧筛选，
+     * 失败/空结果时回滚到旧筛选并提示，旧数据保留、面板不被清空。
      */
     private void refreshFilters() {
         if (filterRefreshing) return;
+        long now = System.currentTimeMillis();
+        if (now - lastFilterRefreshTime < FILTER_REFRESH_INTERVAL) return;
+        // 节流时间戳只在成功时记（见 applyFilters）：失败也计次的话，失败后 30 秒内无法重试
         filterRefreshing = true;
+        filterBackup = Cache.snapshot();
         Site site = getSite();
         // 先清掉本站 5 分钟的首页缓存，否则 homeContent 直接返回缓存、
         // 所谓“重拉取”根本没发出请求，定义永远判“没变”（v5.9.5 的重拉取就是这么失效的）
@@ -289,16 +327,36 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
                 result -> App.post(() -> applyFilters(result)),
                 error -> {
                     error.printStackTrace();
-                    App.post(() -> filterRefreshing = false);
+                    App.post(() -> {
+                        filterRefreshing = false;
+                        if (filterBackup != null) Cache.restore(filterBackup);
+                        Notify.show("筛选刷新失败，已保留旧筛选");
+                    });
                 }
         ), MoreExecutors.directExecutor());
     }
 
     private void applyFilters(Result result) {
         filterRefreshing = false;
-        if (mBinding == null || getView() == null || !isAdded() || result == null) return;
-        Cache.clear().put(result);
+        if (mBinding == null || getView() == null || !isAdded()) {
+            if (filterBackup != null) Cache.restore(filterBackup);
+            return;
+        }
+        if (result == null || result.getTypes().isEmpty()) {
+            if (filterBackup != null) Cache.restore(filterBackup);
+            Notify.show("筛选刷新失败，已保留旧筛选");
+            return;
+        }
+        Cache.put(result, getKey());
         List<Filter> fresh = getFilter();
+        // 新定义是空的（站点本次没返回筛选）：回滚到旧筛选，不清空全站筛选缓存
+        if (fresh.isEmpty() && !mFilters.isEmpty()) {
+            if (filterBackup != null) Cache.restore(filterBackup);
+            Notify.show("筛选刷新失败，已保留旧筛选");
+            return;
+        }
+        // 刷新成功才记节流时间：失败/空结果不计次，用户可以立即再试
+        lastFilterRefreshTime = System.currentTimeMillis();
         if (sameFilters(mFilters, fresh)) return;
         if (filterVisible && !mFilters.isEmpty()) hideFilter();
         mFilters = fresh;
@@ -308,6 +366,8 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
                 .flatMap(filter -> filter.getValue().stream())
                 .noneMatch(value -> value.getV().equals(entry.getValue())));
         if (filterVisible && !mFilters.isEmpty()) showFilter();
+        // 筛选定义变了：重拉一次视频列表，否则面板换了、列表还是按旧键拉的旧数据
+        getVideo();
     }
 
     private static boolean sameFilters(List<Filter> a, List<Filter> b) {
@@ -315,9 +375,13 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
         for (int i = 0; i < a.size(); i++) {
             Filter fa = a.get(i), fb = b.get(i);
             if (!Objects.equals(fa.getKey(), fb.getKey())) return false;
+            if (!Objects.equals(fa.getName(), fb.getName())) return false;
             List<Value> va = fa.getValue(), vb = fb.getValue();
             if (va.size() != vb.size()) return false;
-            for (int j = 0; j < va.size(); j++) if (!Objects.equals(va.get(j).getV(), vb.get(j).getV())) return false;
+            for (int j = 0; j < va.size(); j++) {
+                if (!Objects.equals(va.get(j).getV(), vb.get(j).getV())) return false;
+                if (!Objects.equals(va.get(j).getN(), vb.get(j).getN())) return false;
+            }
         }
         return true;
     }

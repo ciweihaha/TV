@@ -65,7 +65,7 @@ public class FolderFragment extends BaseFragment {
 
     private HashMap<String, String> getExtend() {
         HashMap<String, String> extend = new HashMap<>();
-        for (Filter filter : Cache.get(mType)) if (filter.getInit() != null) extend.put(filter.getKey(), filter.getInit());
+        for (Filter filter : Cache.get(getKey(), mType)) if (filter.getInit() != null) extend.put(filter.getKey(), filter.getInit());
         return extend;
     }
 
