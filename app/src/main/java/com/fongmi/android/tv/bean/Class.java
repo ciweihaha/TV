@@ -103,13 +103,13 @@ public class Class implements Parcelable, Diffable<Class> {
         this.filters = filters;
     }
 
-    /** 深拷贝（分类归并用：改桶的显示名不影响原分类）。 */
+    /** 深拷贝（分类归并用：改桶的显示名不影响原分类）。filters 也深拷贝，改副本的筛选不影响原分类。 */
     public Class copy() {
         Class copy = new Class();
         copy.typeId = this.typeId;
         copy.typeName = this.typeName;
         copy.typeFlag = this.typeFlag;
-        copy.filters = this.filters;
+        copy.filters = this.filters == null ? null : this.filters.stream().filter(Objects::nonNull).map(Filter::copy).toList();
         copy.land = this.land;
         copy.circle = this.circle;
         copy.ratio = this.ratio;
