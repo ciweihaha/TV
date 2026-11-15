@@ -65,6 +65,11 @@ public class SiteViewModel extends ViewModel {
         execute(TaskType.RESULT, result, () -> SiteApi.categoryContent(key, tids, page, filter, extend));
     }
 
+    /** 分类归并后的拉取（按成员分别发 extend）：每个成员只收到自己筛选定义里的键。 */
+    public void categoryContent(String key, List<String> tids, String page, boolean filter, HashMap<String, String> extend, java.util.Map<String, HashMap<String, String>> extendsByTid) {
+        execute(TaskType.RESULT, result, () -> SiteApi.categoryContent(key, tids, page, filter, extend, extendsByTid));
+    }
+
     public void action(String key, String act) {
         execute(TaskType.ACTION, action, () -> SiteApi.action(key, act));
     }
