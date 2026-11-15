@@ -19,10 +19,13 @@ public class TypeAdapter extends RecyclerView.Adapter<TypeAdapter.ViewHolder> {
 
     private final OnClickListener mListener;
     private final List<Class> mItems;
+    /** 所属站点的 key：筛选 Cache 按站隔离，取定义时必须带站 key，两站同 typeId 不再互相覆盖。 */
+    private final String siteKey;
 
-    public TypeAdapter(OnClickListener listener) {
+    public TypeAdapter(OnClickListener listener, String siteKey) {
         mListener = listener;
         mItems = new ArrayList<>();
+        this.siteKey = siteKey;
     }
 
     public void addAll(List<Class> items) {
@@ -61,7 +64,7 @@ public class TypeAdapter extends RecyclerView.Adapter<TypeAdapter.ViewHolder> {
     }
 
     private int getIcon(Class item) {
-        return Cache.get(item).isEmpty() ? 0 : item.getFilter() ? R.drawable.ic_vod_filter_off : R.drawable.ic_vod_filter_on;
+        return Cache.get(siteKey, item).isEmpty() ? 0 : item.getFilter() ? R.drawable.ic_vod_filter_off : R.drawable.ic_vod_filter_on;
     }
 
     public interface OnClickListener {
