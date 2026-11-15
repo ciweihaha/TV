@@ -1,308 +1,378 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 当贝市场搜索屏 1:1 复刻：全屏纯蓝底（固定，不跟随壁纸），左栏输拼音首字母、右栏实时出结果。
+     旧布局的拼音全键/九键 tab、7 图标行、拼写条、底部系统输入法/完成行已全部删除；
+     输入模型改为“按 A–Z 首字母、右侧实时刷新”，没有拼写条、没有候选词提交、没有九键切音节。 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/shape_dangbei_bg"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:orientation="horizontal"
     android:padding="24dp">
 
+    <!-- 左栏（约 35%）：搜索框 + 功能行 + A–Z 字母格 + 模式行 + 提示行 + 当前匹配 -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_marginEnd="24dp"
-        android:layout_weight="2"
+        android:layout_weight="35"
         android:orientation="vertical">
 
+        <!-- 搜索框：放大镜 + 已输字母 + 语音 -->
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
-            <com.fongmi.android.tv.ui.custom.CustomMic
-                android:id="@+id/mic"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_gravity="center_vertical"
-                android:layout_marginEnd="12dp"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:nextFocusDown="@id/keyboard"
-                android:src="@drawable/ic_search_mic" />
-
-            <com.fongmi.android.tv.ui.custom.CustomSearchView
-                android:id="@+id/keyword"
+            <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:background="@null"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:hint="@string/search_keyword"
-                android:imeOptions="actionDone"
-                android:inputType="textCapWords|textAutoCorrect|textAutoComplete"
-                android:letterSpacing="0.02"
-                android:maxLength="255"
-                android:nextFocusDown="@id/keyboard"
-                android:singleLine="true"
-                android:textColor="@color/white"
-                android:textColorHint="@color/white"
-                android:textCursorDrawable="@drawable/shape_cursor"
-                android:textSize="24sp" />
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/ic_keyboard_search" />
+
+                <com.fongmi.android.tv.ui.custom.CustomSearchView
+                    android:id="@+id/keyword"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:hint="@string/search_keyword"
+                    android:imeOptions="actionDone"
+                    android:inputType="textCapWords|textAutoCorrect|textAutoComplete"
+                    android:letterSpacing="0.02"
+                    android:maxLength="255"
+                    android:nextFocusDown="@id/funcGrid"
+                    android:singleLine="true"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/white"
+                    android:textCursorDrawable="@drawable/shape_cursor"
+                    android:textSize="24sp" />
+
+                <com.fongmi.android.tv.ui.custom.CustomMic
+                    android:id="@+id/mic"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="8dp"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusDown="@id/funcGrid"
+                    android:src="@drawable/ic_search_mic" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="8dp"
+                android:background="@color/white_30" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- 键盘模式切换：拼音全键 / 拼音九键（笔画键盘已删除） -->
+        <!-- 功能行：布局切换 / 123 / 清空 / 退格 -->
         <androidx.appcompat.widget.LinearLayoutCompat
-            android:id="@+id/keyboardTabs"
-            android:layout_width="match_parent"
+            android:id="@+id/funcRow"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:orientation="horizontal">
 
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/funcGrid"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/selector_keyboard_dangbei"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_site_grid" />
+
             <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tabFull"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:background="@drawable/selector_keyboard_tab"
+                android:id="@+id/funcDigits"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/selector_keyboard_dangbei"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:gravity="center"
-                android:text="@string/keyboard_full"
+                android:text="123"
                 android:textColor="@color/white"
-                android:textSize="16sp" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tabNine"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:background="@drawable/selector_keyboard_tab"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:text="@string/keyboard_nine"
-                android:textColor="@color/white"
-                android:textSize="16sp" />
-
-        </androidx.appcompat.widget.LinearLayoutCompat>
-
-        <!-- 功能键：遥控 / 左移 / 右移 / 删除 / 搜索 / 切换输入法 / 切换站点 -->
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:id="@+id/keyboardIcons"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+                android:textSize="18sp" />
 
             <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/iconRemote"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="7dp"
-                android:background="@drawable/selector_keyboard"
+                android:id="@+id/funcClear"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/selector_keyboard_dangbei"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:scaleType="center"
-                android:src="@drawable/ic_keyboard_remote" />
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_setting_delete" />
 
             <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/iconLeft"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="7dp"
-                android:background="@drawable/selector_keyboard"
+                android:id="@+id/funcBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/selector_keyboard_dangbei"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:scaleType="center"
-                android:src="@drawable/ic_keyboard_left" />
-
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/iconRight"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="7dp"
-                android:background="@drawable/selector_keyboard"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:scaleType="center"
-                android:src="@drawable/ic_keyboard_right" />
-
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/iconBack"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="7dp"
-                android:background="@drawable/selector_keyboard"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:scaleType="center"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
                 android:src="@drawable/ic_keyboard_back" />
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/iconSearch"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="7dp"
-                android:background="@drawable/selector_keyboard"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:scaleType="center"
-                android:src="@drawable/ic_keyboard_search" />
-
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/iconKeyboard"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="7dp"
-                android:background="@drawable/selector_keyboard"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:scaleType="center"
-                android:src="@drawable/ic_keyboard" />
-
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/iconHome"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/selector_keyboard"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:scaleType="center"
-                android:src="@drawable/ic_setting_home" />
-
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- 拼写条：正在拼的拼音（全键一格字母串，九键为可切换的音节）；只在拼写时显示 -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/composingBar"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="12dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:overScrollMode="never"
-            android:visibility="gone"
-            tools:itemCount="3"
-            tools:listitem="@layout/adapter_composing_syllable" />
-
+        <!-- A–Z 字母格（数字盘共用）：5 列，字母直接印在蓝底上，无键框 -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/keyboard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:layout_marginTop="12dp"
             android:overScrollMode="never"
             app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-            app:spanCount="20"
-            tools:itemCount="54"
+            app:spanCount="5"
+            tools:itemCount="26"
             tools:listitem="@layout/adapter_keyboard_text" />
 
-        <!-- 底部：使用系统输入法 / 完成 -->
+        <!-- 模式行：绿点“全键盘” / 蓝点“系统输入法”（系统输入法为逃生通道） -->
         <androidx.appcompat.widget.LinearLayoutCompat
-            android:id="@+id/keyboardBottom"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:orientation="horizontal">
 
             <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/systemIme"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="12dp"
-                android:layout_weight="1"
-                android:background="@drawable/selector_keyboard"
+                android:id="@+id/modeFull"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginEnd="24dp"
+                android:background="@drawable/selector_keyboard_dangbei"
+                android:drawableStart="@drawable/shape_dot_green"
+                android:drawablePadding="6dp"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:text="@string/keyboard_system"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="@string/search_mode_full"
                 android:textColor="@color/white"
                 android:textSize="16sp" />
 
             <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/done"
-                android:layout_width="96dp"
-                android:layout_height="48dp"
-                android:background="@drawable/selector_keyboard"
+                android:id="@+id/modeSystem"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/selector_keyboard_dangbei"
+                android:drawableStart="@drawable/shape_dot_blue"
+                android:drawablePadding="6dp"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:text="@string/keyboard_done"
-                android:textColor="@color/white"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="@string/search_mode_system"
+                android:textColor="@color/white_60"
                 android:textSize="16sp" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <!-- 提示行 -->
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/search_hint_dangbei"
+            android:textColor="@color/dangbei_hint"
+            android:textSize="14sp" />
+
+        <!-- 当前匹配：黄色拼音首字母（已输字母）+ 白色大号中文（首个建议标题） -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/matchLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/matchPin"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/dangbei_pinyin_yellow"
+                android:textSize="20sp"
+                tools:text="D S J M D" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/matchTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/white"
+                android:textSize="28sp"
+                tools:text="当贝影视" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/scroll"
+    <!-- 右栏（约 65%）：竖排三 tab + 结果数 + 结果列表 -->
+    <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="3"
-        android:fillViewport="true"
-        android:overScrollMode="never">
+        android:layout_weight="65"
+        android:orientation="horizontal">
 
+        <!-- 竖排三 tab：应用（全部）/ 游戏 / 影片。
+             游戏、影片在 FongMi 里没有对应的后端分类支持，先置灰不可用，不编造分类。 -->
         <androidx.appcompat.widget.LinearLayoutCompat
-            android:layout_width="match_parent"
+            android:layout_width="96dp"
             android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:id="@+id/recordLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    android:text="@string/search_record"
-                    android:textColor="@color/white"
-                    android:textSize="24sp" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recordRecycler"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="-6dp"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:overScrollMode="never"
-                    tools:itemCount="6"
-                    tools:listitem="@layout/adapter_search_record" />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
+            android:orientation="vertical"
+            android:paddingTop="8dp">
 
             <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/word"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="14dp"
-                android:text="@string/search_hot"
-                android:textColor="@color/white"
-                android:textSize="24sp" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/wordRecycler"
+                android:id="@+id/tabApp"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="-6dp"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:overScrollMode="never"
-                tools:itemCount="10"
-                tools:listitem="@layout/adapter_search_word" />
+                android:layout_height="48dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/selector_tab_dangbei"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:selected="true"
+                android:text="@string/search_tab_app"
+                android:textColor="@color/white"
+                android:textSize="18sp" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tabGame"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginBottom="8dp"
+                android:alpha="0.4"
+                android:background="@drawable/selector_tab_dangbei"
+                android:enabled="false"
+                android:focusable="false"
+                android:gravity="center"
+                android:text="@string/search_tab_game"
+                android:textColor="@color/white_60"
+                android:textSize="18sp" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tabMovie"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:alpha="0.4"
+                android:background="@drawable/selector_tab_dangbei"
+                android:enabled="false"
+                android:focusable="false"
+                android:gravity="center"
+                android:text="@string/search_tab_movie"
+                android:textColor="@color/white_60"
+                android:textSize="18sp" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
-    </androidx.core.widget.NestedScrollView>
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/resultCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                tools:text="相关搜索结果：1个" />
+
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/scroll"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true"
+                android:overScrollMode="never">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical">
+
+                    <androidx.appcompat.widget.LinearLayoutCompat
+                        android:id="@+id/recordLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="14dp"
+                            android:text="@string/search_record"
+                            android:textColor="@color/white"
+                            android:textSize="24sp" />
+
+                        <androidx.recyclerview.widget.RecyclerView
+                            android:id="@+id/recordRecycler"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="-6dp"
+                            android:clipChildren="false"
+                            android:clipToPadding="false"
+                            android:overScrollMode="never"
+                            tools:itemCount="6"
+                            tools:listitem="@layout/adapter_search_record" />
+
+                    </androidx.appcompat.widget.LinearLayoutCompat>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/word"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="14dp"
+                        android:text="@string/search_hot"
+                        android:textColor="@color/white"
+                        android:textSize="24sp" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/wordRecycler"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-6dp"
+                        android:clipChildren="false"
+                        android:clipToPadding="false"
+                        android:overScrollMode="never"
+                        tools:itemCount="10"
+                        tools:listitem="@layout/adapter_search_word" />
+
+                </androidx.appcompat.widget.LinearLayoutCompat>
+            </androidx.core.widget.NestedScrollView>
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
 </androidx.appcompat.widget.LinearLayoutCompat>

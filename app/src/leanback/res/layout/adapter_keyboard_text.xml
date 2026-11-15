@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 当贝字母键：无框透明底、白字 28sp；焦点时淡蓝圆角块 -->
 <com.google.android.material.textview.MaterialTextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/text"
     android:layout_width="match_parent"
-    android:layout_height="48dp"
-    android:background="@drawable/selector_keyboard"
+    android:layout_height="52dp"
+    android:background="@drawable/selector_keyboard_dangbei"
     android:focusable="true"
     android:focusableInTouchMode="true"
     android:gravity="center"
     android:textColor="@color/white"
-    android:textSize="16sp"
-    tools:text="q" />
+    android:textSize="28sp"
+    tools:text="A" />
