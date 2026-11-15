@@ -66,7 +66,11 @@ public class SyllableAdapter extends RecyclerView.Adapter<SyllableAdapter.ViewHo
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Item item = mItems.get(position);
         holder.binding.text.setText(item.text);
+        // 不可点的拼写项（全键模式的字母串、九键未切出的尾部数字）不占焦点位：
+        // focusable 和 focusableInTouchMode 都要关，只关前者遥控器仍能停上去
         holder.binding.text.setFocusable(item.clickable);
+        holder.binding.text.setFocusableInTouchMode(item.clickable);
+        holder.itemView.setFocusable(item.clickable);
         holder.binding.text.setClickable(item.clickable);
         holder.binding.text.setTextColor(ContextCompat.getColor(holder.binding.text.getContext(), item.remainder ? R.color.white_60 : R.color.white));
     }

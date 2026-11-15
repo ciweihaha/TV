@@ -241,12 +241,16 @@ public class KeyboardAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         @Override
         public void onClick(View view) {
-            listener.onKey(mItems.get(getLayoutPosition()));
+            int position = getLayoutPosition();
+            if (position == RecyclerView.NO_POSITION || position < 0 || position >= mItems.size()) return;
+            listener.onKey(mItems.get(position));
         }
 
         @Override
         public boolean onLongClick(View view) {
-            listener.onKeyLongPress(mItems.get(getLayoutPosition()));
+            int position = getLayoutPosition();
+            if (position == RecyclerView.NO_POSITION || position < 0 || position >= mItems.size()) return false;
+            listener.onKeyLongPress(mItems.get(position));
             return true;
         }
     }
@@ -264,12 +268,16 @@ public class KeyboardAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         @Override
         public void onClick(View view) {
-            listener.onKey(mItems.get(getLayoutPosition()));
+            int position = getLayoutPosition();
+            if (position == RecyclerView.NO_POSITION || position < 0 || position >= mItems.size()) return;
+            listener.onKey(mItems.get(position));
         }
 
         @Override
         public boolean onLongClick(View view) {
-            listener.onKeyLongPress(mItems.get(getLayoutPosition()));
+            int position = getLayoutPosition();
+            if (position == RecyclerView.NO_POSITION || position < 0 || position >= mItems.size()) return false;
+            listener.onKeyLongPress(mItems.get(position));
             return true;
         }
     }
