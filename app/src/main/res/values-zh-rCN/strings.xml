@@ -373,6 +373,13 @@
     <string name="search_record">历史</string>
     <string name="search_suggest">建议</string>
     <string name="search_hot">热搜</string>
+    <string name="search_tab_app">应用</string>
+    <string name="search_tab_game">游戏</string>
+    <string name="search_tab_movie">影片</string>
+    <string name="search_mode_full">全键盘</string>
+    <string name="search_mode_system">系统输入法</string>
+    <string name="search_result_count">相关搜索结果：<xliff:g name="count">%d</xliff:g>个</string>
+    <string name="search_hint_dangbei">搜索结果：请输入拼音字母，或汉字</string>
     <string name="keyboard_full">拼音全键</string>
     <string name="keyboard_nine">拼音九键</string>
     <string name="keyboard_system">使用系统输入法</string>
@@ -393,6 +400,7 @@
     <!-- Error -->
     <string name="file_export_success">文件已导出</string>
     <string name="error_config_get">配置取得失败</string>
+    <string name="error_load_failed">加载失败，请检查网络后重试</string>
     <string name="error_spider_load">爬虫加载失败</string>
     <string name="error_file_open">无法打开文件</string>
     <string name="error_file_save">无法保存文件</string>
