@@ -42,6 +42,7 @@ import com.fongmi.android.tv.ui.dialog.HistoryDialog;
 import com.fongmi.android.tv.ui.dialog.LinkDialog;
 import com.fongmi.android.tv.ui.dialog.ReceiveDialog;
 import com.fongmi.android.tv.ui.dialog.SiteDialog;
+import com.fongmi.android.tv.utils.CategoryMerger;
 import com.fongmi.android.tv.utils.ImgUtil;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
@@ -131,6 +132,8 @@ public class VodFragment extends BaseFragment implements ConfigListener, SiteLis
     }
 
     private void setAdapter(Result result) {
+        // mobile 也走分类归并：只显示电影 / 电视剧 / 动画片 / 综艺四个 tab（与 leanback 一致）
+        result.setTypes(CategoryMerger.merge(getHome().getKey(), result.getTypes()));
         mAdapter.addAll(mResult = result);
         mBinding.pager.getAdapter().notifyDataSetChanged();
         setFabVisible(0);
