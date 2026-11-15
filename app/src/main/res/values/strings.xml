@@ -375,6 +375,13 @@
     <string name="search_record">History</string>
     <string name="search_suggest">Suggest</string>
     <string name="search_hot">Hot</string>
+    <string name="search_tab_app">Apps</string>
+    <string name="search_tab_game">Games</string>
+    <string name="search_tab_movie">Movies</string>
+    <string name="search_mode_full">Full keyboard</string>
+    <string name="search_mode_system">System input method</string>
+    <string name="search_result_count">Related results: <xliff:g name="count">%d</xliff:g></string>
+    <string name="search_hint_dangbei">Results: type pinyin letters, or Chinese characters</string>
     <string name="keyboard_full">Full Pinyin</string>
     <string name="keyboard_nine">9-Key Pinyin</string>
     <string name="keyboard_system">Use system input method</string>
@@ -395,6 +402,7 @@
     <!-- Error -->
     <string name="file_export_success">File exported</string>
     <string name="error_config_get">Configuration get failed</string>
+    <string name="error_load_failed">Load failed. Please check your network and try again.</string>
     <string name="error_spider_load">Unable to load crawler</string>
     <string name="error_file_open">Unable to open file</string>
     <string name="error_file_save">Unable to save file</string>

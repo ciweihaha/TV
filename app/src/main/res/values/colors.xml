@@ -19,4 +19,14 @@
     <color name="splash_background">#141218</color>
     <color name="keyboard_blue">#2196F3</color>
 
+    <!-- 当贝市场搜索屏 1:1 复刻用色（实拍取色） -->
+    <color name="dangbei_blue">#2563D8</color>
+    <color name="dangbei_blue_dark">#1D54C6</color>
+    <color name="dangbei_blue_light">#2B6CD9</color>
+    <color name="dangbei_focus">#2F7CF6</color>
+    <color name="dangbei_focus_light">#4A90F8</color>
+    <color name="dangbei_hint">#9FB6D8</color>
+    <color name="dangbei_pinyin_yellow">#FFD83D</color>
+    <color name="dangbei_dot_green">#2ECC71</color>
+
 </resources>
