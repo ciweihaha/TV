@@ -34,17 +34,20 @@ public class LivePlaybackController {
     private int errorRetries;
     private boolean retryPending;
     private LivePlayRequest lastRequest;
-    private final Runnable retryTask = () -> {
-        retryPending = false;
-        if (lastRequest == null || lastRequest.isCatchup() || !lastRequest.matches(state.getChannel())) return;
-        if (state.getPendingRequest() != null) return;
-        requestLive();
-    };
+    private final Runnable retryTask;
 
     public LivePlaybackController(LivePlaybackHost host, LiveDataSource dataSource, LivePlaybackState state) {
         this.host = host;
         this.dataSource = dataSource;
         this.state = state;
+        // retryTask 必须在构造器里初始化：字段初始化器运行时 state 还没赋值，
+        // lambda 里读 state 会报 "variable state might not have been initialized"（CI #128/#129）。
+        this.retryTask = () -> {
+            retryPending = false;
+            if (lastRequest == null || lastRequest.isCatchup() || !lastRequest.matches(state.getChannel())) return;
+            if (state.getPendingRequest() != null) return;
+            requestLive();
+        };
     }
 
     public void reset() {
