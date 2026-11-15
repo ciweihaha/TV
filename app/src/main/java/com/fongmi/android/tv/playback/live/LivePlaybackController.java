@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaMetadata;
 
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.api.config.LiveConfig;
 import com.fongmi.android.tv.bean.Channel;
@@ -25,6 +26,21 @@ public class LivePlaybackController {
     private final LiveDataSource dataSource;
     private final LivePlaybackState state;
 
+    /** 单线路重试上限：瞬时 2004 重拉一次往往就好，超过 2 次说明不是抖动，直接弹错。 */
+    private static final int MAX_ERROR_RETRIES = 2;
+    /** 重试间隔：1s、2s 递增，和 mytv fork / 天光云影同一策略。 */
+    private static final long[] RETRY_DELAYS = {1000, 2000};
+
+    private int errorRetries;
+    private boolean retryPending;
+    private LivePlayRequest lastRequest;
+    private final Runnable retryTask = () -> {
+        retryPending = false;
+        if (lastRequest == null || lastRequest.isCatchup() || !lastRequest.matches(state.getChannel())) return;
+        if (state.getPendingRequest() != null) return;
+        requestLive();
+    };
+
     public LivePlaybackController(LivePlaybackHost host, LiveDataSource dataSource, LivePlaybackState state) {
         this.host = host;
         this.dataSource = dataSource;
@@ -32,8 +48,15 @@ public class LivePlaybackController {
     }
 
     public void reset() {
+        cancelRetry();
         dataSource.cancelUrl();
         state.reset();
+    }
+
+    private void cancelRetry() {
+        App.removeCallbacks(retryTask);
+        retryPending = false;
+        errorRetries = 0;
     }
 
     public void selectGroup(Group group) {
@@ -44,6 +67,7 @@ public class LivePlaybackController {
 
     public void selectChannel(Channel channel) {
         if (channel == null) return;
+        cancelRetry();
         LivePlayRequest activeRequest = state.getActiveRequest();
         boolean restore = activeRequest != null && activeRequest.matches(channel);
         state.setChannel(channel);
@@ -87,6 +111,7 @@ public class LivePlaybackController {
     }
 
     private void startResolvedPlayback(Result result, LivePlayRequest request, String realUrl) {
+        errorRetries = 0;
         long position = result.hasPosition() ? result.getPosition() : request.getPosition();
         state.setPlayingRequest(request, realUrl);
         host.startPlayback(result, position, publishPlaybackMetadata(getEpgData(request)));
@@ -100,8 +125,29 @@ public class LivePlaybackController {
 
     public void playbackError(String msg) {
         if (state.getPendingRequest() != null) return;
+        if (retryPending) return;
+        if (trySameLineRetry()) return;
         host.resetPlaybackForError(msg);
         fallbackAfterError();
+    }
+
+    /**
+     * 单线路（或已在最后一条线路）时自动切线帮不上忙，改重试同一条线路。
+     * 瞬时 2004（票据/分片过期、上游抖动）重拉一次往往就好，不必等用户手动切台；
+     * 重试期间不弹错，耗尽后才走原来的报错 + 切线流程。
+     * 多线路且还没到最后一条时不走这里——自动切线就是恢复手段（原有行为不变）。
+     * 回看（catchup）不重试：requestLive 会切回直播，语义不对。
+     */
+    private boolean trySameLineRetry() {
+        Channel channel = state.getChannel();
+        if (channel == null) return false;
+        if (LiveSetting.isChange() && !channel.isLast()) return false;
+        if (lastRequest == null || lastRequest.isCatchup() || !lastRequest.matches(channel)) return false;
+        if (errorRetries >= MAX_ERROR_RETRIES) return false;
+        retryPending = true;
+        App.post(retryTask, RETRY_DELAYS[errorRetries]);
+        errorRetries++;
+        return true;
     }
 
     public void playbackEnded() {
@@ -238,6 +284,7 @@ public class LivePlaybackController {
 
     private void requestPlayback(LivePlayRequest request, boolean showProgress) {
         if (!host.isPlaybackServiceReady()) return;
+        lastRequest = request;
         state.setPendingRequest(request);
         host.preparePlaybackForRefresh();
         if (request.isCatchup()) host.onCatchupRequested();
