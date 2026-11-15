@@ -250,7 +250,6 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         if (size == 0) focusFirst(mBinding.wordRecycler);
     }
 
-    @Override
     public void onSearch() {
         if (empty()) return;
         String keyword = mBinding.keyword.getText().toString().trim();
