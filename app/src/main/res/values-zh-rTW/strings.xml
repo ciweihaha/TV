@@ -373,6 +373,13 @@
     <string name="search_record">歷史</string>
     <string name="search_suggest">建議</string>
     <string name="search_hot">熱搜</string>
+    <string name="search_tab_app">應用</string>
+    <string name="search_tab_game">遊戲</string>
+    <string name="search_tab_movie">影片</string>
+    <string name="search_mode_full">全鍵盤</string>
+    <string name="search_mode_system">系統輸入法</string>
+    <string name="search_result_count">相關搜索結果：<xliff:g name="count">%d</xliff:g>個</string>
+    <string name="search_hint_dangbei">搜索結果：請輸入拼音字母，或漢字</string>
 
     <!-- Dialog -->
     <string name="dialog_edit">修改</string>
@@ -388,6 +395,7 @@
     <!-- Error -->
     <string name="file_export_success">檔案已導出</string>
     <string name="error_config_get">配置取得失敗</string>
+    <string name="error_load_failed">加載失敗，請檢查網絡後重試</string>
     <string name="error_spider_load">爬蟲載入失敗</string>
     <string name="error_file_open">無法開啟檔案</string>
     <string name="error_file_save">無法儲存檔案</string>
