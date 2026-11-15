@@ -68,6 +68,8 @@ public class Result implements Parcelable {
     private transient List<Episode> resolvedEpisodes;
     private transient File torrentFile;
     private transient boolean direct;
+    /** 归并拉取时全部成员都失败（见 SiteApi）：与“站点没给总页数”不同，total=0 在此不代表“未知、可继续加载”。 */
+    private transient boolean allFailed;
 
     @SerializedName("msg")
     @JsonAdapter(MsgAdapter.class)
@@ -379,6 +381,15 @@ public class Result implements Parcelable {
         jx = 0;
         playUrl = "";
         direct = true;
+    }
+
+    /** 归并拉取是否全部成员都失败。 */
+    public boolean isAllFailed() {
+        return allFailed;
+    }
+
+    public void setAllFailed(boolean allFailed) {
+        this.allFailed = allFailed;
     }
 
     public Integer getCode() {
