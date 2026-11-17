@@ -13,6 +13,7 @@ public final class SubtitleOffsetUtil {
 
     @Nullable
     public static SubtitleOffsets shift(SubtitleOffsets previous, long deltaMs, boolean primary, boolean secondary) {
+        if (previous == null) return null;
         long main = primary ? shift(previous.primaryMs, deltaMs) : previous.primaryMs;
         long sub = secondary ? shift(previous.secondaryMs, deltaMs) : previous.secondaryMs;
         // Only a channel that is actually being shifted can fail. Previously

@@ -55,4 +55,12 @@ public class SubtitleOffsetUtilTest {
     public void shiftLongOverflowIsUnset() {
         assertEquals(C.TIME_UNSET, SubtitleOffsetUtil.shift(Long.MAX_VALUE, 1));
     }
+
+    @Test
+    public void shiftNullPreviousReturnsNull() {
+        // A missing offset state (no subtitle track selected yet) must not
+        // crash the delay adjustment; it just means there is nothing to shift.
+        assertNull(SubtitleOffsetUtil.shift(null, 500, true, false));
+        assertNull(SubtitleOffsetUtil.shift(null, 500, false, true));
+    }
 }

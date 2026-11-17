@@ -6,6 +6,7 @@ import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Site;
 import com.fongmi.android.tv.bean.Vod;
 import com.fongmi.android.tv.utils.SearchResultRanker;
+import com.fongmi.android.tv.utils.SourceLatencyTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,9 +50,13 @@ class VodFallbackPolicy {
     }
 
     void onSearchResult(Result result) {
+        if (result == null) return;
         List<Vod> items = new ArrayList<>(result.getList());
         items.removeIf(this::mismatch);
-        items = SearchResultRanker.rank(items, state.getSearchKeyword(), Vod::getName, Vod::getId, Vod::getSiteKey);
+        // Same match tier, fastest source first: the latency tracker
+        // records each site's search/detail round trip in SiteApi.
+        SourceLatencyTracker latency = SourceLatencyTracker.get();
+        items = SearchResultRanker.rank(items, state.getSearchKeyword(), Vod::getName, Vod::getId, Vod::getSiteKey, item -> latency.latencyMs(item.getSiteKey()));
         state.setSources(items);
         if (state.isSelectFirstSource() && state.hasSources()) nextSource();
         else host.renderSources(state.getSources());

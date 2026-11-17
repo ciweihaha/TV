@@ -135,7 +135,7 @@ public class VodPlaybackController {
     }
 
     public void onPlaybackResult(PlaybackResult<VodPlayRequest> playback) {
-        if (playback == null || cannotApply(playback)) return;
+        if (playback == null || playback.result() == null || cannotApply(playback)) return;
         applyPlaybackResult(playback.result(), playback.request());
     }
 
@@ -178,6 +178,10 @@ public class VodPlaybackController {
     private void resolveEpisodes(Result result, VodPlayRequest request) {
         updateResolvedVod(result);
         Flag flag = state.findFlag(host.getVodKey(), request);
+        // The user may have switched episode/flag while the resolve was in
+        // flight: a missing flag or history means this result is stale,
+        // not a reason to crash the player.
+        if (flag == null || state.getHistory() == null) return;
         Episode selected = updateResolvedEpisodes(flag, request.getId(), result.getResolvedEpisodes());
         if (selected == null) return;
         selectResolvedEpisode(flag, selected);
@@ -194,8 +198,9 @@ public class VodPlaybackController {
         List<Episode> episodes = new ArrayList<>(items);
         if (episodes.isEmpty()) return null;
         Episode selected = episodes.stream().filter(Episode::isSelected).findFirst().orElse(episodes.get(0));
-        if (state.getHistory().isRevSort()) Collections.reverse(episodes);
-        replaceResolvedEpisodes(flag, SourceUrl.original(id), episodes);
+        History history = state.getHistory();
+        if (history != null && history.isRevSort()) Collections.reverse(episodes);
+        if (!replaceResolvedEpisodes(flag, SourceUrl.original(id), episodes)) return null;
         return selected;
     }
 
@@ -219,7 +224,7 @@ public class VodPlaybackController {
         history.setDuration(duration);
     }
 
-    private void replaceResolvedEpisodes(Flag flag, String id, List<Episode> episodes) {
+    private boolean replaceResolvedEpisodes(Flag flag, String id, List<Episode> episodes) {
         List<Episode> current = flag.getEpisodes();
         int position = -1;
         for (int i = current.size() - 1; i >= 0; i--) {
@@ -227,8 +232,11 @@ public class VodPlaybackController {
             position = i;
             current.remove(i);
         }
-        if (position < 0) throw new IllegalStateException("Source episode is no longer selected");
+        // The source episode vanished while resolving (the user switched
+        // away mid-resolve): abort the resolve instead of crashing.
+        if (position < 0) return false;
         current.addAll(position, episodes);
+        return true;
     }
 
     private void renderPlaybackResult(Result result, Episode episode) {
@@ -245,8 +253,11 @@ public class VodPlaybackController {
         state.setPlayingRequest(request);
         state.setUseParse(result.isUseParse());
         state.setQualityPosition(request.getQualityPosition());
-        if (request.getStartPositionMs() != C.TIME_UNSET) state.getHistory().setPosition(request.getStartPositionMs());
-        else if (result.hasPosition()) state.getHistory().setPosition(result.getPosition());
+        History history = state.getHistory();
+        if (history != null) {
+            if (request.getStartPositionMs() != C.TIME_UNSET) history.setPosition(request.getStartPositionMs());
+            else if (result.hasPosition()) history.setPosition(result.getPosition());
+        }
         if (!result.getList().isEmpty()) updateVod(result.getVod());
     }
 
@@ -454,6 +465,7 @@ public class VodPlaybackController {
     private void moveEpisode(int offset, boolean notify, boolean reversed) {
         if (!state.hasEpisode()) return;
         Episode item = state.getRelativeEpisode(offset);
+        if (item == null) return;
         if (!item.isSelected()) selectEpisode(item);
         else if (notify && offset > 0) host.showNoNext(reversed);
         else if (notify) host.showNoPrev(reversed);
@@ -533,7 +545,9 @@ public class VodPlaybackController {
     private boolean skipToEnd(History history, long duration) {
         if (!state.hasEpisode()) return false;
         boolean reversed = history != null && history.isRevPlay();
-        if (!state.getRelativeEpisode(reversed ? -1 : 1).isSelected()) {
+        Episode relative = state.getRelativeEpisode(reversed ? -1 : 1);
+        if (relative == null) return false;
+        if (!relative.isSelected()) {
             nextEpisode(false);
             return true;
         }

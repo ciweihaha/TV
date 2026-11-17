@@ -23,6 +23,7 @@ import com.fongmi.android.tv.player.extractor.Source;
 import com.fongmi.android.tv.player.media.LocalSubtitleScanner;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.Sniffer;
+import com.fongmi.android.tv.utils.SourceLatencyTracker;
 import com.fongmi.android.tv.utils.SourceUrl;
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderDebug;
@@ -484,7 +485,10 @@ public class SiteApi {
         boolean spider = isSpider(site);
         String cacheKey = VodConfig.getCid() + ":detail:" + key + "|" + id + "|" + builtin;
         String detailContent = detailCache.getIfPresent(cacheKey);
+        // Latency is only sampled on a real fetch; a cache hit costs
+        // nothing and must not drag the site's average down to ~0ms.
         if (detailContent == null) {
+            long startNanos = System.nanoTime();
             if (spider) {
                 detailContent = site.recent().spider().detailContent(Arrays.asList(id));
             } else {
@@ -494,6 +498,7 @@ public class SiteApi {
                 detailContent = call(site, params);
             }
             detailCache.put(cacheKey, detailContent);
+            SourceLatencyTracker.get().record(site.getKey(), (System.nanoTime() - startNanos) / 1_000_000);
         }
         SpiderDebug.log("detail", detailContent);
         Result result = spider ? Result.fromJson(detailContent) : Result.fromType(site.getType(), detailContent);
@@ -630,6 +635,7 @@ public class SiteApi {
         boolean hasPage = !page.equals("1");
         boolean spider = isSpider(site);
         String searchContent;
+        long startNanos = System.nanoTime();
         if (spider) {
             searchContent = hasPage ? site.spider().searchContent(keyword, quick, page) : site.spider().searchContent(keyword, quick);
         } else {
@@ -642,6 +648,10 @@ public class SiteApi {
         }
         SpiderDebug.log("search", searchContent);
         Result result = spider ? Result.fromJson(searchContent) : fetchPic(site, Result.fromType(site.getType(), searchContent));
+        // Only successful round trips count as latency samples; a throw
+        // above (timeout, dead source) records nothing — failures are
+        // tracked separately by FailedSourceTracker.
+        SourceLatencyTracker.get().record(site.getKey(), (System.nanoTime() - startNanos) / 1_000_000);
         for (Vod vod : result.getList()) vod.setSite(site);
         return result;
     }

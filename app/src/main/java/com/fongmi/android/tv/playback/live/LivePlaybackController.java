@@ -18,6 +18,7 @@ import com.fongmi.android.tv.playback.PlaybackResult;
 import com.fongmi.android.tv.player.extractor.Source;
 import com.fongmi.android.tv.player.media.MediaItemFactory;
 import com.fongmi.android.tv.setting.LiveSetting;
+import com.fongmi.android.tv.utils.CatchupResumeTracker;
 import com.fongmi.android.tv.utils.ResUtil;
 
 public class LivePlaybackController {
@@ -89,11 +90,35 @@ public class LivePlaybackController {
         if (data.isSelected()) return requestCatchup(data, startPositionMs);
         if (!channel.hasCatchup() && !channel.isRtsp()) return false;
         host.renderEpgSelection(data);
-        return requestCatchup(data, C.TIME_UNSET);
+        // Picking another program to replay resumes where it was left off
+        // this session, instead of always restarting from the beginning.
+        // An explicit start position (e.g. a restore) is respected as-is.
+        if (startPositionMs == C.TIME_UNSET) startPositionMs = resumePositionMs(channel, data);
+        return requestCatchup(data, startPositionMs);
+    }
+
+    private long resumePositionMs(Channel channel, EpgData data) {
+        long resume = state.getCatchupResumeMs(CatchupResumeTracker.key(channel.getName(), data.getStartTime(), data.getStart(), data.getTitle()));
+        return resume >= 0 ? resume : C.TIME_UNSET;
+    }
+
+    /**
+     * Leaving a catchup program (zapping to live or to another program)
+     * remembers the playback position so coming back resumes instead of
+     * restarting. The tracker drops positions that are too short to matter
+     * or too close to the program end.
+     */
+    private void rememberCatchupPosition() {
+        LivePlayRequest active = state.getActiveRequest();
+        if (active == null || !active.isCatchup()) return;
+        EpgData data = active.getCatchupData();
+        long position = host.getPlayerPosition();
+        long duration = data.getEndTime() - data.getStartTime();
+        state.rememberCatchup(CatchupResumeTracker.key(active.getChannel().getName(), data.getStartTime(), data.getStart(), data.getTitle()), position, duration);
     }
 
     public void onPlaybackResult(PlaybackResult<LivePlayRequest> playback) {
-        if (playback == null || cannotApply(playback)) return;
+        if (playback == null || playback.result() == null || cannotApply(playback)) return;
         applyPlaybackResult(playback.result(), playback.request());
     }
 
@@ -289,6 +314,7 @@ public class LivePlaybackController {
     private void requestLive() {
         Channel channel = state.getChannel();
         if (channel == null) return;
+        rememberCatchupPosition();
         LiveConfig.get().setKeep(channel);
         requestPlayback(LivePlayRequest.live(channel, C.TIME_UNSET), true);
     }
@@ -296,6 +322,7 @@ public class LivePlaybackController {
     private boolean requestCatchup(EpgData data, long startPositionMs) {
         Channel channel = state.getChannel();
         if (channel == null) return false;
+        rememberCatchupPosition();
         requestPlayback(LivePlayRequest.catchup(channel, data, startPositionMs), false);
         return true;
     }

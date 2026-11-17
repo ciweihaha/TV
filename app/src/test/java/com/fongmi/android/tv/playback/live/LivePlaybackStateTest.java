@@ -58,6 +58,18 @@ public class LivePlaybackStateTest {
     }
 
     @Test
+    public void catchupResumeRemembersPosition() {
+        LivePlaybackState state = new LivePlaybackState();
+        String key = "CCTV-1|1700000000000|新闻联播";
+        assertEquals(-1, state.getCatchupResumeMs(key));
+        state.rememberCatchup(key, 600_000, 1_800_000);
+        assertEquals(600_000, state.getCatchupResumeMs(key));
+        // Too close to the end is not worth resuming.
+        state.rememberCatchup(key, 1_790_000, 1_800_000);
+        assertEquals(600_000, state.getCatchupResumeMs(key));
+    }
+
+    @Test
     public void stressRapidChannelSwitching() {
         LivePlaybackState state = new LivePlaybackState();
         Channel previous = null;

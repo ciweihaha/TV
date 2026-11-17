@@ -5,9 +5,11 @@ import androidx.media3.common.MediaMetadata;
 
 import com.fongmi.android.tv.bean.Channel;
 import com.fongmi.android.tv.bean.Group;
+import com.fongmi.android.tv.utils.CatchupResumeTracker;
 
 public class LivePlaybackState {
 
+    private final CatchupResumeTracker catchupResume = new CatchupResumeTracker();
     private LivePlayRequest pendingRequest;
     private LivePlayRequest playingRequest;
     private MediaMetadata playbackMetadata;
@@ -28,6 +30,15 @@ public class LivePlaybackState {
         playingRequest = null;
         playbackMetadata = null;
         playbackKey = null;
+    }
+
+    /** Resume position (ms into the program) remembered for a catchup program key, or -1. */
+    long getCatchupResumeMs(String key) {
+        return catchupResume.resumeMs(key);
+    }
+
+    void rememberCatchup(String key, long positionMs, long programDurationMs) {
+        catchupResume.remember(key, positionMs, programDurationMs);
     }
 
     Group getGroup() {

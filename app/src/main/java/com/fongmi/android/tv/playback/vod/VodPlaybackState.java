@@ -110,18 +110,25 @@ public class VodPlaybackState {
     }
 
     Episode getEpisode() {
+        if (!hasFlags()) return null;
         Flag flag = getFlag();
+        List<Episode> episodes = flag.getEpisodes();
+        if (episodes == null || episodes.isEmpty()) return null;
         int position = flag.getPosition();
-        return flag.getEpisodes().get(position >= 0 && position < flag.getEpisodes().size() ? position : 0);
+        return episodes.get(position >= 0 && position < episodes.size() ? position : 0);
     }
 
     boolean hasEpisode() {
-        return hasFlags() && !getFlag().getEpisodes().isEmpty();
+        if (!hasFlags()) return false;
+        List<Episode> episodes = getFlag().getEpisodes();
+        return episodes != null && !episodes.isEmpty();
     }
 
     Episode getRelativeEpisode(int offset) {
+        if (!hasFlags()) return null;
         Flag flag = getFlag();
         List<Episode> episodes = flag.getEpisodes();
+        if (episodes == null || episodes.isEmpty()) return null;
         int position = Math.clamp(flag.getPosition() + offset, 0, episodes.size() - 1);
         return episodes.get(position);
     }

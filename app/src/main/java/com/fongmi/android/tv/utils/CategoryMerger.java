@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -110,17 +111,21 @@ public class CategoryMerger {
             if (primary.getTypeId().isEmpty()) continue;
             Class bucket = primary.copy();
             bucket.setTypeName(entry.getKey());
-            List<String> ids = new ArrayList<>();
+            // Member ids used to be de-duplicated with List.contains, which
+            // is O(m) per member — O(m^2) for a site with many categories
+            // in one bucket. A LinkedHashSet keeps insertion order (the
+            // primary stays first) with O(1) membership checks.
+            LinkedHashSet<String> ids = new LinkedHashSet<>();
             ids.add(primary.getTypeId());
             for (Class member : members) {
-                if (!member.getTypeId().isEmpty() && !ids.contains(member.getTypeId())) ids.add(member.getTypeId());
+                if (!member.getTypeId().isEmpty()) ids.add(member.getTypeId());
                 // 登记每个成员的筛选定义（深拷贝，调用方改了不影响登记表）；本站下次归并时先清掉旧登记
                 if (!member.getTypeId().isEmpty() && !member.getFilters().isEmpty()) {
                     MEMBER_FILTERS.put(prefix + member.getTypeId(), member.getFilters().stream().filter(java.util.Objects::nonNull).map(Filter::copy).toList());
                     while (MEMBER_FILTERS.size() > MEMBER_FILTERS_MAX) MEMBER_FILTERS.remove(MEMBER_FILTERS.keySet().iterator().next());
                 }
             }
-            REGISTRY.put(prefix + primary.getTypeId(), ids);
+            REGISTRY.put(prefix + primary.getTypeId(), new ArrayList<>(ids));
             while (REGISTRY.size() > REGISTRY_MAX) REGISTRY.remove(REGISTRY.keySet().iterator().next());
             merged.add(bucket);
         }
