@@ -105,6 +105,7 @@ final class VodPreloader {
         History history = state.getHistory();
         int offset = history != null && history.isRevPlay() ? -1 : 1;
         Episode episode = state.getRelativeEpisode(offset);
+        if (episode == null) return null;
         return episode.isSelected() || SourceUrl.isResolved(episode.getUrl()) ? null : episode;
     }
 

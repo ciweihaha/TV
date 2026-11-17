@@ -18,6 +18,9 @@ public class VodPlaybackStateTest {
         for (int i = 0; i < count; i++) {
             flag.getEpisodes().add(Episode.create("第" + (i + 1) + "集", "url-" + i));
         }
+        // Mirror playback: the flag's position is the selected episode
+        // index (a fresh Flag starts at -1, "nothing selected yet").
+        flag.setPosition(0);
         state.setFlags(List.of(flag));
         return state;
     }
@@ -49,6 +52,19 @@ public class VodPlaybackStateTest {
         assertSame(state.getFlags().get(0).getEpisodes().get(1), state.getRelativeEpisode(1));
         assertSame(state.getFlags().get(0).getEpisodes().get(2), state.getRelativeEpisode(99));
         assertSame(state.getFlags().get(0).getEpisodes().get(0), state.getRelativeEpisode(-99));
+    }
+
+    @Test
+    public void unselectedFlagTreatsFirstEpisodeAsCurrent() {
+        // A fresh Flag starts at position -1 ("nothing selected yet");
+        // relative moves from there still land on a real episode.
+        VodPlaybackState state = new VodPlaybackState();
+        Flag flag = new Flag("线路1");
+        flag.getEpisodes().add(Episode.create("第1集", "url-0"));
+        flag.getEpisodes().add(Episode.create("第2集", "url-1"));
+        state.setFlags(List.of(flag));
+        assertSame(flag.getEpisodes().get(0), state.getEpisode());
+        assertSame(flag.getEpisodes().get(0), state.getRelativeEpisode(1));
     }
 
     @Test
