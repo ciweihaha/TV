@@ -14,6 +14,7 @@ import com.fongmi.android.tv.bean.Group;
 import com.fongmi.android.tv.bean.Live;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.player.extractor.Source;
+import com.fongmi.android.tv.utils.EpgFetchGuard;
 import com.fongmi.android.tv.utils.Formatters;
 import com.github.catvod.net.OkHttp;
 import com.google.common.cache.Cache;
@@ -29,6 +30,8 @@ public class LiveApi {
      * download per (channel, date) is enough. The XMLTV path already has a
      * 6h disk cache; this covers the JSON path (SCF output) which had none. */
     private static final Cache<String, String> epgJsonCache = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.DAYS).maximumSize(512).build();
+
+    private static final EpgFetchGuard EPG_GUARD = new EpgFetchGuard();
 
     public static void parse(@NonNull Live item) throws Exception {
         LiveParser.start(item.recent());
@@ -98,8 +101,21 @@ public class LiveApi {
         String cacheKey = item.getTvgId() + "|" + date;
         String json = epgJsonCache.getIfPresent(cacheKey);
         if (json == null) {
-            json = OkHttp.string(url);
-            epgJsonCache.put(cacheKey, json);
+            // A dead EPG server must never take down the caller: getEpg is
+            // also reached from the media-browse path (LiveBrowse
+            // .loadMetadata), which has no error handler. A failed day is
+            // remembered for a few minutes so rapid channel zapping does
+            // not re-issue the same failing request.
+            if (!EPG_GUARD.shouldFetch(cacheKey)) return;
+            try {
+                json = OkHttp.string(url);
+                epgJsonCache.put(cacheKey, json);
+                EPG_GUARD.recordSuccess(cacheKey);
+            } catch (Exception e) {
+                EPG_GUARD.recordFailure(cacheKey);
+                e.printStackTrace();
+                return;
+            }
         }
         item.setData(Epg.objectFrom(json, item.getTvgId(), date, zoneId));
     }

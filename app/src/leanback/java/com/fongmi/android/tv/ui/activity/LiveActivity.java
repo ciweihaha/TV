@@ -190,6 +190,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.control.action.invert.setOnClickListener(view -> onInvert());
         mBinding.control.action.across.setOnClickListener(view -> onAcross());
         mBinding.control.action.change.setOnClickListener(view -> onChange());
+        mBinding.control.action.previous.setOnClickListener(view -> mLive.backToPreviousChannel());
         mBinding.control.action.player.setOnClickListener(view -> onPlayer());
         mBinding.control.action.decoder.setOnClickListener(view -> onDecoder());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
@@ -494,6 +495,16 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         @Override
         public void onPrev() {
             mLive.prevChannel();
+        }
+
+        @Override
+        public boolean hasPreviousChannel() {
+            return mLive.hasPreviousChannel();
+        }
+
+        @Override
+        public void onPreviousChannel() {
+            mLive.backToPreviousChannel();
         }
 
         @Override
@@ -869,6 +880,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
     @Override
     public void renderChannelSelection(Channel channel) {
+        mBinding.control.action.previous.setVisibility(mLive.hasPreviousChannel() ? View.VISIBLE : View.GONE);
         App.post(mR0, 100);
         mChannel = channel;
         refreshKeepState();

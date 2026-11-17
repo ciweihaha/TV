@@ -8,15 +8,14 @@ import com.fongmi.android.tv.bean.Flag;
 import com.fongmi.android.tv.bean.History;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Vod;
+import com.fongmi.android.tv.utils.FailedSourceTracker;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class VodPlaybackState {
 
-    private final Set<String> failedIds;
+    private final FailedSourceTracker failedIds;
     private final List<Vod> sources;
     private final List<Flag> flags;
     private VodPlayRequest pendingRequest;
@@ -35,7 +34,7 @@ public class VodPlaybackState {
     private boolean builtin;
 
     public VodPlaybackState() {
-        this.failedIds = new HashSet<>();
+        this.failedIds = new FailedSourceTracker();
         this.sources = new ArrayList<>();
         this.flags = new ArrayList<>();
         this.quality = Result.empty();
@@ -64,11 +63,11 @@ public class VodPlaybackState {
     }
 
     void addFailedId(String id) {
-        if (id != null && !id.isEmpty()) failedIds.add(id);
+        failedIds.add(id);
     }
 
     boolean hasFailedId(String id) {
-        return id != null && failedIds.contains(id);
+        return failedIds.has(id);
     }
 
     List<Vod> getSources() {

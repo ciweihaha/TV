@@ -7,12 +7,12 @@
     android:orientation="vertical"
     android:translationY="-40dp">
 
-    <com.airbnb.lottie.LottieAnimationView
+    <androidx.appcompat.widget.AppCompatImageView
         android:layout_width="160dp"
         android:layout_height="180dp"
-        app:lottie_autoPlay="true"
-        app:lottie_loop="true"
-        app:lottie_rawRes="@raw/empty" />
+        android:alpha="0.6"
+        android:contentDescription="@string/error_empty"
+        android:src="@drawable/ic_empty" />
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/text"

@@ -205,6 +205,21 @@ public class LivePlaybackController {
         moveChannel(1);
     }
 
+    public boolean hasPreviousChannel() {
+        return state.getPreviousChannel() != null;
+    }
+
+    /**
+     * Jumps back to the channel watched before the current one. Selecting
+     * it swaps the two, so calling this again returns to where you were.
+     */
+    public boolean backToPreviousChannel() {
+        Channel previous = state.getPreviousChannel();
+        if (previous == null) return false;
+        selectChannel(previous);
+        return true;
+    }
+
     public void prevLine() {
         switchLine(false, true);
     }

@@ -116,7 +116,6 @@ dependencies {
     implementation libs.customactivityoncrash
     implementation libs.eventbus
     implementation libs.flexbox
-    implementation libs.lottie
     implementation libs.material
     implementation libs.materialdesigncolors
     implementation libs.nanohttpd
@@ -132,6 +131,7 @@ dependencies {
     annotationProcessor libs.eventbus.annotation.processor
     annotationProcessor libs.glide.compiler
     coreLibraryDesugaring libs.desugar
+    testImplementation libs.junit
 }
 
 if (file('test.gradle').isFile()) apply from: 'test.gradle'

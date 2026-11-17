@@ -204,6 +204,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
         mBinding.control.action.invert.setOnClickListener(view -> onInvert());
         mBinding.control.action.across.setOnClickListener(view -> onAcross());
         mBinding.control.action.change.setOnClickListener(view -> onChange());
+        mBinding.control.action.previous.setOnClickListener(view -> mLive.backToPreviousChannel());
         mBinding.control.action.player.setOnClickListener(view -> onPlayer());
         mBinding.control.action.decoder.setOnClickListener(view -> onDecoder());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
@@ -767,6 +768,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
 
     @Override
     public void renderChannelSelection(Channel channel) {
+        mBinding.control.action.previous.setVisibility(mLive.hasPreviousChannel() ? View.VISIBLE : View.GONE);
         if (mGroup != null) mGroup.setPosition(mChannelAdapter.setSelected(channel.group(mGroup)));
         mChannel = channel;
         refreshKeepState();
@@ -866,6 +868,16 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
         @Override
         public void onPrev() {
             mLive.prevChannel();
+        }
+
+        @Override
+        public boolean hasPreviousChannel() {
+            return mLive.hasPreviousChannel();
+        }
+
+        @Override
+        public void onPreviousChannel() {
+            mLive.backToPreviousChannel();
         }
 
         @Override

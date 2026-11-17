@@ -70,6 +70,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     private static final SessionCommand COMMAND_REPEAT = new SessionCommand(ActionEvent.REPEAT, Bundle.EMPTY);
     private static final SessionCommand COMMAND_KEEP = new SessionCommand(BuildConfig.APPLICATION_ID.concat(".keep"), Bundle.EMPTY);
     private static final SessionCommand COMMAND_SPEED = new SessionCommand(BuildConfig.APPLICATION_ID.concat(".speed"), Bundle.EMPTY);
+    private static final SessionCommand COMMAND_PREVIOUS_CHANNEL = new SessionCommand(BuildConfig.APPLICATION_ID.concat(".previous_channel"), Bundle.EMPTY);
     private static final String ACTION_MEDIA_BROWSER_SERVICE = "android.media.browse.MediaBrowserService";
 
     private static volatile boolean running;
@@ -467,7 +468,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     @Override
     public MediaSession.ConnectionResult onConnect(@NonNull MediaSession session, @NonNull MediaSession.ControllerInfo controller) {
         clients.connect(controller, getPackageName());
-        SessionCommands commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon().add(COMMAND_REPEAT).add(COMMAND_KEEP).add(COMMAND_SPEED).build();
+        SessionCommands commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon().add(COMMAND_REPEAT).add(COMMAND_KEEP).add(COMMAND_SPEED).add(COMMAND_PREVIOUS_CHANNEL).build();
         return new MediaLibrarySession.ConnectionResult.AcceptedResultBuilder(session).setAvailableSessionCommands(commands).build();
     }
 
@@ -488,6 +489,11 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
             float speed = player.getSpeed();
             player.setSpeed(speed < 1 ? 1 : speed < 1.25f ? 1.25f : speed < 1.5f ? 1.5f : speed < 2 ? 2 : 1);
             updateMediaButtons();
+            return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
+        }
+        if (COMMAND_PREVIOUS_CHANNEL.customAction.equals(customCommand.customAction)) {
+            if (!canDispatchNavigation() || !navigation.owner().hasPreviousChannel()) return Futures.immediateFuture(new SessionResult(SessionError.ERROR_NOT_SUPPORTED));
+            dispatch(NavigationCallback::onPreviousChannel);
             return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
         }
         return MediaLibrarySession.Callback.super.onCustomCommand(session, controller, customCommand, args);
@@ -978,6 +984,13 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
         }
 
         default void onNext() {
+        }
+
+        default boolean hasPreviousChannel() {
+            return false;
+        }
+
+        default void onPreviousChannel() {
         }
 
         default void onStop() {

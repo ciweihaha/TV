@@ -5,6 +5,7 @@ import com.fongmi.android.tv.bean.Flag;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Site;
 import com.fongmi.android.tv.bean.Vod;
+import com.fongmi.android.tv.utils.SearchResultRanker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,7 @@ class VodFallbackPolicy {
     void onSearchResult(Result result) {
         List<Vod> items = new ArrayList<>(result.getList());
         items.removeIf(this::mismatch);
+        items = SearchResultRanker.rank(items, state.getSearchKeyword(), Vod::getName, Vod::getId, Vod::getSiteKey);
         state.setSources(items);
         if (state.isSelectFirstSource() && state.hasSources()) nextSource();
         else host.renderSources(state.getSources());

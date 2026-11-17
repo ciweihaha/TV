@@ -57,6 +57,11 @@ final class ViewModelSearchRunner {
         long timeout = quick ? Constant.TIMEOUT_SEARCH_QUICK : Constant.TIMEOUT_SEARCH;
         FluentFuture<Result> future = FluentFuture.from(searchExecutor.submit(callable)).withTimeout(timeout, TimeUnit.MILLISECONDS, Task.scheduler());
         futures.add(future);
+        // Finished futures used to stay in the list until the next search
+        // started, so a long session of repeated searches kept every
+        // completed future (and its Result) alive. Drop each one as soon
+        // as it completes, fails or is cancelled.
+        future.addListener(() -> futures.remove(future), MoreExecutors.directExecutor());
         future.addCallback(Task.callback(
                 result -> {
                     if (epoch.get() == current) onResult.accept(result);

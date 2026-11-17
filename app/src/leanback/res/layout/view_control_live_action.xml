@@ -113,5 +113,11 @@
             android:nextFocusRight="@id/config"
             android:text="@string/play_change" />
 
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/previous"
+            style="@style/Control"
+            android:text="@string/live_previous_channel"
+            android:visibility="gone" />
+
     </androidx.appcompat.widget.LinearLayoutCompat>
 </HorizontalScrollView>

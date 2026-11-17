@@ -13,11 +13,13 @@ public class LivePlaybackState {
     private MediaMetadata playbackMetadata;
     private String playbackKey;
     private Channel channel;
+    private Channel previousChannel;
     private Group group;
 
     public void reset() {
         clearPlayback();
         channel = null;
+        previousChannel = null;
         group = null;
     }
 
@@ -40,7 +42,16 @@ public class LivePlaybackState {
         return channel;
     }
 
+    @Nullable
+    Channel getPreviousChannel() {
+        return previousChannel;
+    }
+
     void setChannel(Channel channel) {
+        // Remember the channel being left so the user can jump straight
+        // back to it. Re-selecting the same channel (e.g. restore after a
+        // service reconnect) must not overwrite it.
+        if (this.channel != null && this.channel != channel) previousChannel = this.channel;
         this.channel = channel;
         this.group = channel != null ? channel.getGroup() : group;
     }

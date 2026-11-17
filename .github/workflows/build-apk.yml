@@ -397,6 +397,12 @@ jobs:
       - run: chmod +x gradlew
       - run: '"$GRADLE_BIN_APP" assembleDebug --stacktrace'
 
+      # Round 133: run the JVM unit tests (search ranking, failed-source TTL,
+      # EPG fetch guard, subtitle offsets, live previous-channel state).
+      # Runs after the APK build so the Media3 AARs it needs are already in
+      # app/libs; a test failure fails the run just like a build failure.
+      - run: '"$GRADLE_BIN_APP" :app:testLeanbackDebugUnitTest --stacktrace'
+
       - name: Upload APKs
         uses: actions/upload-artifact@v7.0.2
         with:
