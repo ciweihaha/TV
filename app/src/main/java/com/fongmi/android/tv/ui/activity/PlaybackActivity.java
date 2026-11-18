@@ -482,7 +482,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
             if (!seekToEnd) webView.resumeVideo();
             return;
         }
-        if (mController == null) return false;
+        if (mController == null) return;
         PlayerManager player = player();
         long targetMs = Math.max(0, player.getPosition() + deltaMs);
         long durationMs = player.getDuration();
