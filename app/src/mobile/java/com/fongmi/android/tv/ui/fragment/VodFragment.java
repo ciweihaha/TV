@@ -138,7 +138,7 @@ public class VodFragment extends BaseFragment implements ConfigListener, SiteLis
     private void setAdapter(Result result) {
         // mobile 也走分类归并：只显示电影 / 电视剧 / 动画片 / 综艺四个 tab（与 leanback 一致）
         result.setTypes(CategoryMerger.merge(getHome().getKey(), result.getTypes()));
-        mAdapter.addAll(mResult = result);
+        mAdapter.setItems(mResult = result);
         mBinding.pager.getAdapter().notifyDataSetChanged();
         setFabVisible(0);
         hideProgress();
