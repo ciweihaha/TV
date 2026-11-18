@@ -341,12 +341,16 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         if (isFinishing() || isDestroyed()) return;
         mEmptyShown = false;
         mResult = Result.empty();
-        int index = getRecommendIndex();
-        boolean gone = mAdapter.indexOf("progress") == -1;
-        boolean hasItem = gone && mAdapter.size() > index;
-        if (hasItem) mAdapter.removeItems(index, mAdapter.size() - index);
-        if (gone) mAdapter.add("progress");
+        if (mAdapter.indexOf("progress") == -1) {
+            clearRecommendations();
+            mAdapter.add("progress");
+        }
         mViewModel.homeContent();
+    }
+
+    private void clearRecommendations() {
+        int index = getRecommendIndex();
+        if (mAdapter.size() > index) mAdapter.removeItems(index, mAdapter.size() - index);
     }
 
     private void addVideo(Result result) {
@@ -454,6 +458,12 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
                 getHistory(true);
                 break;
         }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onHomeContent(RefreshEvent.HomeContent event) {
+        Site site = getHome();
+        if (event.matchesSite(site.getKey())) mViewModel.refreshHomeContent(site);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
