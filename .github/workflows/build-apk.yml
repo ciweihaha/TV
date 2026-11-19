@@ -368,19 +368,22 @@ jobs:
 
       # app/build.gradle reads local.properties at configuration time and both
       # debug and release build types use the release signing config, so a
-      # signing config must exist before Gradle configures. Use a throwaway
-      # debug keystore; local.properties is gitignored (*.properties).
-      - name: Create temporary signing keystore
+      # signing config must exist before Gradle configures.
+      # Fixed signing keystore (repo secrets ANDROID_KEYSTORE_BASE64 /
+      # ANDROID_KEY_ALIAS / ANDROID_KEYSTORE_PASSWORD, set 2026-11-19):
+      # every release must be signed with the SAME key, otherwise Android
+      # refuses to update the installed app
+      # (INSTALL_FAILED_UPDATE_INCOMPATIBLE). A throwaway per-run keystore
+      # was used before and each release got a different signature, so no
+      # FongMi release could ever update a previous one. Backup of the
+      # keystore is kept with the project owner, not in this repo.
+      - name: Restore fixed signing keystore
         run: |
-          keytool -genkeypair -v \
-            -keystore "$RUNNER_TEMP/debug.keystore" \
-            -storepass android -alias androiddebugkey -keypass android \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=CI, OU=CI, O=CI, L=CI, ST=CI, C=US"
+          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/fongmi.keystore"
           cat > local.properties <<EOF
-          storeFile=$RUNNER_TEMP/debug.keystore
-          keyAlias=androiddebugkey
-          storePassword=android
+          storeFile=$RUNNER_TEMP/fongmi.keystore
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           EOF
 
       - name: Build debug APK
