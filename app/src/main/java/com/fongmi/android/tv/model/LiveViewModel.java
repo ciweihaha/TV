@@ -86,6 +86,12 @@ public class LiveViewModel extends ViewModel implements LiveDataSource {
     }
 
     public void parseXml(Live item) {
+        // Mark the attempt on the calling thread, before the task starts:
+        // the refresh check in refreshEpgIfDue reads lastAttempt on the
+        // main thread, and a mark made only inside the background task
+        // races it — the check would submit a second XML task, which
+        // cancels this download, and then decline the retry.
+        if (item != null) item.markEpgXmlAttempt(System.currentTimeMillis());
         execute(TaskType.XML, () -> LiveApi.parseXml(item), xml::postValue, error -> xml.postValue(false));
     }
 
@@ -96,13 +102,16 @@ public class LiveViewModel extends ViewModel implements LiveDataSource {
     /**
      * Re-download the XMLTV guide when {@link com.fongmi.android.tv.utils.EpgRefreshPolicy}
      * says it is due (hourly / day changed / no programme covering now).
-     * Runs on the XML task slot; on success the existing xml observer
-     * re-loads the current channel's guide, so the display refreshes
-     * without restarting the app or switching channels.
+     * The decision runs on the calling thread: submitting it as an XML
+     * task would cancel an in-flight initial download (same task slot).
+     * On success the existing xml observer re-loads the current channel's
+     * guide, so the display refreshes without restarting the app or
+     * switching channels.
      */
     public void refreshEpgIfDue(Live item, Channel channel) {
         if (item == null || channel == null) return;
-        execute(TaskType.XML, () -> LiveApi.refreshEpgIfDue(item, channel, zoneId), xml::postValue, error -> xml.postValue(false));
+        if (!LiveApi.isEpgRefreshDue(item, channel, zoneId)) return;
+        execute(TaskType.XML, () -> LiveApi.parseXml(item, true), xml::postValue, error -> xml.postValue(false));
     }
 
     @Override

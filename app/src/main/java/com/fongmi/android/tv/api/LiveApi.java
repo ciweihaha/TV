@@ -70,20 +70,23 @@ public class LiveApi {
     }
 
     /**
-     * Re-download the XMLTV guide when it is due (hourly, day changed, or
-     * the current channel has no programme covering now), then refresh the
-     * displayed guide via the caller's xml observer. Returns true when a
-     * refresh was started. Safe to call on every channel change and on
-     * every return to the foreground: {@link EpgRefreshPolicy} throttles it.
+     * Decides whether the XMLTV guide must be re-downloaded (hourly, day
+     * changed, or the current channel has no programme covering now).
+     * Pure decision, no download: call this on the calling thread BEFORE
+     * submitting any task. It must never run inside the XML task slot —
+     * {@code ViewModelTaskRunner} cancels the previous task of the same
+     * type, so submitting the check as an XML task interrupts the
+     * in-flight initial download and the policy then (correctly) declines
+     * the retry, leaving the guide empty (seen on the tablet 2026-11-19).
      */
-    public static boolean refreshEpgIfDue(@NonNull Live item, @Nullable Channel channel, @NonNull ZoneId zoneId) {
+    public static boolean isEpgRefreshDue(@NonNull Live item, @Nullable Channel channel, @NonNull ZoneId zoneId) {
         if (item.getEpgXml().isEmpty()) return false;
         long now = System.currentTimeMillis();
         boolean hasCurrent = channel != null && channel.getData(zoneId).getInRange() >= 0;
         boolean dayChanged = EpgRefreshPolicy.isDayChanged(item.getEpgXmlLastRefreshMs(), now, zoneId);
-        if (!EpgRefreshPolicy.shouldRefresh(item.getEpgXmlLastRefreshMs(), item.getEpgXmlLastAttemptMs(), now, hasCurrent, dayChanged)) return false;
-        Log.i(TAG, "Epg auto-refresh due channel=" + (channel == null ? "" : channel.getName()) + " hasCurrent=" + hasCurrent + " dayChanged=" + dayChanged + " lastRefresh=" + item.getEpgXmlLastRefreshMs());
-        return parseXml(item, true);
+        boolean due = EpgRefreshPolicy.shouldRefresh(item.getEpgXmlLastRefreshMs(), item.getEpgXmlLastAttemptMs(), now, hasCurrent, dayChanged);
+        if (due) Log.i(TAG, "Epg auto-refresh due channel=" + (channel == null ? "" : channel.getName()) + " hasCurrent=" + hasCurrent + " dayChanged=" + dayChanged + " lastRefresh=" + item.getEpgXmlLastRefreshMs());
+        return due;
     }
 
     @NonNull
