@@ -52,6 +52,11 @@ public class Config {
     @SerializedName("assrt")
     private String assrt;
 
+    /** 新装默认点播地址（用户自有聚合源，20 站合一）。只在地址为空时填入，绝不覆盖用户已填的值。 */
+    public static final String DEFAULT_VOD_URL = "https://live.ciweihaha.win/vod.json";
+    /** 新装默认直播地址。只在地址为空时填入，绝不覆盖用户已填的值。 */
+    public static final String DEFAULT_LIVE_URL = "https://live.ciweihaha.win/live.m3u";
+
     public static List<Config> arrayFrom(String str) {
         Type listType = TypeToken.getParameterized(List.class, Config.class).getType();
         List<Config> items = App.gson().fromJson(str, listType);
@@ -92,14 +97,24 @@ public class Config {
 
     public static Config vod() {
         Config item = AppDatabase.get().getConfigDao().findOne(0);
-        return item == null ? create(0) : item;
+        if (item == null) return create(0, DEFAULT_VOD_URL);
+        if (item.isEmpty()) {
+            item.setUrl(DEFAULT_VOD_URL);
+            item.save();
+        }
+        return item;
     }
 
     public static Config live() {
         String url = Prefers.getString("config_1");
         Config item = TextUtils.isEmpty(url) ? null : AppDatabase.get().getConfigDao().find(url, 1);
         if (item == null) item = AppDatabase.get().getConfigDao().findOne(1);
-        return item == null ? create(1) : item;
+        if (item == null) return create(1, DEFAULT_LIVE_URL);
+        if (item.isEmpty()) {
+            item.setUrl(DEFAULT_LIVE_URL);
+            item.save();
+        }
+        return item;
     }
 
     public static Config wall() {
