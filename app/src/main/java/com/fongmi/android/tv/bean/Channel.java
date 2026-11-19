@@ -266,6 +266,13 @@ public class Channel {
         dataCache = null;
     }
 
+    /** Drop the cached EPG for one day so it is re-downloaded (stale-day refetch). */
+    public void removeData(String date) {
+        if (dataList == null) return;
+        dataList.removeIf(e -> e.equal(date));
+        dataCache = null;
+    }
+
     public Epg getData(ZoneId zoneId) {
         return getData(zoneId, LocalDate.now(zoneId));
     }

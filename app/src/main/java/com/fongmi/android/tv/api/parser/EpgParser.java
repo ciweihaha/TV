@@ -70,13 +70,22 @@ public class EpgParser {
     }
 
     public static synchronized void start(Live live, String url) throws Exception {
+        start(live, url, false);
+    }
+
+    /**
+     * @param force re-download even when the on-disk cache is still fresh.
+     * Used by the hourly / stale-guide auto-refresh: without it the 6h disk
+     * cache would serve yesterday's file all day.
+     */
+    public static synchronized void start(Live live, String url, boolean force) throws Exception {
         checkInterrupted();
         long t0 = System.currentTimeMillis();
-        XmlData data = loadXml(url, Path.epg(Crypto.md5(url) + ".xml"));
+        XmlData data = loadXml(url, Path.epg(Crypto.md5(url) + ".xml"), force);
         ProgrammeResult result = processProgramme(data, prepareLiveChannels(live), live.getZoneId());
         checkInterrupted();
         bindResultsToLive(live, result);
-        Log.i(TAG, "start done elapsed=" + (System.currentTimeMillis() - t0) + "ms");
+        Log.i(TAG, "start done elapsed=" + (System.currentTimeMillis() - t0) + "ms force=" + force);
     }
 
     public static Epg getEpg(String xml, String key, String date, ZoneId zoneId) {
@@ -101,8 +110,8 @@ public class EpgParser {
         return channels;
     }
 
-    private static XmlData loadXml(String url, File file) throws Exception {
-        if (isFresh(file)) {
+    private static XmlData loadXml(String url, File file, boolean force) throws Exception {
+        if (!force && isFresh(file)) {
             try {
                 return parseXmlData(file);
             } catch (Exception e) {

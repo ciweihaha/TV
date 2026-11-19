@@ -93,6 +93,18 @@ public class LiveViewModel extends ViewModel implements LiveDataSource {
         execute(TaskType.EPG, () -> LiveApi.getEpg(item, zoneId), epg::postValue, error -> epg.postValue(new Epg()));
     }
 
+    /**
+     * Re-download the XMLTV guide when {@link com.fongmi.android.tv.utils.EpgRefreshPolicy}
+     * says it is due (hourly / day changed / no programme covering now).
+     * Runs on the XML task slot; on success the existing xml observer
+     * re-loads the current channel's guide, so the display refreshes
+     * without restarting the app or switching channels.
+     */
+    public void refreshEpgIfDue(Live item, Channel channel) {
+        if (item == null || channel == null) return;
+        execute(TaskType.XML, () -> LiveApi.refreshEpgIfDue(item, channel, zoneId), xml::postValue, error -> xml.postValue(false));
+    }
+
     @Override
     public void getUrl(LivePlayRequest request) {
         execute(TaskType.URL, () -> getUrlResult(request), result -> postUrl(request, result), error -> handleUrlError(request, error));

@@ -128,6 +128,10 @@ public class Live {
     private transient String epgApiCache;
     private transient List<String> epgXmlCache;
     private transient Map<String, Long> epgXmlAttempted;
+    /** Last time an XMLTV download succeeded (0 = never). See EpgRefreshPolicy. */
+    private transient long epgXmlLastRefreshMs;
+    /** Last time an XMLTV download was attempted (0 = never). */
+    private transient long epgXmlLastAttemptMs;
 
     public Live() {
     }
@@ -344,6 +348,28 @@ public class Live {
     public synchronized void markEpgXmlFailed(String url) {
         if (epgXmlAttempted == null) epgXmlAttempted = new HashMap<>();
         epgXmlAttempted.put(url, System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10));
+    }
+
+    /** Forget the "already attempted" guard so a forced refresh re-downloads. */
+    public synchronized void clearEpgXmlAttempted() {
+        epgXmlAttempted = null;
+    }
+
+    public synchronized long getEpgXmlLastRefreshMs() {
+        return epgXmlLastRefreshMs;
+    }
+
+    public synchronized long getEpgXmlLastAttemptMs() {
+        return epgXmlLastAttemptMs;
+    }
+
+    public synchronized void markEpgXmlAttempt(long nowMs) {
+        epgXmlLastAttemptMs = nowMs;
+    }
+
+    public synchronized void markEpgXmlRefreshed(long nowMs) {
+        epgXmlLastRefreshMs = nowMs;
+        epgXmlLastAttemptMs = nowMs;
     }
 
     public boolean isEmpty() {

@@ -70,6 +70,7 @@ import com.fongmi.android.tv.ui.dialog.DecoderSettingDialog;
 import com.fongmi.android.tv.ui.dialog.SpeedSettingDialog;
 import com.fongmi.android.tv.ui.dialog.TrackDialog;
 import com.fongmi.android.tv.utils.Biometric;
+import com.fongmi.android.tv.utils.EpgRefreshPolicy;
 import com.fongmi.android.tv.utils.ImgUtil;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.PiP;
@@ -99,6 +100,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     private Runnable mR1;
     private Runnable mR2;
     private Runnable mR3;
+    private Runnable mR4;
     private List<Group> mHides;
     private Group mGroup;
     private Channel mChannel;
@@ -175,6 +177,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
         mR1 = this::hideControl;
         mR2 = this::setTraffic;
         mR3 = this::hideInfo;
+        mR4 = this::checkEpgRefresh;
         mPiP = new PiP();
         setRecyclerView();
         setVideoView();
@@ -642,6 +645,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     }
 
     private void setInfo() {
+        mViewModel.refreshEpgIfDue(getHome(), mChannel);
         mViewModel.getEpg(mChannel);
         mBinding.widget.play.setText("");
         mBinding.widget.name.setMaxEms(48);
@@ -1254,6 +1258,24 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
         if (hasFocus) Util.hideSystemUI(this);
     }
 
+    /**
+     * EPG auto-refresh: re-download the guide when it is due (hourly, day
+     * changed, or the current channel has no programme covering now) and
+     * re-schedule the next hourly check. Skipped until a channel is
+     * selected so it never races the initial guide download at startup.
+     */
+    private void checkEpgRefresh() {
+        App.removeCallbacks(mR4);
+        if (mChannel != null) mViewModel.refreshEpgIfDue(getHome(), mChannel);
+        App.post(mR4, EpgRefreshPolicy.REFRESH_INTERVAL_MS);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        checkEpgRefresh();
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -1264,6 +1286,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     @Override
     protected void onStop() {
         super.onStop();
+        App.removeCallbacks(mR4);
         if (!isAudioOnly()) setStop(true);
     }
 
@@ -1286,7 +1309,7 @@ public class LiveActivity extends PlaybackActivity implements TouchInput.Listene
     @Override
     protected void onDestroy() {
         if (isBindingOwner() && isOwner()) Source.get().exit();
-        App.removeCallbacks(mR1, mR2, mR3);
+        App.removeCallbacks(mR1, mR2, mR3, mR4);
         super.onDestroy();
     }
 }

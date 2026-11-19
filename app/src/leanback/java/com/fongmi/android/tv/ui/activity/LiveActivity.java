@@ -66,6 +66,7 @@ import com.fongmi.android.tv.ui.dialog.DecoderSettingDialog;
 import com.fongmi.android.tv.ui.dialog.SpeedSettingDialog;
 import com.fongmi.android.tv.ui.dialog.TrackDialog;
 import com.fongmi.android.tv.utils.Clock;
+import com.fongmi.android.tv.utils.EpgRefreshPolicy;
 import com.fongmi.android.tv.utils.ImgUtil;
 import com.fongmi.android.tv.utils.KeyUtil;
 import com.fongmi.android.tv.utils.Notify;
@@ -97,6 +98,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     private Runnable mR2;
     private Runnable mR3;
     private Runnable mR4;
+    private Runnable mR5;
     private List<Group> mHides;
     private Group mGroup;
     private Channel mChannel;
@@ -166,6 +168,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mR2 = this::setTraffic;
         mR3 = this::hideInfo;
         mR4 = this::hideUI;
+        mR5 = this::checkEpgRefresh;
         setRecyclerView();
         setVideoView();
         setViewModel();
@@ -753,6 +756,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     private void setInfo() {
+        mViewModel.refreshEpgIfDue(getHome(), mChannel);
         mViewModel.getEpg(mChannel);
         mBinding.widget.play.setText("");
         mBinding.widget.name.setMaxEms(48);
@@ -1175,6 +1179,27 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         else onMenu();
     }
 
+    /**
+     * EPG auto-refresh: re-download the guide when it is due (hourly, day
+     * changed, or the current channel has no programme covering now) and
+     * re-schedule the next hourly check. Runs on return to the foreground
+     * and once an hour while live is in the foreground; the policy in
+     * {@link EpgRefreshPolicy} makes the call cheap when nothing is due.
+     * Skipped until a channel is selected so it never races the initial
+     * guide download at startup.
+     */
+    private void checkEpgRefresh() {
+        App.removeCallbacks(mR5);
+        if (mChannel != null) mViewModel.refreshEpgIfDue(getHome(), mChannel);
+        App.post(mR5, EpgRefreshPolicy.REFRESH_INTERVAL_MS);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        checkEpgRefresh();
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -1184,6 +1209,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     @Override
     protected void onStop() {
         mInput.cancelSeek();
+        App.removeCallbacks(mR5);
         super.onStop();
         if (PlayerSetting.isBackgroundOff()) mClock.stop();
     }
@@ -1210,7 +1236,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mInput.cancelFindChannel();
         mClock.release();
         if (isBindingOwner() && isOwner()) Source.get().exit();
-        App.removeCallbacks(mR0, mR1, mR2, mR3, mR4);
+        App.removeCallbacks(mR0, mR1, mR2, mR3, mR4, mR5);
         super.onDestroy();
     }
 }
