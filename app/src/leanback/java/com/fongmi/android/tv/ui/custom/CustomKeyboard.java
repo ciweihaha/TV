@@ -94,7 +94,8 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
 
     private void updateDecoration() {
         if (decoration != null) binding.keyboard.removeItemDecoration(decoration);
-        binding.keyboard.addItemDecoration(decoration = new SpaceItemDecoration(adapter.getSpanCount(), 8));
+        // 键间距 6dp（以前 8dp）：6 行共省 10dp，左栏放得下，模式行不再被顶出屏幕
+        binding.keyboard.addItemDecoration(decoration = new SpaceItemDecoration(adapter.getSpanCount(), 6));
     }
 
     /** 数字盘时功能行的 123 显示为 ABC（点按切回字母格），字母格时显示 123。 */

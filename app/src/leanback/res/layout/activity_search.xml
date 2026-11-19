@@ -86,7 +86,7 @@
             android:id="@+id/funcRow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatImageView
@@ -139,12 +139,15 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- A–Z 字母格（数字盘共用）：5 列，字母直接印在蓝底上，无键框 -->
+        <!-- A–Z 字母格（数字盘共用）：5 列，字母直接印在蓝底上，无键框。
+             高度用 weight 占满左栏剩余空间：以前是 wrap_content，6 行 52dp 键把模式行顶出屏幕；
+             现在键高 44dp、剩余空间不够时格子内部滚动，模式行和提示行永远可见。 -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/keyboard"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:overScrollMode="never"
@@ -157,13 +160,13 @@
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/modeFull"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_marginEnd="24dp"
                 android:background="@drawable/selector_keyboard_dangbei"
                 android:drawableStart="@drawable/shape_dot_green"
@@ -180,7 +183,7 @@
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/modeSystem"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:background="@drawable/selector_keyboard_dangbei"
                 android:drawableStart="@drawable/shape_dot_blue"
                 android:drawablePadding="6dp"
@@ -199,7 +202,7 @@
         <com.google.android.material.textview.MaterialTextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:text="@string/search_hint_dangbei"
             android:textColor="@color/dangbei_hint"
             android:textSize="14sp" />

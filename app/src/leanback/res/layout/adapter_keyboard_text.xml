@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 当贝字母键：无框透明底、白字 28sp；焦点时淡蓝圆角块 -->
+<!-- 当贝字母键：无框透明底、白字 26sp；焦点时淡蓝圆角块。
+     键高 44dp（以前 52dp）：6 行共 264dp，左栏放得下，模式行不再被顶出屏幕 -->
 <com.google.android.material.textview.MaterialTextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/text"
     android:layout_width="match_parent"
-    android:layout_height="52dp"
+    android:layout_height="44dp"
     android:background="@drawable/selector_keyboard_dangbei"
     android:focusable="true"
     android:focusableInTouchMode="true"
     android:gravity="center"
     android:textColor="@color/white"
-    android:textSize="28sp"
+    android:textSize="26sp"
     tools:text="A" />

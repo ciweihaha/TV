@@ -1,20 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 选集按钮：焦点、背景、点击都在根布局上（和源页签 adapter_flag 一样，根就是焦点载体）。
+     之前焦点落在根布局、背景却在里面的 TextView 上，遥控器移到哪集都看不到高亮；
+     焦点态改成黄色粗框，移到哪集、哪集就亮黄框。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:background="@drawable/selector_episode"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:nextFocusUp="@id/flag"
+    android:nextFocusDown="@id/array">
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="@drawable/selector_item"
         android:ellipsize="marquee"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
         android:gravity="center"
-        android:nextFocusUp="@id/flag"
-        android:nextFocusDown="@id/array"
         android:singleLine="true"
         android:textColor="@color/text"
         android:textSize="16sp"

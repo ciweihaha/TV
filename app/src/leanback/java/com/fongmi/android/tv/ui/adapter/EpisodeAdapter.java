@@ -84,9 +84,11 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Episode item = mItems.get(position);
         holder.binding.text.setMaxWidth(maxWidth);
-        holder.binding.text.setNextFocusUpId(nextFocusUp);
-        holder.binding.text.setNextFocusDownId(nextFocusDown);
-        holder.binding.text.setSelected(item.isSelected());
+        // 焦点、选中态都在根布局上（背景 selector_episode 画在根上，焦点也落在根上）：
+        // 之前选中/焦点方向设在里面的 TextView 上，焦点落在根布局时高亮不显示。
+        holder.binding.getRoot().setNextFocusUpId(nextFocusUp);
+        holder.binding.getRoot().setNextFocusDownId(nextFocusDown);
+        holder.binding.getRoot().setSelected(item.isSelected());
         holder.binding.text.setText(item.getDesc().concat(item.getName()));
         boolean showProgress = item.isSelected() && progress > 0f;
         holder.binding.progress.setVisibility(showProgress ? View.VISIBLE : View.GONE);

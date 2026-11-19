@@ -473,6 +473,16 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
             return true;
         }
         if (KeyUtil.isDownKey(event)) return true;
+        // 全键盘 ↔ 系统输入法一按就切：之前左右键走系统默认焦点搜索，模式行在屏外时
+        // 焦点会无声地挪到看不见的位置，来回切要按很多次方向键。
+        if (KeyUtil.isRightKey(event) && item == mBinding.modeFull) {
+            mBinding.modeSystem.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isLeftKey(event) && item == mBinding.modeSystem) {
+            mBinding.modeFull.requestFocus();
+            return true;
+        }
         if (KeyUtil.isLeftKey(event) && item == mBinding.modeFull) return true;
         if (KeyUtil.isRightKey(event) && item == mBinding.modeSystem) return focusTabOrWord();
         return false;
