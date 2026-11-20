@@ -125,7 +125,6 @@ final class ExoPlayerSession {
         trackSelectors.add(selector);
         return selector;
     }
-    }
 
     @Nullable
     DecoderMode decoderMode(@C.TrackType int trackType) {

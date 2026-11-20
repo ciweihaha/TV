@@ -352,6 +352,7 @@
     <string name="player_mpv_gpu_next">gpu-next</string>
     <string name="player_mpv_vulkan">vulkan</string>
     <string name="player_motion_restart">Applies the next time you open a video</string>
+    <string name="player_motion">Frame interpolation</string>
     <string name="player_mpv_motion">Frame interpolation (SDR)</string>
     <string name="player_mpv_motion_unavailable">Interpolation is unavailable in this playback mode</string>
     <string name="player_mpv_motion_applying">Applying…</string>
