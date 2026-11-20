@@ -5,6 +5,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.DolbyVisionOutputPolicy;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.audio.AudioProcessor;
 import androidx.media3.exoplayer.DecoderManager;
@@ -19,6 +20,8 @@ import androidx.media3.exoplayer.source.preload.PreloadException;
 import androidx.media3.exoplayer.source.preload.PreloadManagerListener;
 import androidx.media3.exoplayer.text.SecondaryTextOutput;
 import androidx.media3.exoplayer.text.SubtitleTranscriptSession;
+import androidx.media3.exoplayer.trackselection.DecodeTrackSelector;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.exoplayer.trackselection.SecondaryTextTrackSelector;
 import androidx.media3.exoplayer.trackselection.TrackSelector;
 
@@ -32,6 +35,8 @@ import com.fongmi.android.tv.setting.PreloadSetting;
 import com.fongmi.android.tv.setting.SubtitleSetting;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 final class ExoPlayerSession {
 
@@ -47,6 +52,9 @@ final class ExoPlayerSession {
     private final LibassPlaybackSession libassPlaybackSession;
     private final SubtitleTranscriptSession subtitleTranscriptSession;
     private final DefaultPreloadManager preloadManager;
+    private final List<DecodeTrackSelector> trackSelectors = new ArrayList<>(2);
+    private final boolean audioPassThrough;
+    private final @DolbyVisionOutputPolicy.Mode int dolbyVisionOutputPolicy;
     private final boolean libassEnabled;
     private final boolean decoderPrewarmingEnabled;
     private final int motionFps;
@@ -56,12 +64,14 @@ final class ExoPlayerSession {
     private PreloadRequest preloadRequest;
 
     ExoPlayerSession(AudioProcessor audioProcessor) {
+        this.audioPassThrough = DecodeSetting.isAudioPassThrough();
+        this.dolbyVisionOutputPolicy = DecodeSetting.getDolbyVisionOutputPolicy();
         this.motionFps = PlayerSetting.getExoMotionFps();
         this.decoderPrewarmingEnabled = PreloadSetting.shouldPrewarmDecoder();
         DecoderMode audioMode = DecoderMode.fromCommonDecoderMode(DecodeSetting.getDecoderMode(PlayerSetting.ENGINE_EXO, C.TRACK_TYPE_AUDIO));
         DecoderMode videoMode = DecoderMode.fromCommonDecoderMode(DecodeSetting.getDecoderMode(PlayerSetting.ENGINE_EXO, C.TRACK_TYPE_VIDEO));
         this.decoderManager = new DecoderManager(audioMode, videoMode);
-        TrackSelector.Factory decodeTrackSelectorFactory = context -> ExoUtil.buildTrackSelector(decoderManager);
+        TrackSelector.Factory decodeTrackSelectorFactory = context -> createTrackSelector();
         SecondaryTextTrackSelector.Factory secondaryTextTrackSelectorFactory = new SecondaryTextTrackSelector.Factory(decodeTrackSelectorFactory);
         SecondaryTextOutput secondaryTextOutput = new SecondaryTextOutput();
         this.libassEnabled = PlayerSetting.isLibass();
@@ -98,7 +108,23 @@ final class ExoPlayerSession {
     }
 
     boolean hasPlaybackSettingsChanged() {
-        return libassEnabled != PlayerSetting.isLibass() || motionFps != PlayerSetting.getExoMotionFps();
+        boolean decodeChanged = isTunnelingEnabled() != DecodeSetting.isTunnelingEnabled() || audioPassThrough != DecodeSetting.isAudioPassThrough() || dolbyVisionOutputPolicy != DecodeSetting.getDolbyVisionOutputPolicy();
+        return decodeChanged || libassEnabled != PlayerSetting.isLibass() || motionFps != PlayerSetting.getExoMotionFps();
+    }
+
+    void setTunnelingEnabled(boolean enabled) {
+        for (DecodeTrackSelector selector : trackSelectors) selector.setParameters(selector.buildUponParameters().setTunnelingEnabled(enabled));
+    }
+
+    private boolean isTunnelingEnabled() {
+        return ((DefaultTrackSelector.Parameters) player.getTrackSelectionParameters()).tunnelingEnabled;
+    }
+
+    private DecodeTrackSelector createTrackSelector() {
+        DecodeTrackSelector selector = ExoUtil.buildTrackSelector(decoderManager);
+        trackSelectors.add(selector);
+        return selector;
+    }
     }
 
     @Nullable

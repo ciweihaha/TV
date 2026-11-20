@@ -3,6 +3,11 @@ package com.fongmi.android.tv.ui.dialog;
 import static com.fongmi.android.tv.ui.dialog.SettingPanelViews.applyEnabled;
 
 import android.view.View;
+import android.widget.CompoundButton;
+
+import androidx.annotation.Nullable;
+import androidx.media3.common.DolbyVisionOutputPolicy;
+import androidx.media3.common.Player;
 
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.databinding.DialogVideoSettingBinding;
@@ -10,10 +15,13 @@ import com.fongmi.android.tv.databinding.ViewSettingSliderBinding;
 import com.fongmi.android.tv.player.PlayerManager;
 import com.fongmi.android.tv.player.effect.video.VideoEffectPreset;
 import com.fongmi.android.tv.player.effect.video.VideoEffectProfile;
+import com.fongmi.android.tv.setting.DecodeSetting;
 import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.setting.VideoSetting;
+import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.SliderUtil;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.slider.Slider;
 
@@ -21,8 +29,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-final class VideoSettingPanel {
+final class VideoSettingPanel implements Player.Listener {
 
+    private static final int TAB_ADVANCED = 2;
     private static final int[][] PRESETS = {
             {VideoEffectPreset.OFF, R.id.presetOriginal},
             {VideoEffectPreset.NATURAL, R.id.presetNatural},
@@ -42,6 +51,8 @@ final class VideoSettingPanel {
 
     private final DialogVideoSettingBinding binding;
     private final PlayerManager player;
+    @Nullable
+    private final Player eventSource;
     private final MpvMotionSettingPanel motionPanel;
     private int currentTab;
     private boolean previewOriginal;
@@ -49,6 +60,7 @@ final class VideoSettingPanel {
     VideoSettingPanel(DialogVideoSettingBinding binding, PlayerManager player) {
         this.binding = binding;
         this.player = player;
+        this.eventSource = player.getPlayer();
         this.motionPanel = new MpvMotionSettingPanel(binding.mpvMotion, player.getPlayer());
     }
 
@@ -56,18 +68,72 @@ final class VideoSettingPanel {
         motionPanel.bind();
         updatePresetCheck();
         bindSliders();
-        SettingPanelViews.bindTabs(binding.tabGroup, getTabs(), this::showTab);
+        bindAdvanced();
         SettingPanelViews.bindCompare(binding.compare, this::previewOriginal);
         bindReset();
-        showTab(0);
+        SettingPanelViews.bindPlaybackTabs(binding.tabGroup, getTabs(), this::showTab);
         updateControls();
-        PlaybackDialogFocus.selectFirstTab(binding.getRoot(), binding.tabGroup, binding.tabPreset);
+        if (eventSource != null) eventSource.addListener(this);
     }
 
     void release() {
+        if (eventSource != null) eventSource.removeListener(this);
         motionPanel.release();
         binding.tabGroup.clearOnButtonCheckedListeners();
+        binding.tunnel.setOnCheckedChangeListener(null);
+        binding.dolbyVisionGroup.setOnCheckedStateChangeListener(null);
         previewOriginal(false);
+    }
+
+    // 上游 e0524f2：轨道变化/首帧时刷新控件，播放状态变化时刷新插帧面板，保持与播放同步。
+    @Override
+    public void onEvents(Player source, Player.Events events) {
+        if (source != eventSource) return;
+        boolean tracksChanged = events.contains(Player.EVENT_TRACKS_CHANGED);
+        boolean firstFrame = events.contains(Player.EVENT_RENDERED_FIRST_FRAME);
+        if (tracksChanged || firstFrame) updateControls();
+        if (tracksChanged || firstFrame || events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)) motionPanel.updateMotion();
+    }
+
+    private void bindAdvanced() {
+        bindTunneling();
+        bindDolbyVision();
+    }
+
+    private void bindTunneling() {
+        boolean tunnelingAvailable = player.canSetTunneling();
+        binding.tunnelRow.setVisibility(tunnelingAvailable ? View.VISIBLE : View.GONE);
+        binding.tunnel.setChecked(DecodeSetting.isTunnelingEnabled());
+        if (tunnelingAvailable) binding.tunnel.setOnCheckedChangeListener(this::onTunnelChanged);
+    }
+
+    private void bindDolbyVision() {
+        String[] modes = ResUtil.getStringArray(R.array.select_dolby_vision_output);
+        binding.dolbyVisionAuto.setText(modes[DolbyVisionOutputPolicy.AUTO]);
+        binding.dolbyVisionOn.setText(modes[DolbyVisionOutputPolicy.ASSUME_SUPPORTED]);
+        binding.dolbyVisionOff.setText(modes[DolbyVisionOutputPolicy.ASSUME_UNSUPPORTED]);
+        Chip chip = switch (DecodeSetting.getDolbyVisionOutputPolicy()) {
+            case DolbyVisionOutputPolicy.ASSUME_SUPPORTED -> binding.dolbyVisionOn;
+            case DolbyVisionOutputPolicy.ASSUME_UNSUPPORTED -> binding.dolbyVisionOff;
+            default -> binding.dolbyVisionAuto;
+        };
+        binding.dolbyVisionGroup.check(chip.getId());
+        binding.dolbyVisionGroup.setOnCheckedStateChangeListener(this::onDolbyVisionChecked);
+    }
+
+    private void onTunnelChanged(CompoundButton button, boolean enabled) {
+        player.setTunnelingEnabled(enabled);
+    }
+
+    private void onDolbyVisionChecked(ChipGroup group, List<Integer> checkedIds) {
+        if (checkedIds.isEmpty()) return;
+        int chipId = checkedIds.get(0);
+        int mode = DolbyVisionOutputPolicy.AUTO;
+        if (chipId == R.id.dolbyVisionOn) mode = DolbyVisionOutputPolicy.ASSUME_SUPPORTED;
+        else if (chipId == R.id.dolbyVisionOff) mode = DolbyVisionOutputPolicy.ASSUME_UNSUPPORTED;
+        if (mode == DecodeSetting.getDolbyVisionOutputPolicy()) return;
+        DecodeSetting.putDolbyVisionOutputPolicy(mode);
+        player.refreshDecodeSettings();
     }
 
     private void onPresetChecked(ChipGroup group, List<Integer> checkedIds) {
@@ -200,13 +266,11 @@ final class VideoSettingPanel {
         boolean sharpnessSupported = supportsSharpness();
         boolean supported = canSetVideoSetting();
         if (!supported) previewOriginal(false);
-        boolean checked = VideoSetting.isEnabled();
-        boolean enabled = supported && checked;
-        updateUnsupported(supported);
+        boolean enabled = supported && VideoSetting.isEnabled();
+        updateEffectActions(supported, enabled);
         binding.temperature.getRoot().setVisibility(mpv ? View.GONE : View.VISIBLE);
         binding.sharpness.getRoot().setVisibility(sharpnessSupported ? View.VISIBLE : View.GONE);
         binding.shadow.getRoot().setVisibility(mpv ? View.GONE : View.VISIBLE);
-        applyEnabled(binding.compare, enabled);
         applyEnabled(binding.presetSection, supported);
         applyEnabled(binding.saturation.getRoot(), enabled);
         applyEnabled(binding.contrast.getRoot(), enabled);
@@ -218,9 +282,13 @@ final class VideoSettingPanel {
         applyEnabled(binding.shadow.getRoot(), enabled && !mpv);
     }
 
-    private void updateUnsupported(boolean supported) {
-        binding.unsupported.setVisibility(supported ? View.GONE : View.VISIBLE);
-        if (!supported) binding.unsupported.setText(getUnsupportedText());
+    private void updateEffectActions(boolean supported, boolean enabled) {
+        boolean effectsTab = currentTab != TAB_ADVANCED;
+        boolean visible = !supported && effectsTab;
+        applyEnabled(binding.compare, enabled && effectsTab);
+        applyEnabled(binding.reset, effectsTab);
+        binding.unsupported.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (visible) binding.unsupported.setText(getUnsupportedText());
     }
 
     private void apply() {
@@ -260,17 +328,19 @@ final class VideoSettingPanel {
     }
 
     private void showTab(int index) {
-        View[] roots = {binding.presetSection, binding.adjustSection};
+        View[] roots = {binding.presetSection, binding.adjustSection, binding.advancedSection};
         MaterialButton[] tabs = getTabs();
         for (int i = 0; i < roots.length; i++) roots[i].setVisibility(index == i ? View.VISIBLE : View.GONE);
         currentTab = index;
+        boolean supported = canSetVideoSetting();
+        updateEffectActions(supported, supported && VideoSetting.isEnabled());
         int focusId = tabs[index].getId();
         binding.reset.setNextFocusDownId(focusId);
         binding.compare.setNextFocusDownId(focusId);
     }
 
     private MaterialButton[] getTabs() {
-        return new MaterialButton[]{binding.tabPreset, binding.tabAdjust};
+        return new MaterialButton[]{binding.tabPreset, binding.tabAdjust, binding.tabAdvanced};
     }
 
     private void previewOriginal(boolean original) {

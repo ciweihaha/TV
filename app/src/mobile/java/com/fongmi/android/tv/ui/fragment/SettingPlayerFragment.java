@@ -1,7 +1,5 @@
 package com.fongmi.android.tv.ui.fragment;
 
-import android.content.DialogInterface;
-import android.os.Build;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,7 +20,6 @@ import com.fongmi.android.tv.ui.base.BaseFragment;
 import com.fongmi.android.tv.ui.dialog.BufferDialog;
 import com.fongmi.android.tv.ui.dialog.MpvConfDialog;
 import com.fongmi.android.tv.ui.dialog.UaDialog;
-import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -61,7 +58,6 @@ public class SettingPlayerFragment extends BaseFragment implements UaListener, B
         mBinding.libass.setOnClickListener(this::setLibass);
         mBinding.mpvConf.setOnClickListener(this::onMpvConf);
         mBinding.mpvGpuNext.setOnClickListener(this::setMpvGpuNext);
-        mBinding.mpvVulkan.setOnClickListener(this::setMpvVulkan);
         mBinding.mpvMotion.setOnClickListener(this::setMpvMotion);
         mBinding.exoMotion.setOnClickListener(this::setExoMotion);
         mBinding.render.setOnClickListener(this::setRender);

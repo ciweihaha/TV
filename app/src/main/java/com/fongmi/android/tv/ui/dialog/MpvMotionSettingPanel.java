@@ -80,7 +80,7 @@ final class MpvMotionSettingPanel {
         updateMotion();
     }
 
-    private void updateMotion() {
+    void updateMotion() {
         if (released || player == null) return;
         int fps = player.getMotionInterpolationFps();
         boolean supported = player.isMotionInterpolationSupported();

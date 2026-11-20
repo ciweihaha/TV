@@ -2,7 +2,6 @@ package com.fongmi.android.tv.ui.activity;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 
@@ -19,7 +18,6 @@ import com.fongmi.android.tv.ui.base.BaseActivity;
 import com.fongmi.android.tv.ui.dialog.BufferDialog;
 import com.fongmi.android.tv.ui.dialog.MpvConfDialog;
 import com.fongmi.android.tv.ui.dialog.UaDialog;
-import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
 
 public class SettingPlayerActivity extends BaseActivity implements UaListener, BufferListener {
@@ -57,7 +55,6 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
         mBinding.libass.setOnClickListener(this::setLibass);
         mBinding.mpvConf.setOnClickListener(this::onMpvConf);
         mBinding.mpvGpuNext.setOnClickListener(this::setMpvGpuNext);
-        mBinding.mpvVulkan.setOnClickListener(this::setMpvVulkan);
         mBinding.mpvMotion.setOnClickListener(this::setMpvMotion);
         mBinding.exoMotion.setOnClickListener(this::setExoMotion);
         mBinding.render.setOnClickListener(this::setRender);
@@ -198,6 +195,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
         if (mBinding != null) {
             setPlaybackModeText();
             setVisible();
+            setMpvOptions();
         }
     }
 }

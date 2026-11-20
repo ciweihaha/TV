@@ -107,6 +107,19 @@ public class PlayerSetting {
         };
     }
 
+    // 上游 44d2b64 的 getMotionFps（fork 版：统一入口返回 MPV 插帧帧率；Exo 插帧用 getExoMotionFps）。
+    public static int getMotionFps() {
+        return getMpvMotionFps();
+    }
+
+    public static int getMotionFps(int motion) {
+        return switch (motion) {
+            case 1 -> 60;
+            case 2 -> 120;
+            default -> 0;
+        };
+    }
+
     public static int getRender() {
         return Math.clamp(Prefers.getInt("render", RENDER_SURFACE), RENDER_SURFACE, RENDER_TEXTURE);
     }

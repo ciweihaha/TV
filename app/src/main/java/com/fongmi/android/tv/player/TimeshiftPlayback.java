@@ -95,6 +95,10 @@ public final class TimeshiftPlayback {
         return isActive() && replaying;
     }
 
+    void onSourceRestart() {
+        if (!replaying) epochOffset = C.TIME_UNSET;
+    }
+
     private void updateWindow() {
         if (!isActive()) return;
         end = clock.currentTimeMillis();

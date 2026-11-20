@@ -98,6 +98,11 @@ public final class MpvUtil {
         return PlayerSetting.getMpvMotionFps() > 0 && isVulkanSupported();
     }
 
+    // 上游 e0524f2 的 getMotionFps（fork 版：用 MPV 专用的 getMpvMotionFps；无 Vulkan 时插帧无效，返回 0）。
+    static int getMotionFps() {
+        return isVulkanSupported() ? PlayerSetting.getMpvMotionFps() : 0;
+    }
+
     public static MpvPlayer buildPlayer(Player.Listener listener) {
         MpvDecoderMode mode = MpvDecoderMode.fromCommonDecoderMode(DecodeSetting.getDecoderMode(PlayerSetting.ENGINE_MPV, C.TRACK_TYPE_VIDEO));
         MpvPlayer player = new MpvPlayer.Builder(App.get()).setVideoDecoderMode(mode).setConfig(buildConfig()).build();
