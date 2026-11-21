@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
 
@@ -20,6 +21,8 @@ import com.fongmi.android.tv.bean.Word;
 import com.fongmi.android.tv.databinding.ActivitySearchBinding;
 import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.setting.Setting;
+import com.fongmi.android.tv.ui.adapter.CandidateAdapter;
+import com.fongmi.android.tv.ui.adapter.KeyboardAdapter;
 import com.fongmi.android.tv.ui.adapter.RecordAdapter;
 import com.fongmi.android.tv.ui.adapter.WordAdapter;
 import com.fongmi.android.tv.ui.base.BaseActivity;
@@ -35,30 +38,34 @@ import com.google.android.flexbox.FlexboxLayoutManager;
 import com.google.common.net.HttpHeaders;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import okhttp3.Call;
 import okhttp3.Response;
 
 /**
- * 当贝市场式搜索屏：左栏输拼音首字母、右栏实时出结果。
+ * 百度输入法电视版搜索屏：左栏输拼音、右栏实时出结果。
  * <p>
- * 输入模型是“按 A–Z 首字母、右侧实时刷新”：没有拼写条、没有候选词提交、没有九键切音节。
+ * 输入模型是手机输入法式：正在拼的拼音显示在搜索框里（已提交文本 + 拼写串），键盘上方有一行候选栏
+ * （中文模式有拼写时显示，首选蓝底，遥控选词上屏去搜；英文模式没有候选栏，字母直输）。
+ * 九键中文是 T9 预测（数字序列按拼音音节切分再走联想链），九键英文是多击（同键连按循环字母）。
  * 点右侧任一建议/历史直接进该标题的搜索结果页。右栏顶部是“影视”范围说明（搜索只搜影视，
  * 2026-11-21 之前的应用/游戏/影片三个 tab 已去掉：应用是摆设、游戏/影片点不进）。
- * 焦点分两个区：左栏（搜索框/功能行/字母格/模式行）、右栏列表（历史/建议）。
- * 键盘有中/英切换：中文模式空格 = 确认首个联想词，英文模式空格 = 输入空格字符。
- * 空格键是字母格里跟在 Z 后面的一格（数字盘里跟在 9 后面），不是单独的通栏条。
+ * 焦点分三个区：左栏面板（页签/候选栏/左列/键格/右列/模式行）、右栏列表（历史/建议）。
+ * 键盘有中/英切换：中文模式空格 = 确认首个联想词并搜索，英文模式空格 = 输入空格字符。
  * <p>
  * 联想链复用旧的 getWord() → getSuggest() iQIYI 建议 + 300ms 防抖 + 三序号防过期（M22），一字未动：
- * 字母键输入更快（连按），防抖比原来更重要。
+ * 字母键输入更快（连按），防抖比原来更重要。候选栏用的就是这条链返回的建议词，不另找词典。
  */
-public class SearchActivity extends BaseActivity implements WordAdapter.OnClickListener, RecordAdapter.OnClickListener {
+public class SearchActivity extends BaseActivity implements WordAdapter.OnClickListener, RecordAdapter.OnClickListener, CustomKeyboard.Callback, CandidateAdapter.OnClickListener {
 
     private ActivitySearchBinding mBinding;
     private CustomKeyboard mKeyboard;
     private RecordAdapter mRecordAdapter;
     private WordAdapter mWordAdapter;
+    private CandidateAdapter mCandidateAdapter;
     /** 联想请求序号：每次输入变化 +1，只有最新一次请求的响应能进候选列表，慢到的过期响应直接丢弃。 */
     private int suggestSeq;
     /** 已实际发出的联想请求序号（防抖后才发出）。 */
@@ -97,8 +104,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     @Override
     protected void initView(Bundle savedInstanceState) {
-        mKeyboard = CustomKeyboard.init(mBinding);
-        mKeyboard.setOnSpaceListener(() -> confirmFirstSuggestion());
+        mKeyboard = CustomKeyboard.init(this, mBinding);
         setRecyclerView();
         updateResultCount();
         checkKeyword();
@@ -135,6 +141,10 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         mBinding.recordRecycler.setHasFixedSize(false);
         mBinding.recordRecycler.setLayoutManager(new FlexboxLayoutManager(this, FlexDirection.ROW));
         mBinding.recordRecycler.setAdapter(mRecordAdapter = new RecordAdapter(this));
+        mBinding.candidateBar.setItemAnimator(null);
+        mBinding.candidateBar.setHasFixedSize(false);
+        mBinding.candidateBar.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        mBinding.candidateBar.setAdapter(mCandidateAdapter = new CandidateAdapter(this));
     }
 
     private void checkKeyword() {
@@ -145,6 +155,8 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     private void setKeyword(String text) {
         mBinding.keyword.setText(text);
         mBinding.keyword.setSelection(text.length());
+        // 外部改了搜索框：键盘以框内文本为准，丢弃拼写状态
+        if (mKeyboard != null) mKeyboard.syncFromBox();
     }
 
     private void getWord(String text) {
@@ -175,7 +187,8 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     private void getSuggest(String text, int seq) {
         suggestRequestedSeq = seq;
         mBinding.word.setText(R.string.search_suggest);
-        OkHttp.newCall("https://suggest.video.iqiyi.com/?if=mobile&key=" + Uri.encode(ZhuToPin.get(text))).enqueue(getCallback(false, seq));
+        // 分词符 ' 只分隔拼写显示，不进联想查询
+        OkHttp.newCall("https://suggest.video.iqiyi.com/?if=mobile&key=" + Uri.encode(ZhuToPin.get(text.replace("'", "")))).enqueue(getCallback(false, seq));
     }
 
     private Callback getCallback(boolean hot, int seq) {
@@ -201,6 +214,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         mWordAdapter.setItems(Word.objectFrom(result).getData());
         updateResultCount();
         updateMatchDisplay();
+        updateCandidateBar();
     }
 
     /** 右上角“相关搜索结果：N个”（历史 + 建议两栏的条数之和）。 */
@@ -211,17 +225,27 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         mBinding.resultCount.setText(getString(R.string.search_result_count, count));
     }
 
-    /** 左下角当前匹配：黄色已输首字母（字母间空格分隔）+ 白色大号中文（首个建议标题）。
-     * 项目里没有中文→拼音的转换库，黄行不用首个标题的拼音、而用用户已输的首字母——
-     * 视觉结构与当贝一致，数据不编造；空输入或无建议时整块隐藏。 */
+    /** 左下角当前匹配：黄色拼音（正在拼的拼音字母，字母间空格分隔）+ 白色大号中文（首个建议标题）。
+     * 英文模式直接显示原文（CCTV 5）；没有拼写时（只有已提交文本）整块隐藏。 */
     private void updateMatchDisplay() {
         if (mWordAdapter == null || mWordAdapter.getItemCount() == 0 || empty()) {
             mBinding.matchLayout.setVisibility(View.GONE);
             return;
         }
         String keyword = mBinding.keyword.getText().toString().trim();
-        // 英文模式直接显示原文（CCTV 5）；中文模式显示已输首字母（字母间空格分隔）。
-        mBinding.matchPin.setText(mKeyboard != null && mKeyboard.isEnglishMode() ? keyword : spacedLetters(keyword.toUpperCase()));
+        if (mKeyboard != null && mKeyboard.isEnglishMode()) {
+            mBinding.matchPin.setText(keyword);
+        } else if (mKeyboard != null && mKeyboard.isComposing()) {
+            String pinyin = mKeyboard.composingDisplay().replace("'", "").replaceAll("[^A-Za-z]", "");
+            if (pinyin.isEmpty()) {
+                mBinding.matchLayout.setVisibility(View.GONE);
+                return;
+            }
+            mBinding.matchPin.setText(spacedLetters(pinyin.toUpperCase()));
+        } else {
+            mBinding.matchLayout.setVisibility(View.GONE);
+            return;
+        }
         mBinding.matchTitle.setText(mWordAdapter.getItem(0).getTitle());
         mBinding.matchLayout.setVisibility(View.VISIBLE);
     }
@@ -235,6 +259,50 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         return sb.toString();
     }
 
+    /** 候选栏：中文模式正在拼写且有建议时显示前 8 个建议词，首选蓝底；英文/符号盘/系统模式不显示。 */
+    private void updateCandidateBar() {
+        if (mKeyboard == null || mWordAdapter == null || mCandidateAdapter == null) return;
+        boolean show = mBinding.kbPanel.getVisibility() == View.VISIBLE
+                && mKeyboard.getMode() != KeyboardAdapter.MODE_SYMBOL
+                && !mKeyboard.isSystemMode() && !mKeyboard.isEnglishMode()
+                && mKeyboard.isComposing() && mWordAdapter.getItemCount() > 0;
+        if (!show) {
+            if (mBinding.candidateBar.getVisibility() != View.GONE) mBinding.candidateBar.setVisibility(View.GONE);
+            return;
+        }
+        List<String> titles = new ArrayList<>();
+        int n = Math.min(8, mWordAdapter.getItemCount());
+        for (int i = 0; i < n; i++) titles.add(mWordAdapter.getItem(i).getTitle());
+        boolean hadFocus = mBinding.candidateBar.hasFocus();
+        mCandidateAdapter.setItems(titles);
+        mBinding.candidateBar.setVisibility(View.VISIBLE);
+        if (hadFocus) mBinding.candidateBar.post(() -> focusCandidate(0));
+    }
+
+    private boolean isCandidateBarVisible() {
+        return mBinding.candidateBar.getVisibility() == View.VISIBLE && mCandidateAdapter != null && mCandidateAdapter.getItemCount() > 0;
+    }
+
+    private boolean focusCandidate(int position) {
+        if (mCandidateAdapter == null || position < 0 || position >= mCandidateAdapter.getItemCount()) return false;
+        RecyclerView.LayoutManager lm = mBinding.candidateBar.getLayoutManager();
+        View child = lm == null ? null : lm.findViewByPosition(position);
+        if (child == null) return false;
+        child.requestFocus();
+        return true;
+    }
+
+    @Override
+    public void onCandidateClick(String text) {
+        setKeyword(text);
+        onSearch();
+    }
+
+    @Override
+    public void onCandidateFocus(int position) {
+        // 蓝底跟随焦点：CandidateAdapter 的焦点监听里已经 setSelected，这里不用再做事
+    }
+
     @Override
     public void onItemClick(String text) {
         setKeyword(text);
@@ -242,10 +310,30 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     /** 中文模式空格键：确认首个联想词（与点首个建议相同：填进搜索框并立即搜）。
-     * 无建议时什么都不做。英文/数字盘模式的空格不走这里（直接输空格字符，见 CustomKeyboard）。 */
-    private void confirmFirstSuggestion() {
-        if (mWordAdapter == null || mWordAdapter.getItemCount() == 0) return;
-        onItemClick(mWordAdapter.getItem(0).getTitle());
+     * 无建议（或建议未对应当前输入）时什么都不做。英文/数字盘模式的空格不走这里（直接输空格字符，见 CustomKeyboard）。 */
+    @Override
+    public void onConfirmFirstAndSearch() {
+        String first = getFirstCandidate();
+        if (first == null || first.isEmpty()) return;
+        setKeyword(first);
+        onSearch();
+    }
+
+    /** 当前候选词的第一个：只有最新一次联想请求已应用、且正在拼写时才有效，
+     * 否则返回 null（避免把旧输入的候选、热搜词当成当前拼音的首选提交）。 */
+    @Override
+    public String getFirstCandidate() {
+        if (mWordAdapter == null || mWordAdapter.getItemCount() == 0) return null;
+        if (mKeyboard == null || !mKeyboard.isComposing()) return null;
+        if (suggestAppliedSeq != suggestSeq) return null;
+        return mWordAdapter.getItem(0).getTitle();
+    }
+
+    /** 键盘状态变了（模式/页签/中英文切换）：刷新候选栏与当前匹配。 */
+    @Override
+    public void onStateChanged() {
+        updateCandidateBar();
+        updateMatchDisplay();
     }
 
     @Override
@@ -261,7 +349,10 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         if (size == 0) focusFirst(mBinding.wordRecycler);
     }
 
+    @Override
     public void onSearch() {
+        // 完成/搜索键：先把正在拼的拼音提交为首选候选（没有则提交拼音原文），再搜索
+        if (mKeyboard != null && mKeyboard.isComposing()) mKeyboard.commitComposing(true);
         if (empty()) return;
         String keyword = mBinding.keyword.getText().toString().trim();
         App.post(() -> mRecordAdapter.add(keyword), 250);
@@ -281,21 +372,27 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     /**
-     * 焦点路由（两个区，左栏 ↔ 右栏列表）：
-     * 左栏：搜索框 → 功能行 → 字母格（含 Z 后面的空格键）→ 模式行（上下直通）；右栏：历史/建议列表。
-     * 区之间：左栏右边缘 → 右栏列表首项；列表左边缘 → 字母格首行末尾；列表上边缘 → 搜索框。
+     * 焦点路由（三个区，左栏面板 ↔ 右栏列表）：
+     * 左栏面板：搜索框 → 页签（拼音全键/九键）→ 候选栏 → 键格（左列/右列在两侧）→ 模式行（上下直通）；
+     * 右栏：历史/建议列表。
+     * 区之间：键格右边缘 → 右列，右列右边缘 → 右栏列表首项；列表左边缘 → 键格首行末尾；列表上边缘 → 搜索框。
      * 每条边都显式处理：越界的方向返回 true 吞掉（不让焦点飞出屏幕），其余返回 false 走系统默认移动。
+     * 占位键（QWERTY 错列用的 spacer）不可聚焦，边缘判断全部跳过。
      */
     private boolean findFocus(KeyEvent event) {
         View current = getCurrentFocus();
         if (current == mBinding.keyword) return handleKeywordKey(event);
         if (current == mBinding.mic) return handleMicKey(event);
-        if (current == mBinding.funcLang || current == mBinding.funcDigits || current == mBinding.funcClear || current == mBinding.funcBack) return handleFuncRowKey(event, current);
+        if (current == mBinding.tabFull || current == mBinding.tabNine) return handleTabKey(event, current);
+        if (current == mBinding.segKey || current == mBinding.symKey || current == mBinding.langKey) return handleLeftColKey(event, current);
+        if (current == mBinding.delKey || current == mBinding.doneKey) return handleRightColKey(event, current);
         if (current == mBinding.modeFull || current == mBinding.modeSystem) return handleModeRowKey(event, current);
         View inKeyboard = mBinding.keyboard.findContainingItemView(current);
+        View inCandidate = mBinding.candidateBar.findContainingItemView(current);
         View inWord = mBinding.wordRecycler.findContainingItemView(current);
         View inRecord = mBinding.recordRecycler.findContainingItemView(current);
         if (inKeyboard != null) return handleKeyboardKey(event, inKeyboard);
+        if (inCandidate != null) return handleCandidateKey(event, inCandidate);
         if (inRecord != null) return handleRecordKey(event, inRecord);
         if (inWord != null) return handleWordKey(event, inWord);
         return false;
@@ -305,6 +402,451 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     private boolean focusRightList() {
         boolean hasRecord = mBinding.recordLayout.getVisibility() == View.VISIBLE;
         return focusFirst(hasRecord ? mBinding.recordRecycler : mBinding.wordRecycler);
+    }
+
+    private static boolean isSpacer(View view) {
+        return view != null && KeyboardAdapter.TAG_SPACER.equals(view.getTag());
+    }
+
+    private static int centerXOnScreen(View view) {
+        int[] loc = new int[2];
+        view.getLocationOnScreen(loc);
+        return loc[0] + view.getWidth() / 2;
+    }
+
+    private static int centerYOnScreen(View view) {
+        int[] loc = new int[2];
+        view.getLocationOnScreen(loc);
+        return loc[1] + view.getHeight() / 2;
+    }
+
+    /** 键格里按屏上 x 最近的非占位子项（跨容器移动用：候选栏/模式行下来时，坐标系不同不能直接比 getLeft）。 */
+    private View findNearestKeyboardByScreenX(List<View> row, int targetX) {
+        View nearest = null;
+        int minDist = Integer.MAX_VALUE;
+        for (View child : row) {
+            int dist = Math.abs(centerXOnScreen(child) - targetX);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = child;
+            }
+        }
+        return nearest;
+    }
+
+    /** 键格里按屏上 y 最近的非占位子项（左列/右列横向进出键格时用）。 */
+    private View findNearestKeyboardByScreenY(int targetY) {
+        View nearest = null;
+        int minDist = Integer.MAX_VALUE;
+        for (int i = 0; i < mBinding.keyboard.getChildCount(); i++) {
+            View child = mBinding.keyboard.getChildAt(i);
+            if (isSpacer(child)) continue;
+            int dist = Math.abs(centerYOnScreen(child) - targetY);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = child;
+            }
+        }
+        return nearest;
+    }
+
+    private List<View> keyboardRow(boolean first) {
+        List<View> row = new ArrayList<>();
+        int edgeTop = -1;
+        for (int i = 0; i < mBinding.keyboard.getChildCount(); i++) {
+            View child = mBinding.keyboard.getChildAt(i);
+            if (isSpacer(child)) continue;
+            if (edgeTop == -1) edgeTop = child.getTop();
+            if (first && child.getTop() == edgeTop) row.add(child);
+            if (!first) {
+                if (child.getTop() > edgeTop) edgeTop = child.getTop();
+            }
+        }
+        if (!first) {
+            for (int i = 0; i < mBinding.keyboard.getChildCount(); i++) {
+                View child = mBinding.keyboard.getChildAt(i);
+                if (!isSpacer(child) && child.getTop() == edgeTop) row.add(child);
+            }
+        }
+        return row;
+    }
+
+    private View findNearestInRow(List<View> row, int targetX) {
+        return findNearestKeyboardByScreenX(row, targetX);
+    }
+
+    private boolean isFirstRow(RecyclerView rv, View item) {
+        int firstTop = -1;
+        for (int i = 0; i < rv.getChildCount(); i++) {
+            View child = rv.getChildAt(i);
+            if (rv == mBinding.keyboard && isSpacer(child)) continue;
+            firstTop = child.getTop();
+            break;
+        }
+        return firstTop != -1 && item.getTop() == firstTop;
+    }
+
+    private boolean isLastRow(RecyclerView rv, View item) {
+        int lastTop = -1;
+        for (int i = rv.getChildCount() - 1; i >= 0; i--) {
+            View child = rv.getChildAt(i);
+            if (rv == mBinding.keyboard && isSpacer(child)) continue;
+            lastTop = child.getTop();
+            break;
+        }
+        return lastTop != -1 && item.getTop() == lastTop;
+    }
+
+    private boolean isFirstInRow(RecyclerView rv, View focused) {
+        int top = focused.getTop();
+        int left = focused.getLeft();
+        for (int i = 0; i < rv.getChildCount(); i++) {
+            View child = rv.getChildAt(i);
+            if (rv == mBinding.keyboard && isSpacer(child)) continue;
+            if (child.getTop() == top && child.getLeft() < left) return false;
+        }
+        return true;
+    }
+
+    private boolean isLastInRow(RecyclerView rv, View focused) {
+        int top = focused.getTop();
+        int right = focused.getRight();
+        for (int i = 0; i < rv.getChildCount(); i++) {
+            View child = rv.getChildAt(i);
+            if (rv == mBinding.keyboard && isSpacer(child)) continue;
+            if (child.getTop() == top && child.getRight() > right) return false;
+        }
+        return true;
+    }
+
+    private static int centerX(View view) {
+        return view.getLeft() + view.getWidth() / 2;
+    }
+
+    /** 键格首行最右一格（右栏列表左移的落点固定是首行末尾的 P）。 */
+    private View findLastInFirstRow(RecyclerView rv) {
+        List<View> row = keyboardRow(true);
+        View nearest = null;
+        int maxLeft = Integer.MIN_VALUE;
+        for (View child : row) {
+            if (child.getLeft() > maxLeft) {
+                maxLeft = child.getLeft();
+                nearest = child;
+            }
+        }
+        return nearest;
+    }
+
+    private View findNearestModeByScreenX(int targetX) {
+        View[] items = {mBinding.modeFull, mBinding.modeSystem};
+        View nearest = null;
+        int minDist = Integer.MAX_VALUE;
+        for (View item : items) {
+            int dist = Math.abs(centerXOnScreen(item) - targetX);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = item;
+            }
+        }
+        return nearest;
+    }
+
+    private View findNearestLeftCol(int targetY) {
+        View[] items = {mBinding.segKey, mBinding.symKey, mBinding.langKey};
+        View nearest = null;
+        int minDist = Integer.MAX_VALUE;
+        for (View item : items) {
+            int dist = Math.abs(centerYOnScreen(item) - targetY);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = item;
+            }
+        }
+        return nearest;
+    }
+
+    private View findNearestRightCol(int targetY) {
+        View[] items = {mBinding.delKey, mBinding.doneKey};
+        View nearest = null;
+        int minDist = Integer.MAX_VALUE;
+        for (View item : items) {
+            int dist = Math.abs(centerYOnScreen(item) - targetY);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = item;
+            }
+        }
+        return nearest;
+    }
+
+    private boolean handleKeywordKey(KeyEvent event) {
+        if (KeyUtil.isDownKey(event)) {
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
+        if (!KeyUtil.isRightKey(event)) return false;
+        if (mBinding.keyword.getSelectionEnd() < mBinding.keyword.getText().length()) return false;
+        boolean hasRecord = mBinding.recordLayout.getVisibility() == View.VISIBLE;
+        return focusFirst(hasRecord ? mBinding.recordRecycler : mBinding.wordRecycler);
+    }
+
+    private boolean handleMicKey(KeyEvent event) {
+        if (KeyUtil.isDownKey(event)) {
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
+        if (KeyUtil.isRightKey(event)) return focusRightList();
+        return false;
+    }
+
+    private boolean handleTabKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event)) {
+            mBinding.keyword.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event)) {
+            if (isCandidateBarVisible()) return focusCandidate(mCandidateAdapter.getSelected());
+            View child = findNearestInRow(keyboardRow(true), centerXOnScreen(item));
+            if (child != null) {
+                child.requestFocus();
+                return true;
+            }
+            return false;
+        }
+        if (KeyUtil.isLeftKey(event) && item == mBinding.tabFull) return true;
+        if (KeyUtil.isLeftKey(event) && item == mBinding.tabNine) {
+            mBinding.tabFull.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isRightKey(event) && item == mBinding.tabFull) {
+            mBinding.tabNine.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isRightKey(event) && item == mBinding.tabNine) return focusRightList();
+        return false;
+    }
+
+    private boolean handleCandidateKey(KeyEvent event, View item) {
+        int position = mBinding.candidateBar.getChildAdapterPosition(item);
+        if (KeyUtil.isUpKey(event)) {
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event)) {
+            View child = findNearestInRow(keyboardRow(true), centerXOnScreen(item));
+            if (child != null) {
+                child.requestFocus();
+                return true;
+            }
+            return false;
+        }
+        if (KeyUtil.isLeftKey(event)) {
+            if (position > 0) return focusCandidate(position - 1);
+            return true;
+        }
+        if (KeyUtil.isRightKey(event)) {
+            if (position >= 0 && position < mCandidateAdapter.getItemCount() - 1) return focusCandidate(position + 1);
+            return focusRightList();
+        }
+        return false;
+    }
+
+    private boolean handleLeftColKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event)) {
+            if (item == mBinding.segKey) {
+                if (isCandidateBarVisible()) return focusCandidate(mCandidateAdapter.getSelected());
+                mKeyboard.focusSelectedTab();
+                return true;
+            }
+            if (item == mBinding.symKey) {
+                mBinding.segKey.requestFocus();
+                return true;
+            }
+            mBinding.symKey.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event)) {
+            if (item == mBinding.segKey) {
+                mBinding.symKey.requestFocus();
+                return true;
+            }
+            if (item == mBinding.symKey) {
+                mBinding.langKey.requestFocus();
+                return true;
+            }
+            mBinding.modeFull.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isLeftKey(event)) return true;
+        if (KeyUtil.isRightKey(event)) {
+            View child = findNearestKeyboardByScreenY(centerYOnScreen(item));
+            if (child != null) {
+                child.requestFocus();
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    private boolean handleRightColKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event)) {
+            if (item == mBinding.delKey) {
+                if (isCandidateBarVisible()) return focusCandidate(mCandidateAdapter.getSelected());
+                mKeyboard.focusSelectedTab();
+                return true;
+            }
+            mBinding.delKey.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event)) {
+            if (item == mBinding.delKey) {
+                mBinding.doneKey.requestFocus();
+                return true;
+            }
+            mBinding.modeFull.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isLeftKey(event)) {
+            View child = findNearestKeyboardByScreenY(centerYOnScreen(item));
+            if (child != null) {
+                child.requestFocus();
+                return true;
+            }
+            return false;
+        }
+        if (KeyUtil.isRightKey(event)) return focusRightList();
+        return false;
+    }
+
+    private boolean handleModeRowKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event)) {
+            // 模式行上方是键格末行；系统输入法模式下面板隐藏，直接回搜索框
+            if (mBinding.kbPanel.getVisibility() == View.VISIBLE) {
+                View child = findNearestInRow(keyboardRow(false), centerXOnScreen(item));
+                if (child != null) {
+                    child.requestFocus();
+                    return true;
+                }
+            }
+            mBinding.keyword.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event)) return true;
+        // 全键盘 ↔ 系统输入法左右切换
+        if (KeyUtil.isRightKey(event) && item == mBinding.modeFull) {
+            mBinding.modeSystem.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isLeftKey(event) && item == mBinding.modeSystem) {
+            mBinding.modeFull.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isLeftKey(event) && item == mBinding.modeFull) return true;
+        if (KeyUtil.isRightKey(event) && item == mBinding.modeSystem) return focusRightList();
+        return false;
+    }
+
+    private boolean handleKeyboardKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.keyboard, item)) {
+            if (isCandidateBarVisible()) {
+                View candidate = findNearestCandidateByScreenX(centerXOnScreen(item));
+                if (candidate != null) {
+                    candidate.requestFocus();
+                    return true;
+                }
+            }
+            mKeyboard.focusSelectedTab();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event) && isLastRow(mBinding.keyboard, item)) {
+            // 键格末行下方就是模式行
+            View mode = findNearestModeByScreenX(centerXOnScreen(item));
+            if (mode != null) {
+                mode.requestFocus();
+                return true;
+            }
+            return false;
+        }
+        if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.keyboard, item)) {
+            View col = findNearestLeftCol(centerYOnScreen(item));
+            if (col != null) {
+                col.requestFocus();
+                return true;
+            }
+            return true;
+        }
+        if (KeyUtil.isRightKey(event) && isLastInRow(mBinding.keyboard, item)) {
+            View col = findNearestRightCol(centerYOnScreen(item));
+            if (col != null) {
+                col.requestFocus();
+                return true;
+            }
+            return focusRightList();
+        }
+        return false;
+    }
+
+    private View findNearestCandidateByScreenX(int targetX) {
+        View nearest = null;
+        int minDist = Integer.MAX_VALUE;
+        for (int i = 0; i < mBinding.candidateBar.getChildCount(); i++) {
+            View child = mBinding.candidateBar.getChildAt(i);
+            int dist = Math.abs(centerXOnScreen(child) - targetX);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = child;
+            }
+        }
+        return nearest;
+    }
+
+    private boolean handleRecordKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.recordRecycler, item)) {
+            // 右栏已没有 tab：历史列表首行按上直接回搜索框
+            mBinding.keyword.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event) && isLastRow(mBinding.recordRecycler, item)) return focusFirst(mBinding.wordRecycler);
+        if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.recordRecycler, item)) {
+            // 左移回左栏：落到键格首行末尾（P）
+            View child = findLastInFirstRow(mBinding.keyboard);
+            if (child != null) {
+                child.requestFocus();
+                return true;
+            }
+            return false;
+        }
+        if (KeyUtil.isRightKey(event) && isLastInRow(mBinding.recordRecycler, item)) return true;
+        return false;
+    }
+
+    private boolean handleWordKey(KeyEvent event, View item) {
+        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.wordRecycler, item)) {
+            if (mBinding.recordLayout.getVisibility() == View.VISIBLE) {
+                View child = findNearestInLastRow(mBinding.recordRecycler, item.getLeft());
+                if (child != null) {
+                    mBinding.scroll.smoothScrollTo(0, 0);
+                    child.requestFocus();
+                    return true;
+                }
+            }
+            // 右栏已没有 tab：建议列表首行按上直接回搜索框
+            mBinding.keyword.requestFocus();
+            return true;
+        }
+        if (KeyUtil.isDownKey(event) && isLastRow(mBinding.wordRecycler, item)) return true;
+        if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.wordRecycler, item)) {
+            // 左移回左栏：落到键格首行末尾（P）
+            View child = findLastInFirstRow(mBinding.keyboard);
+            if (child != null) {
+                child.requestFocus();
+                return true;
+            }
+            return false;
+        }
+        if (KeyUtil.isRightKey(event) && isLastInRow(mBinding.wordRecycler, item)) return true;
+        return false;
     }
 
     private View findNearestInFirstRow(RecyclerView rv, int targetLeft) {
@@ -341,227 +883,6 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
             }
         }
         return nearest;
-    }
-
-    /** 字母格首行最右一格（右栏列表左移的落点固定是首行末尾的 E）。
-     * 注意不用右栏列表项的 getTop() 去比字母格子项的 getTop()：两者不在同一坐标系
-     *（列表在右栏，字母格在左栏中部），直接取首行最右一格就是几何上最近的。 */
-    private View findLastInFirstRow(RecyclerView rv) {
-        if (rv.getChildCount() == 0) return null;
-        int firstTop = rv.getChildAt(0).getTop();
-        View nearest = null;
-        int maxLeft = Integer.MIN_VALUE;
-        for (int i = 0; i < rv.getChildCount(); i++) {
-            View child = rv.getChildAt(i);
-            if (child.getTop() == firstTop && child.getLeft() > maxLeft) {
-                maxLeft = child.getLeft();
-                nearest = child;
-            }
-        }
-        return nearest;
-    }
-
-    private boolean isFirstRow(RecyclerView rv, View item) {
-        View first = rv.getChildAt(0);
-        return first != null && item.getTop() == first.getTop();
-    }
-
-    private boolean isLastRow(RecyclerView rv, View item) {
-        View last = rv.getChildAt(rv.getChildCount() - 1);
-        return last != null && item.getTop() == last.getTop();
-    }
-
-    private boolean isFirstInRow(RecyclerView rv, View focused) {
-        int top = focused.getTop();
-        int left = focused.getLeft();
-        for (int i = 0; i < rv.getChildCount(); i++) {
-            View child = rv.getChildAt(i);
-            if (child.getTop() == top && child.getLeft() < left) return false;
-        }
-        return true;
-    }
-
-    private boolean isLastInRow(RecyclerView rv, View focused) {
-        int top = focused.getTop();
-        int right = focused.getRight();
-        for (int i = 0; i < rv.getChildCount(); i++) {
-            View child = rv.getChildAt(i);
-            if (child.getTop() == top && child.getRight() > right) return false;
-        }
-        return true;
-    }
-
-    private static int centerX(View view) {
-        return view.getLeft() + view.getWidth() / 2;
-    }
-
-    private View findNearestFunc(int targetLeft) {
-        View[] items = {mBinding.funcLang, mBinding.funcDigits, mBinding.funcClear, mBinding.funcBack};
-        View nearest = null;
-        int minDist = Integer.MAX_VALUE;
-        for (View item : items) {
-            int dist = Math.abs(centerX(item) - targetLeft);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = item;
-            }
-        }
-        return nearest;
-    }
-
-    /** 模式行里离目标 x 最近的一项（字母格末行按下的落点；空格键在末行，不再单独占一行）。 */
-    private View findNearestMode(int targetLeft) {
-        View[] items = {mBinding.modeFull, mBinding.modeSystem};
-        View nearest = null;
-        int minDist = Integer.MAX_VALUE;
-        for (View item : items) {
-            int dist = Math.abs(centerX(item) - targetLeft);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = item;
-            }
-        }
-        return nearest;
-    }
-
-    private boolean handleKeywordKey(KeyEvent event) {
-        if (KeyUtil.isDownKey(event)) {
-            mKeyboard.focusFunctionRow();
-            return true;
-        }
-        if (!KeyUtil.isRightKey(event)) return false;
-        if (mBinding.keyword.getSelectionEnd() < mBinding.keyword.getText().length()) return false;
-        boolean hasRecord = mBinding.recordLayout.getVisibility() == View.VISIBLE;
-        return focusFirst(hasRecord ? mBinding.recordRecycler : mBinding.wordRecycler);
-    }
-
-    private boolean handleMicKey(KeyEvent event) {
-        if (KeyUtil.isDownKey(event)) {
-            mKeyboard.focusFunctionRow();
-            return true;
-        }
-        if (KeyUtil.isRightKey(event)) return focusRightList();
-        return false;
-    }
-
-    private boolean handleFuncRowKey(KeyEvent event, View item) {
-        if (KeyUtil.isUpKey(event)) {
-            mBinding.keyword.requestFocus();
-            return true;
-        }
-        if (KeyUtil.isDownKey(event)) {
-            View child = findNearestInFirstRow(mBinding.keyboard, centerX(item));
-            if (child != null) {
-                child.requestFocus();
-                return true;
-            }
-            // 系统输入法模式下字母格隐藏，下方就是模式行，直接落到“全键盘”
-            mBinding.modeFull.requestFocus();
-            return true;
-        }
-        if (KeyUtil.isLeftKey(event) && item == mBinding.funcLang) return true;
-        if (KeyUtil.isRightKey(event) && item == mBinding.funcBack) return focusRightList();
-        return false;
-    }
-
-    private boolean handleModeRowKey(KeyEvent event, View item) {
-        if (KeyUtil.isUpKey(event)) {
-            // 模式行上方是字母格末行（Z + 空格键）；系统输入法模式下字母格隐藏，直接回搜索框
-            if (mBinding.keyboard.getVisibility() == View.VISIBLE) {
-                View child = findNearestInLastRow(mBinding.keyboard, centerX(item));
-                if (child != null) {
-                    child.requestFocus();
-                    return true;
-                }
-            }
-            mBinding.keyword.requestFocus();
-            return true;
-        }
-        if (KeyUtil.isDownKey(event)) return true;
-        // 全键盘 ↔ 系统输入法一按就切：之前左右键走系统默认焦点搜索，模式行在屏外时
-        // 焦点会无声地挪到看不见的位置，来回切要按很多次方向键。
-        if (KeyUtil.isRightKey(event) && item == mBinding.modeFull) {
-            mBinding.modeSystem.requestFocus();
-            return true;
-        }
-        if (KeyUtil.isLeftKey(event) && item == mBinding.modeSystem) {
-            mBinding.modeFull.requestFocus();
-            return true;
-        }
-        if (KeyUtil.isLeftKey(event) && item == mBinding.modeFull) return true;
-        if (KeyUtil.isRightKey(event) && item == mBinding.modeSystem) return focusRightList();
-        return false;
-    }
-
-    private boolean handleKeyboardKey(KeyEvent event, View item) {
-        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.keyboard, item)) {
-            View func = findNearestFunc(centerX(item));
-            if (func != null) {
-                func.requestFocus();
-                return true;
-            }
-            return false;
-        }
-        if (KeyUtil.isDownKey(event) && isLastRow(mBinding.keyboard, item)) {
-            // 字母格末行（含 Z 后面的空格键）下方就是模式行
-            View mode = findNearestMode(centerX(item));
-            if (mode != null) {
-                mode.requestFocus();
-                return true;
-            }
-            return false;
-        }
-        if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.keyboard, item)) return true;
-        if (KeyUtil.isRightKey(event) && isLastInRow(mBinding.keyboard, item)) return focusRightList();
-        return false;
-    }
-
-    private boolean handleRecordKey(KeyEvent event, View item) {
-        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.recordRecycler, item)) {
-            // 右栏已没有 tab：历史列表首行按上直接回搜索框
-            mBinding.keyword.requestFocus();
-            return true;
-        }
-        if (KeyUtil.isDownKey(event) && isLastRow(mBinding.recordRecycler, item)) return focusFirst(mBinding.wordRecycler);
-        if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.recordRecycler, item)) {
-            // 左移回左栏：落到字母格首行末尾（与旧的 tab 左移落点一致）
-            View child = findLastInFirstRow(mBinding.keyboard);
-            if (child != null) {
-                child.requestFocus();
-                return true;
-            }
-            return false;
-        }
-        if (KeyUtil.isRightKey(event) && isLastInRow(mBinding.recordRecycler, item)) return true;
-        return false;
-    }
-
-    private boolean handleWordKey(KeyEvent event, View item) {
-        if (KeyUtil.isUpKey(event) && isFirstRow(mBinding.wordRecycler, item)) {
-            if (mBinding.recordLayout.getVisibility() == View.VISIBLE) {
-                View child = findNearestInLastRow(mBinding.recordRecycler, item.getLeft());
-                if (child != null) {
-                    mBinding.scroll.smoothScrollTo(0, 0);
-                    child.requestFocus();
-                    return true;
-                }
-            }
-            // 右栏已没有 tab：建议列表首行按上直接回搜索框
-            mBinding.keyword.requestFocus();
-            return true;
-        }
-        if (KeyUtil.isDownKey(event) && isLastRow(mBinding.wordRecycler, item)) return true;
-        if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.wordRecycler, item)) {
-            // 左移回左栏：落到字母格首行末尾（与旧的 tab 左移落点一致）
-            View child = findLastInFirstRow(mBinding.keyboard);
-            if (child != null) {
-                child.requestFocus();
-                return true;
-            }
-            return false;
-        }
-        if (KeyUtil.isRightKey(event) && isLastInRow(mBinding.wordRecycler, item)) return true;
-        return false;
     }
 
     private boolean focusFirst(RecyclerView rv) {

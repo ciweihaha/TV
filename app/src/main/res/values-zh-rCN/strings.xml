@@ -382,7 +382,9 @@
     <string name="search_lang_toggle">中/英</string>
     <string name="search_space">空格</string>
     <string name="search_hint_english">英文输入：直接输入字母、单词搜索</string>
-    <string name="search_hint_keys">中/英切换输入模式，空格选首个联想词</string>
+    <string name="search_hint_keys">中/英切换输入模式；空格选首个联想词；候选栏选词直接搜</string>
+    <string name="search_seg">分词</string>
+    <string name="search_delete">删除</string>
     <string name="search_mode_full">全键盘</string>
     <string name="search_mode_system">系统输入法</string>
     <string name="search_result_count">相关搜索结果：<xliff:g name="count">%d</xliff:g>个</string>

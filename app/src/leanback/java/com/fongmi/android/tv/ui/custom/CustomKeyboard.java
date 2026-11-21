@@ -8,64 +8,118 @@ import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.databinding.ActivitySearchBinding;
+import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.adapter.KeyboardAdapter;
+import com.fongmi.android.tv.utils.PinyinTable;
 import com.fongmi.android.tv.utils.Util;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * 当贝市场式搜索键盘：A–Z 平铺字母格 + 数字盘 + 功能行（中/英切换 / 123 / 清空 / 退格）；
- * 空格键是字母格里跟在 Z 后面的一格（数字盘里跟在 9 后面），不是单独的通栏条。
+ * 百度输入法电视版式搜索键盘：拼音全键（QWERTY 三行错列）/ 拼音九键（T9 预测）+ 符号盘。
  * <p>
- * 输入模型是“输拼音首字母、右侧实时出结果”：按键只向搜索框追加一个字母/数字，没有拼音拼写条、
- * 没有候选词提交、没有九键切音节。旧的 T9/拼写状态机（拼写串、数字序列、音节切分、音节点击、拼写提交等）已全部删除。
+ * 面板（底部灰色）：顶部页签只有拼音全键 / 拼音九键（没有笔画）；键盘上方是候选栏（SearchActivity 管，
+ * 中文模式有拼写时显示，首选蓝底）；左列 分词 / ?12 / 中/英，右列 删除 / 完成（完成占两行高），
+ * 空格在全键第三行中间、九键是 0 键；左下角 du 标志。
  * <p>
- * 中/英切换（2026-11-21）：默认中文（现状：输拼音首字母、右侧出联想）；英文 = 字母直输、按字面搜。
- * 两种模式下字母/数字键的行为相同（联想接口对拉丁字母原样查询，ZhuToPin.get 只转注音、不动拉丁字母），
- * 切换真正改变的是空格键：中文模式空格 = 确认首个联想词（与点首个建议相同），英文/数字盘模式空格 = 输入空格字符。
- * 当前模式显示在搜索页提示行第一行。
+ * 输入方式与手机输入法一致：正在拼的拼音显示在搜索框里（已提交文本 + 拼写串），候选词走现有的
+ * getSuggest → iQIYI 建议链；点候选栏选词上屏并搜索；退格先删拼写中的最后一个字母/数字，再删已提交的字符；
+ * 点“完成”先提交首选候选（没有则提交拼音原文）再搜索；中文空格 = 确认首个联想词并搜索。
  * <p>
- * 搜索框内容就是唯一的文本状态（没有 committed/composing 两份状态）：外部改动搜索框（语音输入、
- * 历史记录、初始关键字）时不需要同步，追加/退格/清空都直接改搜索框本身。系统输入法模式下
- * 搜索框归系统输入法管，自带键盘格与功能行隐藏，只留模式行作切回入口。
+ * 九键中文是预测输入（T9）：每键只按一次，数字序列按 PinyinTable 切成拼音音节；分词键在数字序列末尾
+ * 强制断一个音节；不编造中文词库。九键英文是多击输入：同键连按在该键字母间循环（如 2→A→B→C），
+ * 换键或停顿超过 1.2 秒即确认当前字母。
+ * <p>
+ * 中/英切换：中文 = 输拼音出候选栏；英文 = 字母直输、没有候选栏。切到英文时正在拼的拼音按原文提交，
+ * 不丢输入。系统输入法模式下搜索框归系统输入法管，自带面板隐藏，只留模式行作切回入口。
  */
 public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
 
     private static final int MAX_LEN = 20;
+    private static final char[] PUNCTS = {'.', ',', '?', '!'};
+    private static final long PUNCT_TIMEOUT = 1000;
+    /** 英文九键多击：同键连按的确认时限。 */
+    private static final long TAP_TIMEOUT = 1200;
+    /** 九键各键的多击字母表（与键面一致）。 */
+    private static final String[] TAP_LETTERS = {"", "", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"};
 
     private final ActivitySearchBinding binding;
+    private final Callback callback;
     private KeyboardAdapter adapter;
     private SpaceItemDecoration decoration;
-    /** 当前是数字盘（true）还是字母格（false）；不记入 Setting，进搜索屏永远从字母格开始。 */
-    private boolean digitsMode;
+    private int customMode;
+
+    /** 已提交进搜索框的文本（中文或字符）。 */
+    private final StringBuilder committed = new StringBuilder();
+    /** 全键正在拼的拼音字母（可含分词符 '）。 */
+    private final StringBuilder composing = new StringBuilder();
+    /** 九键已按的数字序列。 */
+    private final StringBuilder digits = new StringBuilder();
+    /** 九键当前切出的音节。 */
+    private List<String> syllables = new ArrayList<>();
+    /** 九键未切出的尾部数字。 */
+    private String remainder = "";
+    /** 分词键强制断开的音节边界（数字序列里的下标位置）。 */
+    private final List<Integer> segBreaks = new ArrayList<>();
+    /** 1 键标点循环：上次输入的标点与时间。 */
+    private String lastPunct = "";
+    private long lastPunctTime;
+    /** 英文九键多击：上次按的数字键与时间。 */
+    private String lastTapDigit = "";
+    private long lastTapTime;
     /** 中/英输入模式：默认中文（false = 中文，true = 英文）；不记入 Setting，进搜索屏永远从中文开始。 */
     private boolean englishMode;
-    /** 空格键在中文模式下的动作（确认首个联想词），由 SearchActivity 设置；英文/数字盘模式空格直接输空格字符，不走这里。 */
-    private OnSpaceListener spaceListener;
+    /** 光标在已提交文本里的位置；-1 表示末尾（默认）。新版没有光标移动键，恒为末尾。 */
+    private int cursorPos = -1;
 
-    /** 中文模式空格键的回调：SearchActivity 用首个联想词实现（点首个建议的同一效果）。 */
-    public interface OnSpaceListener {
-        void onSpace();
+    /** 光标处的有效位置（夹在 [0, committed.length] 内）。 */
+    private int editPos() {
+        if (cursorPos < 0) return committed.length();
+        return Math.max(0, Math.min(cursorPos, committed.length()));
     }
 
-    public void setOnSpaceListener(OnSpaceListener listener) {
-        this.spaceListener = listener;
+    /** 在光标处插入已提交文本，光标移到插入内容之后；末尾时保持 -1。 */
+    private void insertCommitted(String text) {
+        int pos = editPos();
+        committed.insert(pos, text);
+        cursorPos = pos + text.length();
+        if (cursorPos >= committed.length()) cursorPos = -1;
+        renderBox();
+    }
+
+    /** 删掉光标前一个已提交字符，光标跟进一步。 */
+    private void deleteCommittedBeforeCursor() {
+        int pos = editPos();
+        if (pos <= 0) return;
+        committed.deleteCharAt(pos - 1);
+        cursorPos = pos - 1;
+        if (cursorPos >= committed.length()) cursorPos = -1;
+        renderBox();
+    }
+
+    public static CustomKeyboard init(Callback callback, ActivitySearchBinding binding) {
+        CustomKeyboard keyboard = new CustomKeyboard(callback, binding);
+        keyboard.initView();
+        return keyboard;
+    }
+
+    public CustomKeyboard(Callback callback, ActivitySearchBinding binding) {
+        this.callback = callback;
+        this.binding = binding;
+        this.customMode = Setting.getKeyboardMode();
+    }
+
+    public boolean isSystemMode() {
+        return adapter != null && adapter.isSystemMode();
     }
 
     public boolean isEnglishMode() {
         return englishMode;
     }
 
-    public static CustomKeyboard init(ActivitySearchBinding binding) {
-        CustomKeyboard keyboard = new CustomKeyboard(binding);
-        keyboard.initView();
-        return keyboard;
-    }
-
-    public CustomKeyboard(ActivitySearchBinding binding) {
-        this.binding = binding;
-    }
-
-    public boolean isSystemMode() {
-        return adapter != null && adapter.isSystemMode();
+    public int getMode() {
+        return adapter == null ? customMode : adapter.getMode();
     }
 
     public void showSystemKeyboard() {
@@ -76,54 +130,90 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         Util.hideKeyboard(binding.keyword);
     }
 
+    /** 是否正在拼写（拼写串有内容）。 */
+    public boolean isComposing() {
+        return composingDisplay().length() > 0;
+    }
+
+    /** 正在拼的拼音在搜索框里的显示：全键是字母串（含分词符），九键是切出的音节连写 + 未切出的尾部数字。 */
+    public String composingDisplay() {
+        if (adapter != null && adapter.getMode() == KeyboardAdapter.MODE_PINYIN) {
+            StringBuilder sb = new StringBuilder();
+            for (String s : syllables) sb.append(s);
+            sb.append(remainder);
+            return sb.toString();
+        }
+        return composing.toString();
+    }
+
     private void initView() {
         binding.keyboard.setItemAnimator(null);
         binding.keyboard.setHasFixedSize(false);
         binding.keyboard.setAdapter(adapter = new KeyboardAdapter(this));
-        ((GridLayoutManager) binding.keyboard.getLayoutManager()).setSpanCount(adapter.getSpanCount());
-        binding.funcLang.setOnClickListener(v -> toggleLang());
-        binding.funcDigits.setOnClickListener(v -> toggleDigits());
-        binding.funcClear.setOnClickListener(v -> clearAll());
-        binding.funcBack.setOnClickListener(v -> onBackspace());
-        binding.funcBack.setOnLongClickListener(v -> {
-            clearAll();
+        ((GridLayoutManager) binding.keyboard.getLayoutManager()).setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
+            @Override
+            public int getSpanSize(int position) {
+                return adapter.getSpanSize(position);
+            }
+        });
+        binding.tabFull.setOnClickListener(v -> setMode(KeyboardAdapter.MODE_FULL));
+        binding.tabNine.setOnClickListener(v -> setMode(KeyboardAdapter.MODE_PINYIN));
+        binding.segKey.setOnClickListener(v -> onSegmentKey());
+        binding.symKey.setOnClickListener(v -> onToggleSymbol());
+        binding.langKey.setOnClickListener(v -> toggleLang());
+        binding.delKey.setOnClickListener(v -> onBackspace());
+        binding.delKey.setOnLongClickListener(v -> {
+            committed.setLength(0);
+            cursorPos = -1;
+            clearComposingState();
+            resetTap();
+            renderBox();
             return true;
         });
-        binding.modeFull.setOnClickListener(v -> setMode(KeyboardAdapter.MODE_LETTERS));
+        binding.doneKey.setOnClickListener(v -> callback.onSearch());
+        binding.modeFull.setOnClickListener(v -> setMode(customMode));
         binding.modeSystem.setOnClickListener(v -> setMode(KeyboardAdapter.MODE_SYSTEM));
-        updateDecoration();
-        updateFuncDigitsLabel();
-        setMode(KeyboardAdapter.MODE_LETTERS);
+        setMode(customMode);
     }
 
     public void setMode(int mode) {
         if (mode == KeyboardAdapter.MODE_SYSTEM) {
+            // 进系统模式先同步搜索框的当前内容：系统输入法接管后框内文本可能已变，
+            // 不同步的话 committed 还是旧文本，之后按删除会把旧文本回写覆盖新输入
+            syncFromBox();
             adapter.setMode(KeyboardAdapter.MODE_SYSTEM);
-            binding.funcRow.setVisibility(View.GONE);
-            binding.keyboard.setVisibility(View.GONE);
+            binding.kbPanel.setVisibility(View.GONE);
             showSystemKeyboard();
-        } else {
-            digitsMode = false;
-            adapter.setMode(KeyboardAdapter.MODE_LETTERS);
+        } else if (mode == KeyboardAdapter.MODE_SYMBOL) {
+            // 符号盘是临时布局：不记入模式记忆，customMode 保持进入符号盘前的模式（全键/九键），按 ABC 回到该模式
+            adapter.setMode(KeyboardAdapter.MODE_SYMBOL);
             ((GridLayoutManager) binding.keyboard.getLayoutManager()).setSpanCount(adapter.getSpanCount());
             updateDecoration();
-            binding.funcRow.setVisibility(View.VISIBLE);
-            binding.keyboard.setVisibility(View.VISIBLE);
+        } else {
+            customMode = mode;
+            Setting.putKeyboardMode(mode);
+            syncFromBox();
+            adapter.setMode(mode);
+            ((GridLayoutManager) binding.keyboard.getLayoutManager()).setSpanCount(adapter.getSpanCount());
+            updateDecoration();
+            binding.kbPanel.setVisibility(View.VISIBLE);
             hideSystemKeyboard();
-            updateFuncDigitsLabel();
+            updateTabs();
         }
         updateModeRow();
+        callback.onStateChanged();
     }
 
     private void updateDecoration() {
         if (decoration != null) binding.keyboard.removeItemDecoration(decoration);
-        // 键间距 6dp（以前 8dp）：6 行共省 10dp，左栏放得下，模式行不再被顶出屏幕
         binding.keyboard.addItemDecoration(decoration = new SpaceItemDecoration(adapter.getSpanCount(), 6));
     }
 
-    /** 数字盘时功能行的 123 显示为 ABC（点按切回字母格），字母格时显示 123。 */
-    private void updateFuncDigitsLabel() {
-        binding.funcDigits.setText(digitsMode ? "ABC" : "123");
+    private void updateTabs() {
+        binding.tabFull.setSelected(customMode == KeyboardAdapter.MODE_FULL);
+        binding.tabNine.setSelected(customMode == KeyboardAdapter.MODE_PINYIN);
+        binding.tabFull.setTextColor(ContextCompat.getColor(binding.tabFull.getContext(), customMode == KeyboardAdapter.MODE_FULL ? R.color.white : R.color.white_60));
+        binding.tabNine.setTextColor(ContextCompat.getColor(binding.tabNine.getContext(), customMode == KeyboardAdapter.MODE_PINYIN ? R.color.white : R.color.white_60));
     }
 
     /** 模式行高亮当前模式：自带键盘时“全键盘”白字、系统输入法灰字，反之亦然。 */
@@ -133,17 +223,88 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         binding.modeSystem.setTextColor(ContextCompat.getColor(binding.modeSystem.getContext(), system ? R.color.white : R.color.white_60));
     }
 
-    /** 搜索框下方向键：落到功能行第一个键（中/英切换）。 */
-    public void focusFunctionRow() {
-        binding.funcLang.requestFocus();
+    /** 搜索框下方向键：落到页签行当前选中的页签。 */
+    public void focusSelectedTab() {
+        if (binding.kbPanel.getVisibility() == View.VISIBLE) {
+            if (customMode == KeyboardAdapter.MODE_PINYIN) binding.tabNine.requestFocus();
+            else binding.tabFull.requestFocus();
+        } else {
+            binding.modeFull.requestFocus();
+        }
     }
 
-    /** 中/英切换：中文 = 输拼音首字母出联想（现状），英文 = 字母直输按字面搜。
-     * 键上文字固定是“中/英”，当前模式显示在提示行第一行（提示行平时是中文那句，
-     * 英文模式换成英文提示）。字母/数字键本身在两种模式下行为相同。 */
+    private void renderBox() {
+        String text = committed.toString() + composingDisplay();
+        binding.keyword.setText(text);
+        // 正在拼写时光标在拼写串末尾；否则光标停在移动后的位置（默认末尾）
+        binding.keyword.setSelection(isComposing() ? text.length() : editPos());
+    }
+
+    /** 外部改动了搜索框（语音输入、历史记录、初始关键字、模式切换）：以框内文本为准，丢弃拼写状态。 */
+    public void syncFromBox() {
+        committed.setLength(0);
+        committed.append(binding.keyword.getText().toString());
+        cursorPos = -1;
+        clearComposingState();
+        resetTap();
+    }
+
+    private void clearComposingState() {
+        composing.setLength(0);
+        digits.setLength(0);
+        syllables.clear();
+        remainder = "";
+        segBreaks.clear();
+    }
+
+    private void resegment() {
+        if (segBreaks.isEmpty()) {
+            PinyinTable.Segmentation seg = PinyinTable.segment(digits.toString());
+            syllables = new ArrayList<>(seg.syllables);
+            remainder = seg.remainder;
+            return;
+        }
+        // 有强制断点：按断点分段切分，未切出的尾部数字顺延到下一段再切
+        List<String> all = new ArrayList<>();
+        String pending = "";
+        int prev = 0;
+        List<Integer> breaks = new ArrayList<>(segBreaks);
+        java.util.Collections.sort(breaks);
+        for (int b : breaks) {
+            if (b <= prev || b > digits.length()) continue;
+            String part = pending + digits.substring(prev, b);
+            PinyinTable.Segmentation seg = PinyinTable.segment(part);
+            all.addAll(seg.syllables);
+            pending = seg.remainder;
+            prev = b;
+        }
+        String last = pending + digits.substring(prev);
+        PinyinTable.Segmentation seg = PinyinTable.segment(last);
+        all.addAll(seg.syllables);
+        syllables = all;
+        remainder = seg.remainder;
+    }
+
+    /** 把正在拼的拼音提交（useCandidate=true 时用首选候选，没有则提交拼音原文；false 时提交拼音原文），拼写状态清空。 */
+    public void commitComposing(boolean useCandidate) {
+        if (!isComposing()) return;
+        String candidate = useCandidate ? callback.getFirstCandidate() : null;
+        String text = candidate != null && !candidate.isEmpty() ? candidate : composingDisplay();
+        int pos = editPos();
+        committed.insert(pos, text);
+        cursorPos = pos + text.length();
+        if (cursorPos >= committed.length()) cursorPos = -1;
+        clearComposingState();
+        resetTap();
+        renderBox();
+    }
+
+    /** 中/英切换：中文 = 输拼音出候选栏，英文 = 字母直输、无候选栏。切到英文时正在拼的拼音按原文提交，不丢输入。 */
     private void toggleLang() {
+        if (!englishMode) commitComposing(false);
         englishMode = !englishMode;
         updateHint();
+        callback.onStateChanged();
     }
 
     /** 提示行第一行随中/英文模式切换：中文是原来的“请输入拼音字母，或汉字”，英文是英文提示。 */
@@ -151,58 +312,228 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         binding.hintText.setText(englishMode ? R.string.search_hint_english : R.string.search_hint_dangbei);
     }
 
-    /** 空格键（字母格里 Z 后面那格 / 数字盘里 9 后面那格）：英文/数字盘模式 = 输入一个空格字符
-     * （空输入时不输前导空格）；中文模式 = 确认首个联想词（回调给 SearchActivity，
-     * 与点首个建议相同；无建议时什么都不做）。 */
-    private void onSpace() {
-        if (digitsMode || englishMode) {
-            Editable editable = binding.keyword.getText();
-            if (editable == null || editable.length() == 0) return;
-            appendText(" ");
-            return;
+    /** 分词键：九键中文在数字序列末尾强制断一个音节；全键中文在拼写串末尾加分词符。英文模式无拼音可分，不做事。 */
+    private void onSegmentKey() {
+        if (isSystemMode() || englishMode) return;
+        if (adapter != null && adapter.getMode() == KeyboardAdapter.MODE_PINYIN) {
+            if (digits.length() == 0 || segBreaks.contains(digits.length())) return;
+            segBreaks.add(digits.length());
+            resegment();
+            renderBox();
+        } else {
+            if (composing.length() == 0 || composing.charAt(composing.length() - 1) == '\'') return;
+            composing.append('\'');
+            renderBox();
         }
-        if (spaceListener != null) spaceListener.onSpace();
     }
 
-    /** 字母格 ↔ 数字盘切换（功能行 123/ABC 键）。 */
-    private void toggleDigits() {
-        digitsMode = !digitsMode;
-        adapter.setMode(digitsMode ? KeyboardAdapter.MODE_DIGITS : KeyboardAdapter.MODE_LETTERS);
-        ((GridLayoutManager) binding.keyboard.getLayoutManager()).setSpanCount(adapter.getSpanCount());
-        updateDecoration();
-        updateFuncDigitsLabel();
+    /** ?12 键：符号盘与当前模式互切；进符号盘前正在拼的拼音按原文提交。 */
+    private void onToggleSymbol() {
+        if (isSystemMode()) return;
+        if (adapter != null && adapter.getMode() == KeyboardAdapter.MODE_SYMBOL) {
+            setMode(customMode);
+            return;
+        }
+        commitComposing(false);
+        setMode(KeyboardAdapter.MODE_SYMBOL);
     }
 
     @Override
     public void onKey(KeyboardAdapter.KeyItem item) {
-        if (item.kind == KeyboardAdapter.KIND_SPACE) {
-            onSpace();
+        if (item.kind == KeyboardAdapter.KIND_SPACER) return;
+        resetTapIfNotDigit(item);
+        switch (item.kind) {
+            case KeyboardAdapter.KIND_LETTER:
+                onLetter(item.text);
+                break;
+            case KeyboardAdapter.KIND_DIGIT:
+                onDigit(item.text);
+                break;
+            case KeyboardAdapter.KIND_SYMBOL:
+                onSymbol(item.text);
+                break;
+            case KeyboardAdapter.KIND_ACTION:
+                onAction(item.action);
+                break;
+        }
+    }
+
+    @Override
+    public void onKeyLongPress(KeyboardAdapter.KeyItem item) {
+        if (item.kind == KeyboardAdapter.KIND_ACTION && item.action == KeyboardAdapter.ACTION_BACKSPACE) {
+            committed.setLength(0);
+            cursorPos = -1;
+            clearComposingState();
+            resetTap();
+            renderBox();
+        } else if (item.kind == KeyboardAdapter.KIND_DIGIT) {
+            // 长按数字键直接输入数字本身（短按是 T9 拼音 / 英文多击）：九键模式下 2–9 也能打出数字
+            commitComposing(false);
+            if (binding.keyword.length() < MAX_LEN) insertCommitted(item.text);
+            resetTap();
+        }
+    }
+
+    private void resetTap() {
+        lastTapDigit = "";
+        lastTapTime = 0;
+    }
+
+    private void resetTapIfNotDigit(KeyboardAdapter.KeyItem item) {
+        if (item.kind != KeyboardAdapter.KIND_DIGIT) resetTap();
+    }
+
+    private void onLetter(String letter) {
+        if (binding.keyword.length() >= MAX_LEN) return;
+        if (englishMode) {
+            // 英文模式：字母直接提交进搜索框，没有候选栏
+            insertCommitted(letter);
             return;
         }
-        if (item.kind == KeyboardAdapter.KIND_LETTER || item.kind == KeyboardAdapter.KIND_DIGIT) appendText(item.text);
+        composing.append(letter);
+        renderBox();
     }
 
-    /** 向搜索框末尾追加一个字母/数字；TextWatcher 会触发联想（300ms 防抖，见 SearchActivity）。 */
-    private void appendText(String text) {
+    private void onDigit(String digit) {
+        if ("0".equals(digit)) {
+            onSpaceKey();
+            return;
+        }
+        if ("1".equals(digit)) {
+            onPunctKey();
+            return;
+        }
+        if (binding.keyword.length() >= MAX_LEN) return;
+        if (englishMode) {
+            onTapDigit(digit);
+            return;
+        }
+        digits.append(digit);
+        resegment();
+        renderBox();
+    }
+
+    /** 英文九键多击：同键 1.2 秒内连按在该键字母间循环（如 2→A→B→C），换键或超时即确认当前字母再起新字母。 */
+    private void onTapDigit(String digit) {
+        int d;
+        try {
+            d = Integer.parseInt(digit);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (d < 2 || d > 9) return;
+        String letters = TAP_LETTERS[d];
+        long now = android.os.SystemClock.uptimeMillis();
+        if (digit.equals(lastTapDigit) && now - lastTapTime < TAP_TIMEOUT && committed.length() > 0) {
+            char cur = committed.charAt(committed.length() - 1);
+            int idx = letters.indexOf(cur);
+            if (idx >= 0) {
+                committed.setCharAt(committed.length() - 1, letters.charAt((idx + 1) % letters.length()));
+                lastTapTime = now;
+                renderBox();
+                return;
+            }
+        }
+        insertCommitted(String.valueOf(letters.charAt(0)));
+        lastTapDigit = digit;
+        lastTapTime = now;
+    }
+
+    private void onSymbol(String text) {
+        commitComposing(false);
+        if (binding.keyword.length() >= MAX_LEN) return;
+        insertCommitted(text);
+    }
+
+    private void onAction(int action) {
+        if (action == KeyboardAdapter.ACTION_BACKSPACE) {
+            onBackspace();
+        } else if (action == KeyboardAdapter.ACTION_SPACE) {
+            onSpaceKey();
+        } else if (action == KeyboardAdapter.ACTION_SYMBOL) {
+            commitComposing(false);
+            setMode(KeyboardAdapter.MODE_SYMBOL);
+        } else if (action == KeyboardAdapter.ACTION_ABC) {
+            // 回到进入符号盘前的模式：九键就回九键，全键就回全键，不写死全键
+            setMode(customMode);
+        } else if (action == KeyboardAdapter.ACTION_SEARCH) {
+            callback.onSearch();
+        }
+    }
+
+    /** 空格：中文正在拼写时确认首个联想词并搜索（与点首个建议相同；无建议时什么都不做）；
+     * 其余情况（英文模式、已提交文本后）输入一个空格字符，空输入时不输前导空格。 */
+    private void onSpaceKey() {
+        if (!englishMode && isComposing()) {
+            callback.onConfirmFirstAndSearch();
+            return;
+        }
+        if (binding.keyword.length() >= MAX_LEN) return;
         Editable editable = binding.keyword.getText();
-        if (editable == null || editable.length() >= MAX_LEN) return;
-        editable.append(text);
-        binding.keyword.setSelection(editable.length());
+        if (editable == null || editable.length() == 0) return;
+        insertCommitted(" ");
     }
 
-    /** 退格：删光标前一个字符（光标一般在末尾，即删最后一个字符）。系统模式也一样：
-     * 直接改搜索框的 Editable，不回写任何缓存文本，不会覆盖系统输入法刚打的字。 */
+    /** 1 键标点：先提交正在拼的拼音，再输入“.”；1 秒内再按则在 . , ? ! 间循环。循环改的是光标前一个标点。 */
+    private void onPunctKey() {
+        long now = System.currentTimeMillis();
+        int pos = editPos();
+        if (!lastPunct.isEmpty() && now - lastPunctTime < PUNCT_TIMEOUT && pos > 0
+                && committed.charAt(pos - 1) == lastPunct.charAt(0)) {
+            int idx = 0;
+            for (int i = 0; i < PUNCTS.length; i++) if (PUNCTS[i] == lastPunct.charAt(0)) idx = i;
+            char next = PUNCTS[(idx + 1) % PUNCTS.length];
+            committed.setCharAt(pos - 1, next);
+            lastPunct = String.valueOf(next);
+        } else {
+            commitComposing(true);
+            if (binding.keyword.length() >= MAX_LEN) return;
+            insertCommitted(".");
+            lastPunct = ".";
+        }
+        lastPunctTime = now;
+        renderBox();
+    }
+
+    /** 退格：先删拼写中的最后一个字母/数字，再删已提交的字符（光标前一个）。 */
     private void onBackspace() {
-        Editable editable = binding.keyword.getText();
-        if (editable == null) return;
-        int pos = binding.keyword.getSelectionStart();
-        if (pos <= 0) return;
-        editable.delete(pos - 1, pos);
-        binding.keyword.setSelection(pos - 1);
+        if (isSystemMode()) {
+            // 系统键盘模式：搜索框归系统输入法管，直接删输入法缓冲区光标前的字符；
+            // 绝不能用 renderBox() 把陈旧的 committed 回写，那会覆盖系统输入法刚打的字
+            Editable editable = binding.keyword.getText();
+            int pos = binding.keyword.getSelectionStart();
+            if (editable != null && pos > 0) editable.delete(pos - 1, pos);
+            committed.setLength(0);
+            committed.append(binding.keyword.getText().toString());
+            cursorPos = -1;
+            return;
+        }
+        resetTap();
+        if (isComposing()) {
+            if (adapter.getMode() == KeyboardAdapter.MODE_PINYIN) {
+                if (digits.length() > 0) digits.deleteCharAt(digits.length() - 1);
+                segBreaks.removeIf(b -> b >= digits.length());
+                resegment();
+            } else if (composing.length() > 0) {
+                composing.deleteCharAt(composing.length() - 1);
+            }
+            renderBox();
+            return;
+        }
+        deleteCommittedBeforeCursor();
     }
 
-    /** 清空：删掉搜索框全部内容（空输入时右侧切回历史 + 热搜）。 */
-    private void clearAll() {
-        binding.keyword.setText("");
+    public interface Callback {
+
+        void onSearch();
+
+        /** 当前候选词的第一个（用于完成/空格/标点时提交拼写）；没有候选或候选未对应当前输入时返回 null。 */
+        String getFirstCandidate();
+
+        /** 中文空格：确认首个联想词并搜索（与点首个建议相同；无建议时什么都不做）。 */
+        void onConfirmFirstAndSearch();
+
+        /** 键盘状态变了（模式/页签/中英文切换）：SearchActivity 刷新候选栏等。 */
+        void onStateChanged();
     }
 }

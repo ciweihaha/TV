@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 当贝市场搜索屏 1:1 复刻：全屏纯蓝底（固定，不跟随壁纸），左栏输拼音首字母、右栏实时出结果。
-     旧布局的拼音全键/九键 tab、7 图标行、拼写条、底部系统输入法/完成行已全部删除；
-     输入模型改为“按 A–Z 首字母、右侧实时刷新”，没有拼写条、没有候选词提交、没有九键切音节。
-     2026-11-21：应用/游戏/影片三个死 tab 已去掉，右栏顶部改为“影视”范围说明（搜索只搜影视）；
-     功能行首位是中/英切换键，空格键是字母格里跟在 Z 后面的一格（数字盘里跟在 9 后面）。 -->
+<!-- 百度输入法电视版搜索屏：底部灰色键盘面板 + 右栏实时出结果。
+     面板顶部页签只有拼音全键 / 拼音九键（没有笔画键盘）；候选栏在键盘上方，首选蓝底，
+     遥控选词上屏去搜；全键 QWERTY 三行错列，空格在第三行中间；左列 分词 / ?12 / 中/英，
+     右列 删除 / 完成（完成占两行高）；左下角 du 标志。英文模式没有候选栏，字母直输。
+     2026-11-21：应用/游戏/影片三个死 tab 已去掉，右栏顶部改为“影视”范围说明（搜索只搜影视）。 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -15,7 +15,7 @@
     android:orientation="horizontal"
     android:padding="24dp">
 
-    <!-- 左栏（约 35%）：搜索框 + 功能行 + A–Z 字母格 + 模式行 + 提示行 + 当前匹配 -->
+    <!-- 左栏（约 35%）：搜索框 + 百度键盘面板 + 模式行 + 提示行 + 当前匹配 -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="0dp"
         android:layout_height="match_parent"
@@ -55,7 +55,7 @@
                     android:inputType="textCapWords|textAutoCorrect|textAutoComplete"
                     android:letterSpacing="0.02"
                     android:maxLength="255"
-                    android:nextFocusDown="@id/funcLang"
+                    android:nextFocusDown="@id/tabFull"
                     android:singleLine="true"
                     android:textColor="@color/white"
                     android:textColorHint="@color/white"
@@ -70,7 +70,7 @@
                     android:layout_marginStart="8dp"
                     android:focusable="true"
                     android:focusableInTouchMode="true"
-                    android:nextFocusDown="@id/funcLang"
+                    android:nextFocusDown="@id/tabFull"
                     android:src="@drawable/ic_search_mic" />
 
             </androidx.appcompat.widget.LinearLayoutCompat>
@@ -83,85 +83,198 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- 功能行：中/英切换 / 123 / 清空 / 退格 -->
+        <!-- 百度键盘面板（底部灰色）：页签 + 候选栏 + 键盘行（左列 / 键格 / 右列）+ du 标志。
+             系统输入法模式下整个面板隐藏，只留模式行作切回入口。 -->
         <androidx.appcompat.widget.LinearLayoutCompat
-            android:id="@+id/funcRow"
-            android:layout_width="wrap_content"
+            android:id="@+id/kbPanel"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+            android:background="@color/baidu_panel_gray"
+            android:orientation="vertical"
+            android:padding="12dp">
 
-            <!-- 中/英切换键（取代旧的网格图标键：网格键与 123 是同一个字母/数字切换，不损失功能）。
-                 中文 = 现状（输拼音首字母、右侧出联想）；英文 = 字母直输、按字面搜，空格输空格字符。
-                 当前模式显示在下方提示行。 -->
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/funcLang"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/selector_keyboard_dangbei"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:text="@string/search_lang_toggle"
-                android:textColor="@color/white"
-                android:textSize="18sp" />
+            <!-- 页签：拼音全键 / 拼音九键（没有笔画键盘） -->
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/kbTabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/funcDigits"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/selector_keyboard_dangbei"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:text="123"
-                android:textColor="@color/white"
-                android:textSize="18sp" />
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tabFull"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/selector_keyboard_tab"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:gravity="center"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:text="@string/keyboard_full"
+                    android:textColor="@color/white"
+                    android:textSize="16sp" />
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/funcClear"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/selector_keyboard_dangbei"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_setting_delete" />
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tabNine"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:background="@drawable/selector_keyboard_tab"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:gravity="center"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:text="@string/keyboard_nine"
+                    android:textColor="@color/white"
+                    android:textSize="16sp" />
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/funcBack"
-                android:layout_width="48dp"
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <!-- 候选栏：键盘上方，首选蓝底；中文模式有拼写且有建议时才显示，英文模式不显示 -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/candidateBar"
+                android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="@drawable/selector_keyboard_dangbei"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_keyboard_back" />
+                android:layout_marginTop="8dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:orientation="horizontal"
+                android:overScrollMode="never"
+                android:visibility="gone"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                tools:itemCount="4"
+                tools:listitem="@layout/adapter_candidate" />
+
+            <!-- 键盘行：左列（分词 / ?12 / 中/英）+ 键格 + 右列（删除 / 完成， 完成占两行高） -->
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/kbRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="56dp"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/segKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_marginBottom="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/selector_keyboard_dangbei"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:gravity="center"
+                        android:text="@string/search_seg"
+                        android:textColor="@color/white"
+                        android:textSize="15sp" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/symKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_marginBottom="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/selector_keyboard_dangbei"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:gravity="center"
+                        android:text="?12"
+                        android:textColor="@color/white"
+                        android:textSize="16sp" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/langKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/selector_keyboard_dangbei"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:gravity="center"
+                        android:text="@string/search_lang_toggle"
+                        android:textColor="@color/white"
+                        android:textSize="15sp" />
+
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                <!-- 全键 QWERTY 三行错列（20 列，半键为单位）/ 九键 3×4（3 列）/ 符号盘（20 列）共用 -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/keyboard"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
+                    app:spanCount="20"
+                    tools:itemCount="30"
+                    tools:listitem="@layout/adapter_keyboard_text" />
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="56dp"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/delKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_marginBottom="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/selector_keyboard_dangbei"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:gravity="center"
+                        android:text="@string/search_delete"
+                        android:textColor="@color/white"
+                        android:textSize="15sp" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/doneKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="2"
+                        android:background="@drawable/selector_keyboard_dangbei"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:gravity="center"
+                        android:text="@string/keyboard_done"
+                        android:textColor="@color/white"
+                        android:textSize="16sp" />
+
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <!-- 左下角 du 标志 -->
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/duLogo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:focusable="false"
+                    android:text="du"
+                    android:textColor="@color/baidu_blue"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
 
         </androidx.appcompat.widget.LinearLayoutCompat>
-
-        <!-- A–Z 字母格（数字盘共用）：5 列，字母直接印在蓝底上，无键框；末行 Z 后面跟一个空格键
-             （数字盘是 9 后面跟空格键）。高度用 weight 占满左栏剩余空间：以前是 wrap_content，
-             6 行 52dp 键把模式行顶出屏幕；现在键高 44dp、剩余空间不够时格子内部滚动，
-             模式行和提示行永远可见。 -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/keyboard"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="8dp"
-            android:layout_weight="1"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:overScrollMode="never"
-            app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-            app:spanCount="5"
-            tools:itemCount="27"
-            tools:listitem="@layout/adapter_keyboard_text" />
 
         <!-- 模式行：绿点“全键盘” / 蓝点“系统输入法”（系统输入法为逃生通道） -->
         <androidx.appcompat.widget.LinearLayoutCompat
@@ -238,7 +351,7 @@
                 android:layout_height="wrap_content"
                 android:textColor="@color/dangbei_pinyin_yellow"
                 android:textSize="20sp"
-                tools:text="D S J M D" />
+                tools:text="T U S H U G U A N" />
 
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/matchTitle"
@@ -247,7 +360,7 @@
                 android:layout_marginTop="4dp"
                 android:textColor="@color/white"
                 android:textSize="28sp"
-                tools:text="当贝影视" />
+                tools:text="图书馆员" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 

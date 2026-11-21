@@ -384,7 +384,9 @@
     <string name="search_lang_toggle">中/英</string>
     <string name="search_space">Space</string>
     <string name="search_hint_english">English: type letters or words to search</string>
-    <string name="search_hint_keys">中/英 switches input mode; Space picks the first suggestion</string>
+    <string name="search_hint_keys">中/英 switches input mode; Space picks the first suggestion; pick a word in the bar above to search</string>
+    <string name="search_seg">Segment</string>
+    <string name="search_delete">Delete</string>
     <string name="search_mode_full">Full keyboard</string>
     <string name="search_mode_system">System input method</string>
     <string name="search_result_count">Related results: <xliff:g name="count">%d</xliff:g></string>

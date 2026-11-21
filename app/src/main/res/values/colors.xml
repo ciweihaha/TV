@@ -29,4 +29,8 @@
     <color name="dangbei_pinyin_yellow">#FFD83D</color>
     <color name="dangbei_dot_green">#2ECC71</color>
 
+    <!-- 百度输入法电视版键盘面板用色：底部灰色面板 + 首选候选百度蓝底 -->
+    <color name="baidu_blue">#306EFF</color>
+    <color name="baidu_panel_gray">#4A4A4A</color>
+
 </resources>
