@@ -474,6 +474,12 @@
         <item>120 fps</item>
     </string-array>
 
+    <string-array name="select_motion">
+        <item>@string/setting_off</item>
+        <item>60 fps</item>
+        <item>120 fps</item>
+    </string-array>
+
     <string-array name="select_render">
         <item>Surface</item>
         <item>Texture</item>
