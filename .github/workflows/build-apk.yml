@@ -232,6 +232,8 @@ jobs:
           # directly instead of the wrappers.
           # Round 126: the app wrapper pins Gradle 9.9.1-bin and hit the
           # same timeout in run 42569584589, so pre-download it the same way.
+          # Round 139: wrapper bumped to 9.9.2-bin (Gradle 9.9.2, 19 Nov 2026);
+          # keep the pre-downloaded binary in sync with the wrapper pin.
           # Round 127: services.gradle.org itself returned HTTP 504 from the
           # runner in run 42570731659 (6 attempts, exit 22) even for the
           # pre-download curl. The Tencent Cloud mirror
@@ -266,14 +268,14 @@ jobs:
           fi
           "$GRADLE_HOME/gradle-9.1.0/bin/gradle" --version
           echo "GRADLE_BIN=$GRADLE_HOME/gradle-9.1.0/bin/gradle" >> "$GITHUB_ENV"
-          APP_GRADLE_ZIP="$RUNNER_TEMP/gradle-9.9.1-bin.zip"
-          APP_GRADLE_HOME="$RUNNER_TEMP/gradle-9.9.1"
-          if [ ! -x "$APP_GRADLE_HOME/gradle-9.9.1/bin/gradle" ]; then
-            download_gradle "gradle-9.9.1-bin.zip" "$APP_GRADLE_ZIP"
+          APP_GRADLE_ZIP="$RUNNER_TEMP/gradle-9.9.2-bin.zip"
+          APP_GRADLE_HOME="$RUNNER_TEMP/gradle-9.9.2"
+          if [ ! -x "$APP_GRADLE_HOME/gradle-9.9.2/bin/gradle" ]; then
+            download_gradle "gradle-9.9.2-bin.zip" "$APP_GRADLE_ZIP"
             unzip -q -o "$APP_GRADLE_ZIP" -d "$APP_GRADLE_HOME"
           fi
-          "$APP_GRADLE_HOME/gradle-9.9.1/bin/gradle" --version
-          echo "GRADLE_BIN_APP=$APP_GRADLE_HOME/gradle-9.9.1/bin/gradle" >> "$GITHUB_ENV"
+          "$APP_GRADLE_HOME/gradle-9.9.2/bin/gradle" --version
+          echo "GRADLE_BIN_APP=$APP_GRADLE_HOME/gradle-9.9.2/bin/gradle" >> "$GITHUB_ENV"
 
       - name: Prefer Google Maven mirror for dependency downloads
         run: |
