@@ -269,6 +269,11 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
             syncFromBox();
             return;
         }
+        // 英文模式没有拼写串：外部输入直接算已提交文本
+        if (englishMode) {
+            syncFromBox();
+            return;
+        }
         if (adapter != null && adapter.getMode() == KeyboardAdapter.MODE_PINYIN) {
             syncFromBox();
             return;
