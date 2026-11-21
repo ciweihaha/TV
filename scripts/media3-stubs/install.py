@@ -985,6 +985,55 @@ def patch_mpv_player(media3: Path) -> None:
   public void removeMotionInterpolationListener(Runnable listener) {}""",
         "MpvPlayer round-101 extension APIs",
     )
+    # Round 139 (v5.9.16): upstream 88612c0 (Switch mpv GPU output from advanced
+    # video settings) calls MpvPlayer.VideoOutputOption + set/getPendingVideoOutput
+    # + canSetVideoOutput/canSetVideoOutputOption. None of these exist in the
+    # public FongMi/media source (release-1.11.0-fongmi, 3c2cbe8) — they only
+    # exist in FongMi's prebuilt AARs. Minimal shim following the round-101
+    # pattern: the enum values are real (the TV code only uses GPU_NEXT and
+    # VULKAN), but runtime switching is NOT supported on the public media
+    # build, so canSetVideoOutput() returns false and the in-player GPU-output
+    # section stays hidden (VideoSettingPanel gates visibility on it, and the
+    # toggle path is gated on canSetVideoOutputOption()). gpu-next/vulkan
+    # still apply at player build time via MpvUtil.getVideoOptions() ->
+    # MpvAndroidOptions (5380d11), so the SettingOutput screen keeps working.
+    replace_once(
+        path,
+        """  /** Removes a motion-interpolation listener (shim: no-op). */
+  public void removeMotionInterpolationListener(Runnable listener) {}""",
+        """  /** Removes a motion-interpolation listener (shim: no-op). */
+  public void removeMotionInterpolationListener(Runnable listener) {}
+
+  // ---- FongMi extensions, part 3: runtime video-output switching (round 139) ----
+
+  /** Video-output options switchable at runtime in upstream's private Media3 build. */
+  public enum VideoOutputOption {
+    GPU_NEXT,
+    VULKAN
+  }
+
+  /** Returns whether this build supports switching the video output at runtime (shim: always false). */
+  public boolean canSetVideoOutput() {
+    return false;
+  }
+
+  /** Returns whether this build supports switching a single video-output option at runtime (shim: always false). */
+  public boolean canSetVideoOutputOption() {
+    return false;
+  }
+
+  /** Returns the pending value of a video-output option (shim: always null, i.e. no pending switch). */
+  @Nullable
+  public Boolean getPendingVideoOutput(VideoOutputOption option) {
+    return null;
+  }
+
+  /** Applies a video-output option (shim: no-op, never reached — the UI is gated on {@link #canSetVideoOutputOption}). */
+  public ListenableFuture<Void> setVideoOutput(VideoOutputOption option, boolean enabled) {
+    return Futures.immediateVoidFuture();
+  }""",
+        "MpvPlayer VideoOutputOption shim",
+    )
     replace_once(
         path,
         """    @CanIgnoreReturnValue

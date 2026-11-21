@@ -103,6 +103,11 @@
   `getMotionInterpolationFps`/`isMotionInterpolationSupported`（false）/
   `isMotionInterpolationUpdatePending`（false）/
   `getMotionInterpolationEffectiveTargetFps`/`add/removeMotionInterpolationListener`。
+  第 139 轮（v5.9.16，上游 88612c0）再加：`VideoOutputOption`（GPU_NEXT/VULKAN）
+  与 `canSetVideoOutput()`/`canSetVideoOutputOption()`（恒 false，播放器内
+  GPU 输出栏因此隐藏）/`getPendingVideoOutput()`（恒 null）/`setVideoOutput()`
+  （no-op）；运行期切换需要上游私有 Media3 实现，公开源码里没有，gpu-next/
+  Vulkan 改走输出设置页、播放器创建时经 MpvAndroidOptions 生效。
   第 112 轮把脚本会话接成真实现：`setStartupScripts`（mpv 初始化前排队，
   首次 prepare 时在播片前用 `load-script` 加载）/`loadScript`（`load-script`
   命令，回调报接纳结果，clientId 是本地 token）/`getScriptData`（读 mpv
