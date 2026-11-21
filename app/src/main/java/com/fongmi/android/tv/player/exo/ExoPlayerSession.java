@@ -120,17 +120,19 @@ final class ExoPlayerSession {
     }
 
     void setDolbyVisionOutputPolicy(@DolbyVisionOutputPolicy.Mode int policy) {
-        if (dolbyVisionOutputPolicy == policy) return;
-        preloadManager.setDolbyVisionOutputPolicy(policy);
-        player.setDolbyVisionOutputPolicy(policy);
-        dolbyVisionOutputPolicy = policy;
+        // Fork note (round 139 / v5.9.16): the live setters on DefaultPreloadManager
+        // and ExoPlayer exist only in FongMi's prebuilt AARs, not in the public
+        // Media3 source. Deliberately a no-op that leaves dolbyVisionOutputPolicy
+        // untouched, so hasPlaybackSettingsChanged() keeps reporting the change and
+        // the engine is rebuilt with the new policy (via the renderers factory, as
+        // in 5.9.15) instead of the setting being silently dropped.
     }
 
     void setAudioPassThrough(boolean enabled) {
-        if (audioPassThrough == enabled) return;
-        preloadManager.setAudioPassthroughEnabled(enabled);
-        player.setAudioPassthroughEnabled(enabled);
-        audioPassThrough = enabled;
+        // Fork note (round 139 / v5.9.16): same as setDolbyVisionOutputPolicy
+        // above — no live API on the public build. Leave audioPassThrough
+        // untouched so the engine rebuilds with the new setting (the audio sink
+        // honours it at build time, see ExoUtil.buildAudioSink).
     }
 
     void setTunnelingEnabled(boolean enabled) {
@@ -250,7 +252,11 @@ final class ExoPlayerSession {
         String fontFamily = font == null ? null : font.familyName();
         String fontsDirectory = (font == null ? ExternalFont.getDirectory() : font.directory()).getAbsolutePath();
         LibassConfiguration configuration = new LibassConfiguration.Builder().setFontConfig(fontConfigPath).setFontsDirectory(fontsDirectory).setDefaultFontFamily(fontFamily).setMaximumRenderPixels(LIBASS_MAX_RENDER_PIXELS).setMaximumGlyphCount(LIBASS_MAX_GLYPH_COUNT).setMaximumBitmapCacheSizeMb(LIBASS_MAX_BITMAP_CACHE_SIZE_MB).build();
-        return new LibassPlaybackSession(configuration);
+        // Fork note (round 139 / v5.9.16): upstream 5380d11 calls the one-arg
+        // LibassPlaybackSession(configuration) from its private Media3 build. The
+        // public build only offers (configuration, enabled); libass has no
+        // on/off toggle in this fork any more, so it is always enabled.
+        return new LibassPlaybackSession(configuration, true);
     }
 
     private final class PreloadListener implements PreloadManagerListener {
@@ -282,6 +288,15 @@ final class ExoPlayerSession {
         }
     }
 
+    // Fork note (round 139 / v5.9.16): upstream 9713711 overrides
+    // resolveParametersForSelection here so a preloaded next episode selects the
+    // audio track the user chose for it. That hook exists only in FongMi's
+    // private DefaultTrackSelector (prebuilt AARs) — the public Media3 source has
+    // no such method, and the selection flow passes no period/timeline the app
+    // could use to reimplement it. The override is therefore omitted: the
+    // preload may start on the default audio track, and the chosen track is
+    // still restored at playback time via onTrackRestoreRequested() /
+    // TrackUtil, exactly as 5.9.15 behaved.
     private final class EpisodeTrackSelector extends DecodeTrackSelector {
 
         EpisodeTrackSelector() {
@@ -290,23 +305,6 @@ final class ExoPlayerSession {
 
         void invalidateEpisodeSelection() {
             invalidate(null);
-        }
-
-        @Override
-        protected Parameters resolveParametersForSelection(MappedTrackInfo mappedTrackInfo, MediaSource.MediaPeriodId periodId, Timeline timeline, Parameters parameters) {
-            AudioPreloadPreference preference = preloadAudioPreference.get();
-            if (preference == null || !preference.matches(getMediaItem(periodId, timeline))) return parameters;
-            Tracks tracks = TrackSelectionUtil.buildTracks(mappedTrackInfo, new ExoTrackSelection[mappedTrackInfo.getRendererCount()]);
-            TrackSelectionOverride override = TrackUtil.findRestorationOverride(tracks, preference.track());
-            return override == null ? parameters : parameters.buildUpon().setOverrideForType(override).build();
-        }
-
-        @Nullable
-        private MediaItem getMediaItem(MediaSource.MediaPeriodId periodId, Timeline timeline) {
-            int index = timeline.getIndexOfPeriod(periodId.periodUid);
-            if (index == C.INDEX_UNSET) return null;
-            int windowIndex = timeline.getPeriod(index, new Timeline.Period()).windowIndex;
-            return timeline.getWindow(windowIndex, new Timeline.Window()).mediaItem;
         }
     }
 

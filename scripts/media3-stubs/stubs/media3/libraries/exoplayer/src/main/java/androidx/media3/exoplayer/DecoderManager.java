@@ -11,6 +11,8 @@ import android.content.Context;
 import androidx.annotation.Nullable;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.trackselection.DecodeTrackSelector;
+import java.util.ArrayList;
+import java.util.List;
 
 @UnstableApi
 public final class DecoderManager {
@@ -18,6 +20,7 @@ public final class DecoderManager {
   private DecoderMode audioMode;
   private DecoderMode videoMode;
   private @Nullable ExoPlayer player;
+  private final List<DecodeTrackSelector> trackSelectors = new ArrayList<>();
 
   public DecoderManager(DecoderMode audioMode, DecoderMode videoMode) {
     this.audioMode = audioMode;
@@ -50,5 +53,17 @@ public final class DecoderManager {
 
   public DecodeTrackSelector createTrackSelector(Context context) {
     return new DecodeTrackSelector(context);
+  }
+
+  /**
+   * Registers a track selector created for a session (round 139 / v5.9.16: upstream
+   * 9713711 registers its per-episode selectors here).
+   *
+   * <p>FongMi extension (shim): remembered only — the real implementation wires
+   * decoder-mode changes into the registered selectors, which the shim does not
+   * do (it never rebuilds renderers; see the class header).
+   */
+  public void registerTrackSelector(DecodeTrackSelector selector) {
+    if (selector != null && !trackSelectors.contains(selector)) trackSelectors.add(selector);
   }
 }

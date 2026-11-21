@@ -289,7 +289,10 @@ public class ExoPlayerEngine implements PlayerEngine, AnalyticsListener {
     public boolean seekToNext() {
         int index = player.getCurrentMediaItemIndex() + 1;
         if (!preloadAttached || preloadItem == null || index >= player.getMediaItemCount() || !preloadItem.equals(player.getMediaItemAt(index))) return false;
-        player.seekToPreloadedMediaItem(index, session.getPreloadStartPositionMs());
+        // Fork note (round 139 / v5.9.16): upstream 5380d11 calls
+        // seekToPreloadedMediaItem, which exists only in FongMi's prebuilt AARs.
+        // Stock seekTo() on the preloaded source is the 5.9.15 behaviour.
+        player.seekTo(index, session.getPreloadStartPositionMs());
         return true;
     }
 

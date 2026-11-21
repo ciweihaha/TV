@@ -1034,6 +1034,66 @@ def patch_mpv_player(media3: Path) -> None:
   }""",
         "MpvPlayer VideoOutputOption shim",
     )
+    # Round 139 (v5.9.16): upstream 5380d11 calls MpvPlayer.setDolbyVisionOutputPolicy /
+    # setAudioPassthroughEnabled / getPendingDolbyVisionOutputPolicy (VideoSettingPanel
+    # shows the pending DV policy while a change is in flight). None exist in the
+    # public FongMi/media source (release-1.11.0-fongmi, 3c2cbe8) — only in FongMi's
+    # prebuilt AARs. Shim following the round-139 VideoOutputOption pattern: the
+    # values are stored and reported back, but NOT applied live — the public build
+    # cannot reload mpv video/audio output at runtime. MpvPlayerEngine therefore
+    # leaves its own output fields untouched when the player reports "not
+    # reloaded", so needsRebuild() stays true and the change applies at the next
+    # player rebuild (via MpvAndroidOptions, same as 5.9.15 build-time behaviour).
+    replace_once(
+        path,
+        "import androidx.media3.common.Format;",
+        "import androidx.media3.common.DolbyVisionOutputPolicy;\nimport androidx.media3.common.Format;",
+        "MpvPlayer import DolbyVisionOutputPolicy",
+    )
+    replace_once(
+        path,
+        """  /** Applies a video-output option (shim: no-op, never reached — the UI is gated on {@link #canSetVideoOutputOption}). */
+  public ListenableFuture<Void> setVideoOutput(VideoOutputOption option, boolean enabled) {
+    return Futures.immediateVoidFuture();
+  }""",
+        """  /** Applies a video-output option (shim: no-op, never reached — the UI is gated on {@link #canSetVideoOutputOption}). */
+  public ListenableFuture<Void> setVideoOutput(VideoOutputOption option, boolean enabled) {
+    return Futures.immediateVoidFuture();
+  }
+
+  // ---- FongMi extensions, part 4: runtime Dolby Vision / audio passthrough (round 139) ----
+
+  @DolbyVisionOutputPolicy.Mode private Integer pendingDolbyVisionOutputPolicy;
+  private boolean audioPassthroughEnabled;
+
+  /**
+   * Sets the Dolby Vision output policy (shim: stored only, never applied live).
+   *
+   * <p>Returns false ("not reloaded") so the caller falls back to a player rebuild.
+   */
+  public ListenableFuture<Boolean> setDolbyVisionOutputPolicy(
+      @DolbyVisionOutputPolicy.Mode int policy) {
+    pendingDolbyVisionOutputPolicy = policy;
+    return Futures.immediateFuture(false);
+  }
+
+  /**
+   * Sets whether audio passthrough is enabled (shim: stored only, never applied live).
+   *
+   * <p>The setting takes effect at the next player rebuild via MpvAndroidOptions.
+   */
+  public ListenableFuture<Void> setAudioPassthroughEnabled(boolean enabled) {
+    audioPassthroughEnabled = enabled;
+    return Futures.immediateVoidFuture();
+  }
+
+  /** Returns the pending Dolby Vision output policy (shim: the last value set, or null). */
+  @Nullable
+  public Integer getPendingDolbyVisionOutputPolicy() {
+    return pendingDolbyVisionOutputPolicy;
+  }""",
+        "MpvPlayer DolbyVision/passthrough shim",
+    )
     replace_once(
         path,
         """    @CanIgnoreReturnValue
@@ -1776,6 +1836,96 @@ def patch_mpv_player_config(media3: Path) -> None:
     public MpvPlayerConfig build() {""",
         "MpvPlayerConfig.Builder setDefaultFontDirectories",
     )
+    # Round 139 (v5.9.16): upstream 5380d11 calls
+    # MpvPlayerConfig.Builder.setAllowMotionInterpolationOutputChange(boolean)
+    # (MpvUtil.addAndroidOptions). It does not exist in the public FongMi/media
+    # source (release-1.11.0-fongmi, 3c2cbe8) — only in FongMi's prebuilt AARs.
+    # Store-only shim, same pattern as setMotionInterpolationFps (round 101):
+    # the stock player never reads the value back.
+    replace_once(
+        path,
+        "  @Nullable private final DataSource.Factory dataSourceFactory;\n"
+        "  private final int motionInterpolationFps;\n"
+        "  @Nullable private final File defaultFontsDirectory;\n"
+        "  @Nullable private final File defaultSystemFontsDirectory;\n",
+        "  @Nullable private final DataSource.Factory dataSourceFactory;\n"
+        "  private final int motionInterpolationFps;\n"
+        "  @Nullable private final File defaultFontsDirectory;\n"
+        "  @Nullable private final File defaultSystemFontsDirectory;\n"
+        "  private final boolean allowMotionInterpolationOutputChange;\n",
+        "MpvPlayerConfig allowMotionInterpolationOutputChange field",
+    )
+    replace_once(
+        path,
+        "    this.dataSourceFactory = builder.dataSourceFactory;\n"
+        "    this.motionInterpolationFps = builder.motionInterpolationFps;\n"
+        "    this.defaultFontsDirectory = builder.defaultFontsDirectory;\n"
+        "    this.defaultSystemFontsDirectory = builder.defaultSystemFontsDirectory;\n",
+        "    this.dataSourceFactory = builder.dataSourceFactory;\n"
+        "    this.motionInterpolationFps = builder.motionInterpolationFps;\n"
+        "    this.defaultFontsDirectory = builder.defaultFontsDirectory;\n"
+        "    this.defaultSystemFontsDirectory = builder.defaultSystemFontsDirectory;\n"
+        "    this.allowMotionInterpolationOutputChange = builder.allowMotionInterpolationOutputChange;\n",
+        "MpvPlayerConfig allowMotionInterpolationOutputChange constructor",
+    )
+    replace_once(
+        path,
+        """  @RestrictTo(LIBRARY_GROUP)
+  public int getMotionInterpolationFps() {
+    return motionInterpolationFps;
+  }
+""",
+        """  @RestrictTo(LIBRARY_GROUP)
+  public int getMotionInterpolationFps() {
+    return motionInterpolationFps;
+  }
+
+  @RestrictTo(LIBRARY_GROUP)
+  public boolean isAllowMotionInterpolationOutputChange() {
+    return allowMotionInterpolationOutputChange;
+  }
+""",
+        "MpvPlayerConfig allowMotionInterpolationOutputChange getter",
+    )
+    replace_once(
+        path,
+        "    @Nullable private DataSource.Factory dataSourceFactory;\n"
+        "    private int motionInterpolationFps;\n"
+        "    @Nullable private File defaultFontsDirectory;\n"
+        "    @Nullable private File defaultSystemFontsDirectory;\n",
+        "    @Nullable private DataSource.Factory dataSourceFactory;\n"
+        "    private int motionInterpolationFps;\n"
+        "    @Nullable private File defaultFontsDirectory;\n"
+        "    @Nullable private File defaultSystemFontsDirectory;\n"
+        "    private boolean allowMotionInterpolationOutputChange;\n",
+        "MpvPlayerConfig.Builder allowMotionInterpolationOutputChange field",
+    )
+    replace_once(
+        path,
+        """    @CanIgnoreReturnValue
+    public Builder setMotionInterpolationFps(int motionInterpolationFps) {
+      checkState(!buildCalled);
+      this.motionInterpolationFps = motionInterpolationFps;
+      return this;
+    }
+""",
+        """    @CanIgnoreReturnValue
+    public Builder setMotionInterpolationFps(int motionInterpolationFps) {
+      checkState(!buildCalled);
+      this.motionInterpolationFps = motionInterpolationFps;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setAllowMotionInterpolationOutputChange(
+        boolean allowMotionInterpolationOutputChange) {
+      checkState(!buildCalled);
+      this.allowMotionInterpolationOutputChange = allowMotionInterpolationOutputChange;
+      return this;
+    }
+""",
+        "MpvPlayerConfig.Builder setAllowMotionInterpolationOutputChange",
+    )
     replace_once(
         path,
         """    public Builder addAndroidSubtitleOptions(Context context, MpvSubtitleOptions options) {
@@ -2208,7 +2358,22 @@ def patch_subtitle_view(media3: Path) -> None:
    *
    * <p>FongMi extension (shim): accepted but not applied.
    */
-  public void setBitmapSubtitleBrightness(float bitmapSubtitleBrightness) {}""",
+  public void setBitmapSubtitleBrightness(float bitmapSubtitleBrightness) {}
+
+  /**
+   * Sets a scale factor and the base text-size fraction it is relative to.
+   *
+   * <p>FongMi extension (shim, round 139 / v5.9.16): mirrors the stock one-arg
+   * {@link #setTextSizeScale(float)} ({@code applyTextSizeScale}) with the
+   * caller-supplied fraction instead of {@code DEFAULT_TEXT_SIZE_FRACTION}
+   * (upstream 5380d11 passes the fork's own 0.046 fraction here).
+   */
+  public void setTextSizeScale(float textSizeScale, float textSizeFraction) {
+    defaultTextSizeType = Cue.TEXT_SIZE_TYPE_FRACTIONAL;
+    defaultTextSize = textSizeFraction * textSizeScale;
+    this.textSizeScale = textSizeScale;
+    updateOutput();
+  }""",
         "SubtitleView setBitmapSubtitleBrightness",
     )
 

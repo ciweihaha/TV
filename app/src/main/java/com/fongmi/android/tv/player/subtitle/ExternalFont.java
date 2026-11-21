@@ -51,6 +51,12 @@ public final class ExternalFont {
         return Path.mpv("fonts");
     }
 
+    // Round 139 (v5.9.16): upstream 5380d11 added this no-arg overload (the
+    // font selector passes ExternalFont::getAll as a Supplier).
+    public static List<Entry> getAll() {
+        return getAll(null);
+    }
+
     public static List<Entry> getAll(@Nullable File additionalDirectory) {
         List<File> directories = getDirectories(additionalDirectory);
         List<File[]> filesByDirectory = new ArrayList<>();

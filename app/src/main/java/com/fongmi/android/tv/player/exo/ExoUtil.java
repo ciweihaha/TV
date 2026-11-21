@@ -21,6 +21,7 @@ import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.audio.AudioRendererEventListener;
 import androidx.media3.exoplayer.audio.AudioSink;
+import androidx.media3.exoplayer.audio.AudioTrackAudioOutputProvider;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.exoplayer.libass.LibassPlaybackSession;
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
@@ -91,6 +92,13 @@ public final class ExoUtil {
 
     private static AudioSink buildAudioSink(Context context, boolean enableFloatOutput, boolean enableAudioOutputPlaybackParams, @Nullable AudioProcessor audioProcessor) {
         DefaultAudioSink.Builder builder = new DefaultAudioSink.Builder(context).setEnableFloatOutput(enableFloatOutput).setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams);
+        // Fork note (round 139 / v5.9.16): 5.9.15 honoured the passthrough setting
+        // here — passthrough off forces the AudioTrack provider. Upstream 5380d11
+        // moved it to a setAudioPassthroughEnabled() call on the renderers
+        // factory, which exists only in FongMi's prebuilt AARs, so the sink-side
+        // mechanism is restored (now keyed on OutputSetting, where the setting
+        // moved in the same refactor).
+        if (!OutputSetting.isAudioPassThrough()) builder.setAudioOutputProvider(new AudioTrackAudioOutputProvider.Builder(null).build());
         if (audioProcessor != null) builder.setAudioProcessors(new AudioProcessor[]{audioProcessor});
         return builder.build();
     }
@@ -110,7 +118,6 @@ public final class ExoUtil {
             setEnableDecoderFallback(decoderManager != null);
             setEnableSurfaceControlFrameRetention(true);
             setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON);
-            setAudioPassthroughEnabled(OutputSetting.isAudioPassThrough());
             setDolbyVisionOutputPolicy(OutputSetting.getDolbyVisionOutputPolicy());
         }
 

@@ -76,7 +76,10 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
     }
 
     private void onMpvConf(View view) {
-        MpvConfDialog.show(this);
+        // Fork note (round 139 / v5.9.16): upstream 5380d11 calls the static
+        // MpvConfDialog.show(this), but the leanback dialogs have no static
+        // show() — the fork's form is new XDialog().show(this), as in 5.9.15.
+        new MpvConfDialog().show(this);
     }
 
     private void updateEngine() {
@@ -85,7 +88,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
     }
 
     private void onBuffer(View view) {
-        BufferDialog.show(this);
+        new BufferDialog().show(this);
     }
 
     @Override
@@ -113,7 +116,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
     }
 
     private void onUa(View view) {
-        UaDialog.show(this);
+        new UaDialog().show(this);
     }
 
     @Override

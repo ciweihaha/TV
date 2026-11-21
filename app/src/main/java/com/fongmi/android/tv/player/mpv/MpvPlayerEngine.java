@@ -102,17 +102,26 @@ public class MpvPlayerEngine implements PlayerEngine, Player.Listener {
     }
 
     public ListenableFuture<Boolean> setDolbyVisionOutputPolicy(@DolbyVisionOutputPolicy.Mode int policy) {
+        // Fork note (round 139 / v5.9.16): the public Media3 build cannot reload
+        // video output live, so the player shim reports reloaded=false. Only adopt
+        // the new policy when it was really applied; otherwise leave the stored
+        // policy untouched so needsRebuild() stays true and the change applies at
+        // the next player rebuild (via MpvAndroidOptions, as in 5.9.15).
         return Futures.transform(player.setDolbyVisionOutputPolicy(policy), reloaded -> {
-            dolbyVisionOutputPolicy = policy;
+            if (reloaded) dolbyVisionOutputPolicy = policy;
             return reloaded;
         }, MoreExecutors.directExecutor());
     }
 
     public ListenableFuture<Void> setAudioPassThrough(boolean enabled) {
-        return Futures.transform(player.setAudioPassthroughEnabled(enabled), result -> {
-            audioPassThrough = enabled;
-            return null;
-        }, MoreExecutors.directExecutor());
+        // Fork note (round 139 / v5.9.16): the public Media3 build cannot switch
+        // audio passthrough live, so the player shim only stores the value. Do not
+        // adopt it here — leave audioPassThrough untouched so needsRebuild() stays
+        // true and the change applies at the next player rebuild (via
+        // MpvAndroidOptions, as in 5.9.15). Adopting it would silently drop the
+        // setting: the engine would look up to date while mpv still runs the old
+        // configuration.
+        return Futures.transform(player.setAudioPassthroughEnabled(enabled), result -> null, MoreExecutors.directExecutor());
     }
 
     @Nullable

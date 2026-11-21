@@ -131,6 +131,11 @@ public class PlayerManager implements ParseCallback {
         return player;
     }
 
+    @Nullable
+    public Player getVideoSettingEventSource() {
+        return engine instanceof ExoPlayerEngine exo ? exo.getPlayer() : player;
+    }
+
     public TimeshiftPlayback getTimeshift() {
         return timeshift;
     }
