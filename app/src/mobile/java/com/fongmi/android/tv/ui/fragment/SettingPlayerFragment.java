@@ -75,11 +75,12 @@ public class SettingPlayerFragment extends BaseFragment implements UaListener, B
         boolean exoMotion = exo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
         mBinding.exoMotion.setVisibility(exoMotion ? View.VISIBLE : View.GONE);
         setExoMotionText();
-        boolean vulkan = !exo && MpvUtil.isVulkanSupported();
+        boolean showMpvOptions = !exo && !MpvUtil.isMotionEnabled();
+        boolean vulkan = showMpvOptions && MpvUtil.isVulkanSupported();
         mBinding.mpvConf.setVisibility(exo ? View.GONE : View.VISIBLE);
         mBinding.mpvVulkan.setVisibility(vulkan ? View.VISIBLE : View.GONE);
-        mBinding.mpvMotion.setVisibility(vulkan ? View.VISIBLE : View.GONE);
-        mBinding.mpvGpuNext.setVisibility(exo ? View.GONE : View.VISIBLE);
+        mBinding.mpvMotion.setVisibility(!exo && MpvUtil.isVulkanSupported() ? View.VISIBLE : View.GONE);
+        mBinding.mpvGpuNext.setVisibility(showMpvOptions ? View.VISIBLE : View.GONE);
         mBinding.libass.setVisibility(exo ? View.VISIBLE : View.GONE);
         mBinding.buffer.setVisibility(exo ? View.VISIBLE : View.GONE);
     }
@@ -134,14 +135,9 @@ public class SettingPlayerFragment extends BaseFragment implements UaListener, B
     }
 
     private void setMpvOptions() {
-        boolean motion = MpvUtil.isMotionEnabled();
         mBinding.mpvMotionText.setText(ResUtil.getStringArray(R.array.select_mpv_motion)[PlayerSetting.getMpvMotion()]);
-        mBinding.mpvGpuNextText.setText(Setting.getSwitch(PlayerSetting.isMpvGpuNext() || motion));
-        mBinding.mpvVulkanText.setText(Setting.getSwitch(PlayerSetting.isMpvVulkan() || motion));
-        mBinding.mpvGpuNext.setEnabled(!motion);
-        mBinding.mpvVulkan.setEnabled(!motion);
-        mBinding.mpvGpuNext.setAlpha(motion ? 0.5f : 1f);
-        mBinding.mpvVulkan.setAlpha(motion ? 0.5f : 1f);
+        mBinding.mpvGpuNextText.setText(Setting.getSwitch(PlayerSetting.isMpvGpuNext()));
+        mBinding.mpvVulkanText.setText(Setting.getSwitch(PlayerSetting.isMpvVulkan()));
     }
 
     private void setRender(View view) {
