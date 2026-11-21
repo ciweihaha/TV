@@ -702,7 +702,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
         mBinding.progressLayout.showContent();
         renderFallbackName(item.getName());
         App.removeCallbacks(mR4);
-        setArtwork(item.getPic());
+        renderArtwork(item.getPic());
         refreshKeepState();
         setText(item);
         updateKeep();
@@ -718,7 +718,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     private void renderVodMetadata(String name, String pic) {
         if (name.isEmpty() && pic.isEmpty()) return;
         if (!name.isEmpty()) renderFallbackName(name);
-        if (!pic.isEmpty()) setArtwork();
+        if (!pic.isEmpty()) renderArtwork(pic);
         updateKeep();
     }
 
@@ -796,7 +796,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
 
     @Override
     public void renderArtwork(String url) {
-        setArtwork(url);
+        ImgUtil.load(this, url, mArtworkTarget);
     }
 
     @Override
@@ -1354,15 +1354,6 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     protected void onScrubbingChanged(boolean scrubbing) {
         if (scrubbing) App.removeCallbacks(mR1);
         else if (isVisible(mBinding.control.getRoot())) setR1Callback();
-    }
-
-    private void setArtwork(String url) {
-        mHistory.setVodPic(url);
-        setArtwork();
-    }
-
-    private void setArtwork() {
-        ImgUtil.load(this, mHistory.getVodPic(), mArtworkTarget);
     }
 
     private final CustomTarget<Drawable> mArtworkTarget = new CustomTarget<>() {

@@ -652,7 +652,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         renderFallbackName(item.getName());
         mBinding.video.requestFocus();
         App.removeCallbacks(mR4);
-        setArtwork(item.getPic());
+        renderArtwork(item.getPic());
         refreshKeepState();
         setText(item);
         updateKeep();
@@ -669,7 +669,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         if (name.isEmpty() && pic.isEmpty()) return;
         if (!name.isEmpty()) renderFallbackName(name);
         if (!name.isEmpty()) setPartAdapter();
-        if (!pic.isEmpty()) setArtwork();
+        if (!pic.isEmpty()) renderArtwork(pic);
         updateKeep();
     }
 
@@ -748,7 +748,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
 
     @Override
     public void renderArtwork(String url) {
-        setArtwork(url);
+        ImgUtil.load(this, url, mArtworkTarget);
     }
 
     @Override
@@ -1220,15 +1220,6 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
 
     private void setR2Callback() {
         App.post(mR2, 500);
-    }
-
-    private void setArtwork(String url) {
-        mHistory.setVodPic(url);
-        setArtwork();
-    }
-
-    private void setArtwork() {
-        ImgUtil.load(this, mHistory.getVodPic(), mArtworkTarget);
     }
 
     private final CustomTarget<Drawable> mArtworkTarget = new CustomTarget<>() {
