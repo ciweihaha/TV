@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 当贝市场搜索屏 1:1 复刻：全屏纯蓝底（固定，不跟随壁纸），左栏输拼音首字母、右栏实时出结果。
      旧布局的拼音全键/九键 tab、7 图标行、拼写条、底部系统输入法/完成行已全部删除；
-     输入模型改为“按 A–Z 首字母、右侧实时刷新”，没有拼写条、没有候选词提交、没有九键切音节。 -->
+     输入模型改为“按 A–Z 首字母、右侧实时刷新”，没有拼写条、没有候选词提交、没有九键切音节。
+     2026-11-21：应用/游戏/影片三个死 tab 已去掉，右栏顶部改为“影视”范围说明（搜索只搜影视）；
+     功能行首位是中/英切换键，空格键是字母格里跟在 Z 后面的一格（数字盘里跟在 9 后面）。 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -53,7 +55,7 @@
                     android:inputType="textCapWords|textAutoCorrect|textAutoComplete"
                     android:letterSpacing="0.02"
                     android:maxLength="255"
-                    android:nextFocusDown="@id/funcGrid"
+                    android:nextFocusDown="@id/funcLang"
                     android:singleLine="true"
                     android:textColor="@color/white"
                     android:textColorHint="@color/white"
@@ -68,7 +70,7 @@
                     android:layout_marginStart="8dp"
                     android:focusable="true"
                     android:focusableInTouchMode="true"
-                    android:nextFocusDown="@id/funcGrid"
+                    android:nextFocusDown="@id/funcLang"
                     android:src="@drawable/ic_search_mic" />
 
             </androidx.appcompat.widget.LinearLayoutCompat>
@@ -81,7 +83,7 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- 功能行：布局切换 / 123 / 清空 / 退格 -->
+        <!-- 功能行：中/英切换 / 123 / 清空 / 退格 -->
         <androidx.appcompat.widget.LinearLayoutCompat
             android:id="@+id/funcRow"
             android:layout_width="wrap_content"
@@ -89,17 +91,21 @@
             android:layout_marginTop="12dp"
             android:orientation="horizontal">
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/funcGrid"
+            <!-- 中/英切换键（取代旧的网格图标键：网格键与 123 是同一个字母/数字切换，不损失功能）。
+                 中文 = 现状（输拼音首字母、右侧出联想）；英文 = 字母直输、按字面搜，空格输空格字符。
+                 当前模式显示在下方提示行。 -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/funcLang"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/selector_keyboard_dangbei"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_site_grid" />
+                android:gravity="center"
+                android:text="@string/search_lang_toggle"
+                android:textColor="@color/white"
+                android:textSize="18sp" />
 
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/funcDigits"
@@ -139,9 +145,10 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- A–Z 字母格（数字盘共用）：5 列，字母直接印在蓝底上，无键框。
-             高度用 weight 占满左栏剩余空间：以前是 wrap_content，6 行 52dp 键把模式行顶出屏幕；
-             现在键高 44dp、剩余空间不够时格子内部滚动，模式行和提示行永远可见。 -->
+        <!-- A–Z 字母格（数字盘共用）：5 列，字母直接印在蓝底上，无键框；末行 Z 后面跟一个空格键
+             （数字盘是 9 后面跟空格键）。高度用 weight 占满左栏剩余空间：以前是 wrap_content，
+             6 行 52dp 键把模式行顶出屏幕；现在键高 44dp、剩余空间不够时格子内部滚动，
+             模式行和提示行永远可见。 -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/keyboard"
             android:layout_width="match_parent"
@@ -153,7 +160,7 @@
             android:overScrollMode="never"
             app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
             app:spanCount="5"
-            tools:itemCount="26"
+            tools:itemCount="27"
             tools:listitem="@layout/adapter_keyboard_text" />
 
         <!-- 模式行：绿点“全键盘” / 蓝点“系统输入法”（系统输入法为逃生通道） -->
@@ -198,12 +205,21 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- 提示行 -->
+        <!-- 提示行（第一行随中/英文模式切换，见 CustomKeyboard.toggleLang）+ 新键用法说明 -->
         <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/hintText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:text="@string/search_hint_dangbei"
+            android:textColor="@color/dangbei_hint"
+            android:textSize="14sp" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/search_hint_keys"
             android:textColor="@color/dangbei_hint"
             android:textSize="14sp" />
 
@@ -237,62 +253,12 @@
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
-    <!-- 右栏（约 65%）：竖排三 tab + 结果数 + 结果列表 -->
+    <!-- 右栏（约 65%）：影视范围 + 结果数 + 结果列表 -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="65"
         android:orientation="horizontal">
-
-        <!-- 竖排三 tab：应用（全部）/ 游戏 / 影片。
-             游戏、影片在 FongMi 里没有对应的后端分类支持，先置灰不可用，不编造分类。 -->
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:layout_width="96dp"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:paddingTop="8dp">
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tabApp"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/selector_tab_dangbei"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:text="@string/search_tab_app"
-                android:textColor="@color/white"
-                android:textSize="18sp" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tabGame"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginBottom="8dp"
-                android:alpha="0.4"
-                android:background="@drawable/selector_tab_dangbei"
-                android:enabled="false"
-                android:focusable="false"
-                android:gravity="center"
-                android:text="@string/search_tab_game"
-                android:textColor="@color/white_60"
-                android:textSize="18sp" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tabMovie"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:alpha="0.4"
-                android:background="@drawable/selector_tab_dangbei"
-                android:enabled="false"
-                android:focusable="false"
-                android:gravity="center"
-                android:text="@string/search_tab_movie"
-                android:textColor="@color/white_60"
-                android:textSize="18sp" />
-
-        </androidx.appcompat.widget.LinearLayoutCompat>
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="0dp"
@@ -300,14 +266,34 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/resultCount"
+            <!-- 顶部：搜索范围说明“影视”（搜索只搜影视）+ 右上角结果数。
+                 2026-11-21 之前这里是应用/游戏/影片三个 tab：应用是摆设（实际就是全部结果）、
+                 游戏/影片写死禁用点不进，用户以为搜错了范围；整个去掉，改成“影视”。 -->
+            <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="end"
-                android:textColor="@color/white"
-                android:textSize="16sp"
-                tools:text="相关搜索结果：1个" />
+                android:orientation="horizontal">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/scopeLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/search_scope_movie"
+                    android:textColor="@color/white"
+                    android:textSize="24sp" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/resultCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:gravity="end"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    tools:text="相关搜索结果：1个" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
 
             <androidx.core.widget.NestedScrollView
                 android:id="@+id/scroll"

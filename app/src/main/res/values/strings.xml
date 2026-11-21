@@ -380,9 +380,11 @@
     <string name="search_record">History</string>
     <string name="search_suggest">Suggest</string>
     <string name="search_hot">Hot</string>
-    <string name="search_tab_app">Apps</string>
-    <string name="search_tab_game">Games</string>
-    <string name="search_tab_movie">Movies</string>
+    <string name="search_scope_movie">Movies</string>
+    <string name="search_lang_toggle">中/英</string>
+    <string name="search_space">Space</string>
+    <string name="search_hint_english">English: type letters or words to search</string>
+    <string name="search_hint_keys">中/英 switches input mode; Space picks the first suggestion</string>
     <string name="search_mode_full">Full keyboard</string>
     <string name="search_mode_system">System input method</string>
     <string name="search_result_count">Related results: <xliff:g name="count">%d</xliff:g></string>

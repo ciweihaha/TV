@@ -7,13 +7,15 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.databinding.AdapterKeyboardTextBinding;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 当贝市场式搜索键盘：A–Z 平铺字母格（5 列 × 6 行，字母直接印在蓝底上，无键框）+ 数字盘（0–9）。
+ * 当贝市场式搜索键盘：A–Z 平铺字母格（5 列 × 6 行，字母直接印在蓝底上，无键框；
+ * 末行 Z 后面跟一个空格键）+ 数字盘（0–9，末尾跟一个空格键）。
  * <p>
  * 输入模型是“输拼音首字母、右侧实时出结果”：按键只向搜索框追加一个字母/数字，没有拼音拼写条、
  * 没有候选词提交、没有九键切音节。旧的拼音全键（QWERTY 错列）/ 拼音九键（T9 预测）/ 符号盘
@@ -30,6 +32,8 @@ public class KeyboardAdapter extends RecyclerView.Adapter<KeyboardAdapter.TextHo
 
     public static final int KIND_LETTER = 0;
     public static final int KIND_DIGIT = 1;
+    /** 空格键：字母格里跟在 Z 后面（第 27 格），数字盘里跟在 9 后面。 */
+    public static final int KIND_SPACE = 2;
 
     /** 当贝字母格：5 列。 */
     private static final int SPAN_COUNT = 5;
@@ -39,7 +43,9 @@ public class KeyboardAdapter extends RecyclerView.Adapter<KeyboardAdapter.TextHo
 
     static {
         for (char c = 'A'; c <= 'Z'; c++) LETTERS.add(KeyItem.letter(String.valueOf(c)));
+        LETTERS.add(KeyItem.space());
         for (char c = '0'; c <= '9'; c++) DIGITS.add(KeyItem.digit(String.valueOf(c)));
+        DIGITS.add(KeyItem.space());
     }
 
     private final OnClickListener listener;
@@ -94,7 +100,9 @@ public class KeyboardAdapter extends RecyclerView.Adapter<KeyboardAdapter.TextHo
 
     @Override
     public void onBindViewHolder(@NonNull TextHolder holder, int position) {
-        holder.binding.text.setText(mItems.get(position).label);
+        KeyItem item = mItems.get(position);
+        // 空格键的显示文字走字符串资源（中文“空格”/英文“Space”），其余键直接用键面文字
+        holder.binding.text.setText(item.kind == KIND_SPACE ? holder.itemView.getContext().getString(R.string.search_space) : item.label);
     }
 
     /** 一个按键：kind 决定输入方式（字母/数字），text 是追加进搜索框的内容。 */
@@ -116,6 +124,12 @@ public class KeyboardAdapter extends RecyclerView.Adapter<KeyboardAdapter.TextHo
 
         static KeyItem digit(String text) {
             return new KeyItem(KIND_DIGIT, text, text);
+        }
+
+        /** 空格键：text 是英文/数字盘模式下追加进搜索框的空格字符；label 不用，
+         * 显示文字在 onBindViewHolder 里取 R.string.search_space。 */
+        static KeyItem space() {
+            return new KeyItem(KIND_SPACE, " ", null);
         }
     }
 

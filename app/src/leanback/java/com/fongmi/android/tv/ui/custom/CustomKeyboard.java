@@ -12,10 +12,16 @@ import com.fongmi.android.tv.ui.adapter.KeyboardAdapter;
 import com.fongmi.android.tv.utils.Util;
 
 /**
- * 当贝市场式搜索键盘：A–Z 平铺字母格 + 数字盘 + 功能行（布局切换 / 123 / 清空 / 退格）。
+ * 当贝市场式搜索键盘：A–Z 平铺字母格 + 数字盘 + 功能行（中/英切换 / 123 / 清空 / 退格）；
+ * 空格键是字母格里跟在 Z 后面的一格（数字盘里跟在 9 后面），不是单独的通栏条。
  * <p>
  * 输入模型是“输拼音首字母、右侧实时出结果”：按键只向搜索框追加一个字母/数字，没有拼音拼写条、
  * 没有候选词提交、没有九键切音节。旧的 T9/拼写状态机（拼写串、数字序列、音节切分、音节点击、拼写提交等）已全部删除。
+ * <p>
+ * 中/英切换（2026-11-21）：默认中文（现状：输拼音首字母、右侧出联想）；英文 = 字母直输、按字面搜。
+ * 两种模式下字母/数字键的行为相同（联想接口对拉丁字母原样查询，ZhuToPin.get 只转注音、不动拉丁字母），
+ * 切换真正改变的是空格键：中文模式空格 = 确认首个联想词（与点首个建议相同），英文/数字盘模式空格 = 输入空格字符。
+ * 当前模式显示在搜索页提示行第一行。
  * <p>
  * 搜索框内容就是唯一的文本状态（没有 committed/composing 两份状态）：外部改动搜索框（语音输入、
  * 历史记录、初始关键字）时不需要同步，追加/退格/清空都直接改搜索框本身。系统输入法模式下
@@ -30,6 +36,23 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
     private SpaceItemDecoration decoration;
     /** 当前是数字盘（true）还是字母格（false）；不记入 Setting，进搜索屏永远从字母格开始。 */
     private boolean digitsMode;
+    /** 中/英输入模式：默认中文（false = 中文，true = 英文）；不记入 Setting，进搜索屏永远从中文开始。 */
+    private boolean englishMode;
+    /** 空格键在中文模式下的动作（确认首个联想词），由 SearchActivity 设置；英文/数字盘模式空格直接输空格字符，不走这里。 */
+    private OnSpaceListener spaceListener;
+
+    /** 中文模式空格键的回调：SearchActivity 用首个联想词实现（点首个建议的同一效果）。 */
+    public interface OnSpaceListener {
+        void onSpace();
+    }
+
+    public void setOnSpaceListener(OnSpaceListener listener) {
+        this.spaceListener = listener;
+    }
+
+    public boolean isEnglishMode() {
+        return englishMode;
+    }
 
     public static CustomKeyboard init(ActivitySearchBinding binding) {
         CustomKeyboard keyboard = new CustomKeyboard(binding);
@@ -58,7 +81,7 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         binding.keyboard.setHasFixedSize(false);
         binding.keyboard.setAdapter(adapter = new KeyboardAdapter(this));
         ((GridLayoutManager) binding.keyboard.getLayoutManager()).setSpanCount(adapter.getSpanCount());
-        binding.funcGrid.setOnClickListener(v -> toggleDigits());
+        binding.funcLang.setOnClickListener(v -> toggleLang());
         binding.funcDigits.setOnClickListener(v -> toggleDigits());
         binding.funcClear.setOnClickListener(v -> clearAll());
         binding.funcBack.setOnClickListener(v -> onBackspace());
@@ -110,12 +133,38 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         binding.modeSystem.setTextColor(ContextCompat.getColor(binding.modeSystem.getContext(), system ? R.color.white : R.color.white_60));
     }
 
-    /** 搜索框下方向键：落到功能行第一个键（布局切换）。 */
+    /** 搜索框下方向键：落到功能行第一个键（中/英切换）。 */
     public void focusFunctionRow() {
-        binding.funcGrid.requestFocus();
+        binding.funcLang.requestFocus();
     }
 
-    /** 字母格 ↔ 数字盘切换（功能行网格键与 123/ABC 键共用）。 */
+    /** 中/英切换：中文 = 输拼音首字母出联想（现状），英文 = 字母直输按字面搜。
+     * 键上文字固定是“中/英”，当前模式显示在提示行第一行（提示行平时是中文那句，
+     * 英文模式换成英文提示）。字母/数字键本身在两种模式下行为相同。 */
+    private void toggleLang() {
+        englishMode = !englishMode;
+        updateHint();
+    }
+
+    /** 提示行第一行随中/英文模式切换：中文是原来的“请输入拼音字母，或汉字”，英文是英文提示。 */
+    private void updateHint() {
+        binding.hintText.setText(englishMode ? R.string.search_hint_english : R.string.search_hint_dangbei);
+    }
+
+    /** 空格键（字母格里 Z 后面那格 / 数字盘里 9 后面那格）：英文/数字盘模式 = 输入一个空格字符
+     * （空输入时不输前导空格）；中文模式 = 确认首个联想词（回调给 SearchActivity，
+     * 与点首个建议相同；无建议时什么都不做）。 */
+    private void onSpace() {
+        if (digitsMode || englishMode) {
+            Editable editable = binding.keyword.getText();
+            if (editable == null || editable.length() == 0) return;
+            appendText(" ");
+            return;
+        }
+        if (spaceListener != null) spaceListener.onSpace();
+    }
+
+    /** 字母格 ↔ 数字盘切换（功能行 123/ABC 键）。 */
     private void toggleDigits() {
         digitsMode = !digitsMode;
         adapter.setMode(digitsMode ? KeyboardAdapter.MODE_DIGITS : KeyboardAdapter.MODE_LETTERS);
@@ -126,6 +175,10 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
 
     @Override
     public void onKey(KeyboardAdapter.KeyItem item) {
+        if (item.kind == KeyboardAdapter.KIND_SPACE) {
+            onSpace();
+            return;
+        }
         if (item.kind == KeyboardAdapter.KIND_LETTER || item.kind == KeyboardAdapter.KIND_DIGIT) appendText(item.text);
     }
 

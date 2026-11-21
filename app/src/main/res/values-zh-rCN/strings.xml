@@ -378,9 +378,11 @@
     <string name="search_record">历史</string>
     <string name="search_suggest">建议</string>
     <string name="search_hot">热搜</string>
-    <string name="search_tab_app">应用</string>
-    <string name="search_tab_game">游戏</string>
-    <string name="search_tab_movie">影片</string>
+    <string name="search_scope_movie">影视</string>
+    <string name="search_lang_toggle">中/英</string>
+    <string name="search_space">空格</string>
+    <string name="search_hint_english">英文输入：直接输入字母、单词搜索</string>
+    <string name="search_hint_keys">中/英切换输入模式，空格选首个联想词</string>
     <string name="search_mode_full">全键盘</string>
     <string name="search_mode_system">系统输入法</string>
     <string name="search_result_count">相关搜索结果：<xliff:g name="count">%d</xliff:g>个</string>
