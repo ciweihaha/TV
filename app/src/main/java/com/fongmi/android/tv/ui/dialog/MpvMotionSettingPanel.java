@@ -8,7 +8,7 @@ import androidx.media3.mpvplayer.MpvPlayer;
 
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.databinding.ViewMpvMotionBinding;
-import com.fongmi.android.tv.setting.PlayerSetting;
+import com.fongmi.android.tv.setting.OutputSetting;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.button.MaterialButton;
@@ -71,7 +71,7 @@ final class MpvMotionSettingPanel {
     }
 
     private void onApplied(int index) {
-        PlayerSetting.putMpvMotion(index);
+        OutputSetting.putMotion(index);
         updateMotion();
     }
 
