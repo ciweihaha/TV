@@ -130,9 +130,16 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         Util.hideKeyboard(binding.keyword);
     }
 
-    /** 是否正在拼写（拼写串有内容）。 */
+    /** 正在拼写（拼写串有内容）。 */
     public boolean isComposing() {
         return composingDisplay().length() > 0;
+    }
+
+    /** renderBox 正在回写搜索框（TextWatcher 回调里用它区分“键盘自己改的”还是“外部改的”）。 */
+    private boolean rendering;
+
+    public boolean isRendering() {
+        return rendering;
     }
 
     /** 正在拼的拼音在搜索框里的显示：全键是字母串（含分词符），九键是切出的音节连写 + 未切出的尾部数字。 */
@@ -235,7 +242,12 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
 
     private void renderBox() {
         String text = committed.toString() + composingDisplay();
-        binding.keyword.setText(text);
+        rendering = true;
+        try {
+            binding.keyword.setText(text);
+        } finally {
+            rendering = false;
+        }
         // 正在拼写时光标在拼写串末尾；否则光标停在移动后的位置（默认末尾）
         binding.keyword.setSelection(isComposing() ? text.length() : editPos());
     }
@@ -247,6 +259,32 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
         cursorPos = -1;
         clearComposingState();
         resetTap();
+    }
+
+    /** 搜索框文本被键盘之外改了（蓝牙键盘/按键注入等直接往输入框里打字）：以框内文本为准，
+     * 不能留着陈旧的 committed，否则下次按删除会把旧文本回写、覆盖刚打的字。
+     * 全键模式下，框内超出已提交部分的尾巴算正在拼的拼音（候选栏照常出）；九键/系统模式直接按整段文本同步。 */
+    public void syncExternalInput() {
+        if (isSystemMode()) {
+            syncFromBox();
+            return;
+        }
+        if (adapter != null && adapter.getMode() == KeyboardAdapter.MODE_PINYIN) {
+            syncFromBox();
+            return;
+        }
+        String text = binding.keyword.getText().toString();
+        String committedText = committed.toString();
+        if (text.startsWith(committedText)) {
+            String suffix = text.substring(committedText.length());
+            if (!suffix.equals(composing.toString())) {
+                composing.setLength(0);
+                composing.append(suffix);
+                resetTap();
+            }
+        } else {
+            syncFromBox();
+        }
     }
 
     private void clearComposingState() {

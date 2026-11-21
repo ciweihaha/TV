@@ -120,6 +120,9 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         mBinding.keyword.addTextChangedListener(new CustomTextListener() {
             @Override
             public void afterTextChanged(Editable s) {
+                // 键盘自己回写（renderBox）不走这里；外部直接往框里打字时先同步键盘状态，
+                // 否则 committed 陈旧、下次按删除会把旧文本回写覆盖刚打的字
+                if (mKeyboard != null && !mKeyboard.isRendering()) mKeyboard.syncExternalInput();
                 getWord(s.toString());
             }
         });
