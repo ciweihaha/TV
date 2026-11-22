@@ -12,6 +12,7 @@ import androidx.fragment.app.Fragment;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
+import com.fongmi.android.tv.player.mpv.MpvConfigFile;
 import com.fongmi.android.tv.player.subtitle.ExternalFont;
 import com.fongmi.android.tv.utils.FileChooser;
 import com.fongmi.android.tv.utils.Notify;
@@ -33,6 +34,7 @@ final class ExternalFontSelector {
     private final Listener listener;
     private final Fragment fragment;
     private final Supplier<List<ExternalFont.Entry>> fontSource;
+    private final boolean importConfiguredFonts;
 
     @Nullable private ChipGroup group;
     @Nullable private ExternalFont.Item selected;
@@ -40,14 +42,23 @@ final class ExternalFontSelector {
     private boolean progressVisible;
     private boolean loading;
 
+    static ExternalFontSelector forSubtitles(Fragment fragment, Listener listener) {
+        return new ExternalFontSelector(fragment, listener, ExternalFont::getAll, true);
+    }
+
     ExternalFontSelector(Fragment fragment, Listener listener) {
-        this(fragment, listener, ExternalFont::getAll);
+        this(fragment, listener, ExternalFont::getAll, false);
     }
 
     ExternalFontSelector(Fragment fragment, Listener listener, Supplier<List<ExternalFont.Entry>> fontSource) {
+        this(fragment, listener, fontSource, false);
+    }
+
+    private ExternalFontSelector(Fragment fragment, Listener listener, Supplier<List<ExternalFont.Entry>> fontSource, boolean importConfiguredFonts) {
         this.fragment = fragment;
         this.listener = listener;
         this.fontSource = fontSource;
+        this.importConfiguredFonts = importConfiguredFonts;
         this.launcher = fragment.registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> FileChooser.getUri(result, this::importFont));
     }
 
@@ -72,7 +83,7 @@ final class ExternalFontSelector {
 
     private void readFonts() {
         try {
-            List<ExternalFont.Entry> loaded = fontSource.get();
+            List<ExternalFont.Entry> loaded = importConfiguredFonts ? ExternalFont.getAll(MpvConfigFile.getSubtitleFontsDirectory()) : fontSource.get();
             App.post(() -> onLoaded(loaded));
         } catch (RuntimeException e) {
             App.post(() -> onLoadFailed(e));
@@ -112,7 +123,10 @@ final class ExternalFontSelector {
         ExternalFont.Item font = entry == null ? null : entry.item();
         Chip chip = createChip(group);
         String label = font == null ? ResUtil.getString(R.string.playback_font_default) : font.displayName();
-        if (font != null && font.source() != null) label += font.directory().equals(ExternalFont.getMpvDirectory()) ? " (mpv/fonts)" : " (mpv.conf)";
+        if (font != null && font.source() != null) {
+            if (!isConfiguredFont(font)) label += " (mpv/fonts)";
+            else if (!importConfiguredFonts) label += " (mpv.conf)";
+        }
         chip.setText(label);
         if (entry != null && entry.typeface() != null) chip.setTypeface(entry.typeface());
         chip.setCheckable(true);
@@ -142,7 +156,15 @@ final class ExternalFontSelector {
         });
     }
 
+    private static boolean isConfiguredFont(ExternalFont.Item font) {
+        return font.source() != null && !font.directory().equals(ExternalFont.getMpvDirectory());
+    }
+
     private void select(@Nullable ExternalFont.Item font) {
+        if (importConfiguredFonts && font != null && isConfiguredFont(font)) {
+            importFont(Uri.fromFile(font.source()));
+            return;
+        }
         selected = font;
         listener.onSelected(font);
     }
