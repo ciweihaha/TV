@@ -33,6 +33,7 @@ public class VodActivity extends BasePagerActivity implements TypeAdapter.OnClic
 
     private ActivityVodBinding mBinding;
     private TypeAdapter mAdapter;
+    private SiteViewModel mViewModel;
 
     public static void start(Activity activity, Result result) {
         start(activity, VodConfig.get().getHome().getKey(), result, true);
@@ -43,7 +44,11 @@ public class VodActivity extends BasePagerActivity implements TypeAdapter.OnClic
     }
 
     private static void start(Activity activity, String key, Result result, boolean home) {
-        if (result == null || result.getTypes().isEmpty()) return;
+        if (result == null) result = Result.empty();
+        // 首页入口：分类为空也照常打开，打开后自动拉一次首页分类补上（见 initView）；
+        // 以前这里直接 return，首页分类还没载回来时点播按钮按下去毫无反应。
+        // 非首页入口（详情页 / 收藏夹）本来就带分类，空结果仍不打开。
+        if (!home && result.getTypes().isEmpty()) return;
         Intent intent = new Intent(activity, VodActivity.class);
         intent.putExtra("key", key);
         intent.putExtra("result", result);
@@ -82,6 +87,11 @@ public class VodActivity extends BasePagerActivity implements TypeAdapter.OnClic
         setTypes();
         setPager();
         setViewModel();
+        // 首页入口打开时分类还是空的（首页分类没载回来就点了点播）：拉一次首页分类，
+        // 到货后 onHomeContentLoaded → applyHomeContent 重建分类页；失败会弹加载失败提示。
+        if (!hasCategories() && getIntent().getBooleanExtra("home", false)) {
+            mViewModel.refreshHomeContent(VodConfig.get().getSite(getKey()));
+        }
     }
 
     private void setRecyclerView() {
@@ -93,7 +103,8 @@ public class VodActivity extends BasePagerActivity implements TypeAdapter.OnClic
 
     private void setTypes() {
         // 分类归并：只显示电影 / 电视剧 / 动画片 / 综艺四个 tab，其余分类按名字规则并进这四个
-        mAdapter.addAll(CategoryMerger.merge(getKey(), getResult().getTypes()));
+        Result result = getResult();
+        mAdapter.addAll(CategoryMerger.merge(getKey(), result == null ? null : result.getTypes()));
     }
 
     private void setPager() {
@@ -101,8 +112,8 @@ public class VodActivity extends BasePagerActivity implements TypeAdapter.OnClic
     }
 
     private void setViewModel() {
-        SiteViewModel viewModel = new ViewModelProvider(this).get(SiteViewModel.class);
-        viewModel.getAction().observe(this, result -> WebActivity.handleAction(this, result));
+        mViewModel = new ViewModelProvider(this).get(SiteViewModel.class);
+        mViewModel.getAction().observe(this, result -> WebActivity.handleAction(this, result));
     }
 
     /**

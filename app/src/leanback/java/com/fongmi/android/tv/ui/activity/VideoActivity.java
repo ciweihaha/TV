@@ -649,6 +649,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     public void renderDetail(Vod item, History history) {
         mHistory = history;
         mBinding.progressLayout.showContent();
+        hideError();
         renderFallbackName(item.getName());
         mBinding.video.requestFocus();
         App.removeCallbacks(mR4);
@@ -789,6 +790,23 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     @Override
     public void showDetailMessage(String msg) {
         Notify.show(msg);
+    }
+
+    @Override
+    public void onDetailFailed(String msg) {
+        // 详情加载失败：错误提示条常驻显示，按确定重新加载详情（页面不退出）。
+        // 用可聚焦的 selector 背景，焦点落在上面时有高亮，用户一看就知道按确定能重试。
+        mBinding.widget.error.setVisibility(View.VISIBLE);
+        mBinding.widget.text.setText(msg);
+        mBinding.widget.error.setBackgroundResource(R.drawable.selector_item);
+        mBinding.widget.error.setFocusable(true);
+        mBinding.widget.error.setClickable(true);
+        mBinding.widget.error.setOnClickListener(v -> {
+            hideError();
+            mVod.requestDetail();
+        });
+        hideProgress();
+        mBinding.widget.error.post(() -> mBinding.widget.error.requestFocus());
     }
 
     @Override
@@ -1164,12 +1182,21 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         PlaybackAction.hideSpeedHint(mBinding.widget.message);
         mBinding.widget.error.setVisibility(View.VISIBLE);
         mBinding.widget.text.setText(text);
+        // 播放错误不是详情错误：恢复普通背景、清掉详情重试的点击，避免按确定时误重载详情
+        mBinding.widget.error.setBackgroundResource(R.drawable.shape_widget);
+        mBinding.widget.error.setOnClickListener(null);
+        mBinding.widget.error.setFocusable(false);
+        mBinding.widget.error.setClickable(false);
         hideProgress();
     }
 
     private void hideError() {
         mBinding.widget.error.setVisibility(View.GONE);
         mBinding.widget.text.setText("");
+        mBinding.widget.error.setBackgroundResource(R.drawable.shape_widget);
+        mBinding.widget.error.setOnClickListener(null);
+        mBinding.widget.error.setFocusable(false);
+        mBinding.widget.error.setClickable(false);
     }
 
     private void showInfo() {

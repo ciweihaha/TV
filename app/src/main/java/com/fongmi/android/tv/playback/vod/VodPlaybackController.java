@@ -65,7 +65,7 @@ public class VodPlaybackController {
 
     public void checkId() {
         String id = resolveVodId();
-        if (id.isEmpty() || id.startsWith(SEARCH_PREFIX)) detailEmpty(false);
+        if (id.isEmpty() || id.startsWith(SEARCH_PREFIX)) detailEmpty();
         else if (!state.isDetailRequested(host.getVodKey(), id)) requestDetail();
     }
 
@@ -87,9 +87,17 @@ public class VodPlaybackController {
     public void onDetailResult(VodDetailResult detail) {
         if (detail == null || !detail.matches(host.getVodKey(), host.getVodId())) return;
         Result result = detail.result();
-        if (result.getList().isEmpty()) detailEmpty(result.hasMsg());
-        else detailLoaded(result.getVod(), detail.history());
-        host.showDetailMessage(result.getMsg());
+        if (result.getList().isEmpty()) {
+            detailEmpty();
+            // 失败要让用户看见：有报错信息就显示它，没有（纯超时/断网）就显示通用加载失败；
+            // 再走宿主的错误重试入口（详情页留住，不退出）。
+            String msg = result.hasMsg() ? result.getMsg() : ResUtil.getString(R.string.error_load_failed);
+            host.showDetailMessage(msg);
+            host.onDetailFailed(msg);
+        } else {
+            detailLoaded(result.getVod(), detail.history());
+            host.showDetailMessage(result.getMsg());
+        }
     }
 
     private void updateVod(Vod item) {
@@ -606,15 +614,15 @@ public class VodPlaybackController {
         if (state.getPlayingRequest() != null) preloader.update(state.getQuality());
     }
 
-    private void detailEmpty(boolean shouldFinish) {
+    private void detailEmpty() {
         if (!host.getVodPlayId().isEmpty()) {
             showMissingEpisode(state.getHistory(), R.string.error_episode_not_found);
             return;
         }
-        if (shouldFinish || host.isFromCollect()) {
-            host.finishVod();
-            return;
-        }
+        // 详情加载失败（超时/断网/爬虫加载失败）不再直接退出页面：以前有报错信息
+        // 或来自收藏时直接 finish，慢网下爬虫加载失败也会触发，详情页转半天后
+        // 无声退出。改成留在详情页显示错误（见 onDetailResult 的 onDetailFailed），
+        // 用户可点错误提示重新加载、按换源试其他源，或按返回离开。
         String name = host.getVodName();
         if (name.isEmpty()) {
             host.renderEmptyDetail();

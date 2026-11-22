@@ -77,7 +77,10 @@ public class KeyboardAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         FULL.add(KeyItem.spacer(2));
         for (String s : new String[]{"z", "x", "c", "v"})
             FULL.add(KeyItem.letter(s, 2));
-        FULL.add(KeyItem.action("", ACTION_SPACE, 4));
+        // 全键空格键只有两键宽（约 33dp）：26sp 下“空格”两个字放不下一行，会折成两行、
+        // 第二行溢出键外（电视上看到键里是“空”、键下还叠着半个“格”），所以键面文字只用单字“空”。
+        // 符号盘的空格键占十键宽，放得下“空格”，键面文字留空、走字符串资源。
+        FULL.add(KeyItem.action("空", ACTION_SPACE, 4));
         for (String s : new String[]{"b", "n", "m"})
             FULL.add(KeyItem.letter(s, 2));
         // 符号盘：数字 + 标点 + ABC / 空格 / 退格
@@ -181,8 +184,11 @@ public class KeyboardAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         KeyItem item = mItems.get(position);
         if (holder instanceof TextHolder) {
-            // 空格键的显示文字走字符串资源（中文“空格”/英文“Space”），其余键直接用键面文字
-            ((TextHolder) holder).binding.text.setText(item.action == ACTION_SPACE ? holder.itemView.getContext().getString(R.string.search_space) : item.label);
+            // 空格键：有键面文字就用键面文字（全键空格键是单字“空”，放得下一行）；
+            // 没写键面文字（符号盘宽空格键）才走字符串资源“空格”/“Space”。
+            String text = item.label;
+            if (item.action == ACTION_SPACE && text.isEmpty()) text = holder.itemView.getContext().getString(R.string.search_space);
+            ((TextHolder) holder).binding.text.setText(text);
         } else if (holder instanceof LargeHolder) {
             ((LargeHolder) holder).binding.text.setText(item.label);
         }

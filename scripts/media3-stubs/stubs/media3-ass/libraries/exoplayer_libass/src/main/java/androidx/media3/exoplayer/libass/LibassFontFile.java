@@ -51,32 +51,38 @@ public final class LibassFontFile {
 
   /**
    * Returns one {@link Face} per font in the file, or an empty list when the file is not a
-   * readable TrueType/OpenType font or collection.
+   * readable TrueType/OpenType font or collection. Truncated font data also yields an
+   * empty list; only opening a missing file throws.
    */
   public static List<Face> listFaces(File file) throws IOException {
     try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-      if (raf.length() < 12) return List.of();
-      int tag = raf.readInt();
-      if (tag == 0x74746366 /* ttcf */) {
-        raf.readInt(); // version
-        int numFonts = raf.readInt();
-        List<Face> faces = new ArrayList<>();
-        for (int i = 0; i < numFonts; i++) {
-          raf.seek(12L + i * 4L);
-          long offset = raf.readInt() & 0xffffffffL;
-          String[] names = readNames(raf, offset, file.getName());
-          if (names == null) continue;
-          faces.add(new Face(i, true, names[0], names[1]));
+      try {
+        if (raf.length() < 12) return List.of();
+        int tag = raf.readInt();
+        if (tag == 0x74746366 /* ttcf */) {
+          raf.readInt(); // version
+          int numFonts = raf.readInt();
+          List<Face> faces = new ArrayList<>();
+          for (int i = 0; i < numFonts; i++) {
+            raf.seek(12L + i * 4L);
+            long offset = raf.readInt() & 0xffffffffL;
+            String[] names = readNames(raf, offset, file.getName());
+            if (names == null) continue;
+            faces.add(new Face(i, true, names[0], names[1]));
+          }
+          return List.copyOf(faces);
         }
-        return List.copyOf(faces);
-      }
-      if (tag != 0x00010000 && tag != 0x4F54544F /* OTTO */
-          && tag != 0x74727565 /* true */) {
+        if (tag != 0x00010000 && tag != 0x4F54544F /* OTTO */
+            && tag != 0x74727565 /* true */) {
+          return List.of();
+        }
+        String[] names = readNames(raf, 0, file.getName());
+        if (names == null) return List.of();
+        return List.of(new Face(0, false, names[0], names[1]));
+      } catch (IOException e) {
+        // Truncated or corrupt font data mid-parse: not a usable font.
         return List.of();
       }
-      String[] names = readNames(raf, 0, file.getName());
-      if (names == null) return List.of();
-      return List.of(new Face(0, false, names[0], names[1]));
     }
   }
 
@@ -104,8 +110,12 @@ public final class LibassFontFile {
       long offset = raf.readInt() & 0xffffffffL;
       long length = raf.readInt() & 0xffffffffL;
       if (tag == 0x6E616D65 /* name */) {
-        // Table offsets inside a collection face are relative to that face's offset table.
-        nameOffset = baseOffset + offset;
+        // Table offsets are absolute file offsets (from the beginning of the
+        // file) - in a collection as well as in a standalone font. Adding the
+        // face's offset-table base here reads the wrong bytes (verified
+        // against NotoSansCJK-Regular.ttc: base-relative reads return
+        // licence text / garbage as the family name).
+        nameOffset = offset;
         nameLength = length;
         break;
       }

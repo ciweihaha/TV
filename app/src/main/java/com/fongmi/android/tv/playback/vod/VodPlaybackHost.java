@@ -141,6 +141,11 @@ public interface VodPlaybackHost {
 
     void showDetailMessage(String msg);
 
+    /** 详情加载失败（超时/断网/爬虫加载失败）：宿主显示错误并提供重试，页面不退出。
+     * 默认空实现，不强制各端都做；电视端实现为错误提示条，点击重新加载。 */
+    default void onDetailFailed(String msg) {
+    }
+
     void showSwitchLine(Flag flag);
 
     void showSwitchSource(Vod item);

@@ -376,7 +376,9 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     /**
      * 焦点路由（三个区，左栏面板 ↔ 右栏列表）：
-     * 左栏面板：搜索框 → 页签（拼音全键/九键）→ 候选栏 → 键格（左列/右列在两侧）→ 模式行（上下直通）；
+     * 左栏面板：搜索框 → 模式行 → 页签（拼音全键/九键）→ 候选栏 → 键格（左列/右列在两侧），
+     * 面板贴着屏幕底边，键格末行下方什么都没有；模式行在搜索框下方、面板外，
+     * 系统输入法模式下面板隐藏、模式行还在，可切回全键盘。
      * 右栏：历史/建议列表。
      * 区之间：键格右边缘 → 右列，右列右边缘 → 右栏列表首项；列表左边缘 → 键格首行末尾；列表上边缘 → 搜索框。
      * 每条边都显式处理：越界的方向返回 true 吞掉（不让焦点飞出屏幕），其余返回 false 走系统默认移动。
@@ -584,7 +586,9 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     private boolean handleKeywordKey(KeyEvent event) {
         if (KeyUtil.isDownKey(event)) {
-            mKeyboard.focusSelectedTab();
+            // 搜索框下方是模式行（面板贴底后模式行移到搜索框下方）
+            View mode = findNearestModeByScreenX(centerXOnScreen(mBinding.keyword));
+            if (mode != null) mode.requestFocus();
             return true;
         }
         if (!KeyUtil.isRightKey(event)) return false;
@@ -595,7 +599,8 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     private boolean handleMicKey(KeyEvent event) {
         if (KeyUtil.isDownKey(event)) {
-            mKeyboard.focusSelectedTab();
+            View mode = findNearestModeByScreenX(centerXOnScreen(mBinding.mic));
+            if (mode != null) mode.requestFocus();
             return true;
         }
         if (KeyUtil.isRightKey(event)) return focusRightList();
@@ -604,6 +609,12 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     private boolean handleTabKey(KeyEvent event, View item) {
         if (KeyUtil.isUpKey(event)) {
+            // 页签上方是模式行（面板贴底后模式行移到搜索框下方）
+            View mode = findNearestModeByScreenX(centerXOnScreen(item));
+            if (mode != null) {
+                mode.requestFocus();
+                return true;
+            }
             mBinding.keyword.requestFocus();
             return true;
         }
@@ -677,7 +688,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
                 mBinding.langKey.requestFocus();
                 return true;
             }
-            mBinding.modeFull.requestFocus();
+            // 左列最下方是 中/英，下方什么都没有（面板贴底），吞掉
             return true;
         }
         if (KeyUtil.isLeftKey(event)) return true;
@@ -707,7 +718,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
                 mBinding.doneKey.requestFocus();
                 return true;
             }
-            mBinding.modeFull.requestFocus();
+            // 右列最下方是 完成，下方什么都没有（面板贴底），吞掉
             return true;
         }
         if (KeyUtil.isLeftKey(event)) {
@@ -724,18 +735,17 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     private boolean handleModeRowKey(KeyEvent event, View item) {
         if (KeyUtil.isUpKey(event)) {
-            // 模式行上方是键格末行；系统输入法模式下面板隐藏，直接回搜索框
-            if (mBinding.kbPanel.getVisibility() == View.VISIBLE) {
-                View child = findNearestInRow(keyboardRow(false), centerXOnScreen(item));
-                if (child != null) {
-                    child.requestFocus();
-                    return true;
-                }
-            }
+            // 模式行上方是搜索框（面板贴底后模式行移到搜索框下方）
             mBinding.keyword.requestFocus();
             return true;
         }
-        if (KeyUtil.isDownKey(event)) return true;
+        if (KeyUtil.isDownKey(event)) {
+            // 模式行下方是页签；系统输入法模式下面板隐藏，什么都没有
+            if (mBinding.kbPanel.getVisibility() == View.VISIBLE) {
+                mKeyboard.focusSelectedTab();
+            }
+            return true;
+        }
         // 全键盘 ↔ 系统输入法左右切换
         if (KeyUtil.isRightKey(event) && item == mBinding.modeFull) {
             mBinding.modeSystem.requestFocus();
@@ -763,13 +773,8 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
             return true;
         }
         if (KeyUtil.isDownKey(event) && isLastRow(mBinding.keyboard, item)) {
-            // 键格末行下方就是模式行
-            View mode = findNearestModeByScreenX(centerXOnScreen(item));
-            if (mode != null) {
-                mode.requestFocus();
-                return true;
-            }
-            return false;
+            // 键格末行下方什么都没有（面板贴着屏幕底边），吞掉
+            return true;
         }
         if (KeyUtil.isLeftKey(event) && isFirstInRow(mBinding.keyboard, item)) {
             View col = findNearestLeftCol(centerYOnScreen(item));
