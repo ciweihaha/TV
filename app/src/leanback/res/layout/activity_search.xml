@@ -102,7 +102,7 @@
                 android:drawableStart="@drawable/shape_dot_green"
                 android:drawablePadding="6dp"
                 android:focusable="true"
-                android:focusableInTouchMode="true"
+                android:focusableInTouchMode="false"
                 android:gravity="center_vertical"
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
@@ -118,7 +118,7 @@
                 android:drawableStart="@drawable/shape_dot_blue"
                 android:drawablePadding="6dp"
                 android:focusable="true"
-                android:focusableInTouchMode="true"
+                android:focusableInTouchMode="false"
                 android:gravity="center_vertical"
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
@@ -183,7 +183,9 @@
         </FrameLayout>
 
         <!-- 百度键盘面板（底部灰色）：页签 + 候选栏 + 键盘行（左列 / 键格 / 右列）+ du 标志。
-             系统输入法模式下整个面板隐藏，只留模式行作切回入口。 -->
+             系统输入法模式下整个面板隐藏，只留模式行作切回入口。
+             面板内各键 focusableInTouchMode=false：触摸点按第一下就要激活（为 true 时第一下只取焦点、
+             点击被吞掉，九键连按会多进一位数字；遥控方向键焦点仍靠 focusable=true）。 -->
         <androidx.appcompat.widget.LinearLayoutCompat
             android:id="@+id/kbPanel"
             android:layout_width="match_parent"
@@ -207,7 +209,7 @@
                     android:layout_marginEnd="12dp"
                     android:background="@drawable/selector_keyboard_tab"
                     android:focusable="true"
-                    android:focusableInTouchMode="true"
+                    android:focusableInTouchMode="false"
                     android:gravity="center"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
@@ -221,7 +223,7 @@
                     android:layout_height="40dp"
                     android:background="@drawable/selector_keyboard_tab"
                     android:focusable="true"
-                    android:focusableInTouchMode="true"
+                    android:focusableInTouchMode="false"
                     android:gravity="center"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
@@ -270,7 +272,7 @@
                         android:layout_marginBottom="6dp"
                         android:background="@drawable/selector_keyboard_dangbei"
                         android:focusable="true"
-                        android:focusableInTouchMode="true"
+                        android:focusableInTouchMode="false"
                         android:gravity="center"
                         android:text="@string/search_seg"
                         android:textColor="@color/white"
@@ -283,7 +285,7 @@
                         android:layout_marginBottom="6dp"
                         android:background="@drawable/selector_keyboard_dangbei"
                         android:focusable="true"
-                        android:focusableInTouchMode="true"
+                        android:focusableInTouchMode="false"
                         android:gravity="center"
                         android:text="@string/search_symbols"
                         android:textColor="@color/white"
@@ -295,7 +297,7 @@
                         android:layout_height="48dp"
                         android:background="@drawable/selector_keyboard_dangbei"
                         android:focusable="true"
-                        android:focusableInTouchMode="true"
+                        android:focusableInTouchMode="false"
                         android:gravity="center"
                         android:text="@string/search_lang_toggle"
                         android:textColor="@color/white"
@@ -331,7 +333,7 @@
                         android:layout_marginBottom="6dp"
                         android:background="@drawable/selector_keyboard_dangbei"
                         android:focusable="true"
-                        android:focusableInTouchMode="true"
+                        android:focusableInTouchMode="false"
                         android:gravity="center"
                         android:text="@string/search_delete"
                         android:textColor="@color/white"
@@ -343,7 +345,7 @@
                         android:layout_height="102dp"
                         android:background="@drawable/selector_keyboard_dangbei"
                         android:focusable="true"
-                        android:focusableInTouchMode="true"
+                        android:focusableInTouchMode="false"
                         android:gravity="center"
                         android:text="@string/keyboard_done"
                         android:textColor="@color/white"

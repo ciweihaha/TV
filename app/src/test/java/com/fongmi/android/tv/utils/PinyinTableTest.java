@@ -22,6 +22,33 @@ public class PinyinTableTest {
     }
 
     @Test
+    public void tushuguanIncrementalDisplay() {
+        // 5.9.23 回归：九键逐键输入 887484826 时搜索框的显示（音节连写 + 未切出的尾部数字），
+        // 每按一位数字只激活一次的前提下必须这样递进；期望值经本地 JVM 直接跑 PinyinTable 核实。
+        // 平板 5.9.21 实测曾出 "tu87484826"——那是输入层多进了一位 8（数字序列变成 8887484826，
+        // 见 poisonedSequenceStallsAfterFirstSyllable），不是切分错；切分本身一直是对的。
+        String[] digits = {"8", "8", "7", "4", "8", "4", "8", "2", "6"};
+        String[] display = {"8", "tu", "tu7", "tuqi", "tushu", "tushui", "tushugu", "tushugua", "tushuguan"};
+        StringBuilder input = new StringBuilder();
+        for (int i = 0; i < digits.length; i++) {
+            input.append(digits[i]);
+            PinyinTable.Segmentation seg = PinyinTable.segment(input.toString());
+            StringBuilder shown = new StringBuilder();
+            for (String s : seg.syllables) shown.append(s);
+            shown.append(seg.remainder);
+            assertEquals("display after " + input, display[i], shown.toString());
+        }
+    }
+
+    @Test
+    public void poisonedSequenceStallsAfterFirstSyllable() {
+        // 5.9.21 平板实测的 "tu87484826" 就是这个序列：多进一位 8 之后切分只出首音节 tu，
+        // 其余数字原样当尾部保留——切分是确定性的，修法在输入层（按键点按第一下就要激活），
+        // 不要改切分算法来“容忍”多进的数字。
+        assertSegment("8887484826", List.of("tu"), "87484826");
+    }
+
+    @Test
     public void tushuguanSegmentsToThreeSyllables() {
         assertSegment("887484826", List.of("tu", "shu", "guan"), "");
     }

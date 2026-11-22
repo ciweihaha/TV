@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 当贝字母键：无框透明底、白字 26sp；焦点时淡蓝圆角块。
      键高 48dp（与九键/占位键一致）：全键三行 3×48+2×6=156dp，左右两列定高 48/102dp 正好对齐；
-     面板贴底、模式行在搜索框下方，键再高也不会把模式行顶出屏幕 -->
+     面板贴底、模式行在搜索框下方，键再高也不会把模式行顶出屏幕
+     focusableInTouchMode=false：触摸点按第一下就要激活（为 true 时第一下只取焦点、点击被吞掉，
+     九键连按会多进一位数字、切分停在首音节；遥控方向键焦点仍靠 focusable=true） -->
 <com.google.android.material.textview.MaterialTextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/text"
@@ -9,7 +11,7 @@
     android:layout_height="48dp"
     android:background="@drawable/selector_keyboard_dangbei"
     android:focusable="true"
-    android:focusableInTouchMode="true"
+    android:focusableInTouchMode="false"
     android:gravity="center"
     android:textColor="@color/white"
     android:textSize="26sp"

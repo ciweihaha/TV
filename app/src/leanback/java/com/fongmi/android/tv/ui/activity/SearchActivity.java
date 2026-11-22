@@ -901,6 +901,17 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     @Override
+    protected void onBackInvoked() {
+        // 系统输入法模式下返回键先回自带键盘（系统键盘没弹出来时返回键也不能直接退出搜索，
+        // 否则用户切过去就卡住、只能强停重进）；自带键盘模式下返回键照常退出搜索页
+        if (mKeyboard != null && mKeyboard.isSystemMode()) {
+            mKeyboard.backToCustomMode();
+            return;
+        }
+        super.onBackInvoked();
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
         mBinding.mic.setFocusable(false);

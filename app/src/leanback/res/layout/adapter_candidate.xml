@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 候选栏一个候选词：横向排布，首选蓝底（见 CandidateAdapter），其余透明底白字 -->
+<!-- 候选栏一个候选词：横向排布，首选蓝底（见 CandidateAdapter），其余透明底白字
+     focusableInTouchMode=false：触摸点按第一下就要选中上屏（为 true 时第一下只取焦点、点击被吞掉；
+     遥控方向键焦点仍靠 focusable=true） -->
 <com.google.android.material.textview.MaterialTextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/text"
@@ -8,7 +10,7 @@
     android:layout_marginEnd="8dp"
     android:background="@drawable/shape_candidate_normal"
     android:focusable="true"
-    android:focusableInTouchMode="true"
+    android:focusableInTouchMode="false"
     android:gravity="center"
     android:paddingStart="16dp"
     android:paddingEnd="16dp"

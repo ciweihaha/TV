@@ -1,7 +1,9 @@
 package com.fongmi.android.tv.ui.custom;
 
+import android.content.Context;
 import android.text.Editable;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -124,6 +126,20 @@ public class CustomKeyboard implements KeyboardAdapter.OnClickListener {
 
     public void showSystemKeyboard() {
         Util.showKeyboard(binding.keyword);
+        // 系统输入法有时第一次弹不出来（EMUI/Leanback 下 showSoftInput 可能被拒）：600ms 后若输入法
+        // 仍未激活，再强制弹一次。弹不出来也不困住用户：模式行 + 返回键都能切回自带键盘。
+        binding.keyword.postDelayed(() -> {
+            if (!isSystemMode() || binding.keyword.getWindowToken() == null) return;
+            InputMethodManager imm = (InputMethodManager) binding.keyword.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null && !imm.isActive(binding.keyword)) {
+                imm.showSoftInput(binding.keyword, InputMethodManager.SHOW_FORCED);
+            }
+        }, 600);
+    }
+
+    /** 从系统输入法模式回来自带键盘（返回键/模式行共用）：回到进入系统模式前的全键/九键。 */
+    public void backToCustomMode() {
+        if (isSystemMode()) setMode(customMode);
     }
 
     public void hideSystemKeyboard() {
