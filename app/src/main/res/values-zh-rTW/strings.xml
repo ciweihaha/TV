@@ -163,6 +163,7 @@
     <string name="subtitle_style">樣式</string>
     <string name="playback_font">字型</string>
     <string name="playback_font_default">系統預設</string>
+    <string name="playback_font_choose">選擇字型檔</string>
     <string name="playback_font_import">匯入字型</string>
     <string name="playback_font_imported">已匯入字型：%1$s</string>
     <string name="playback_font_import_failed">無法匯入字型</string>

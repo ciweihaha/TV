@@ -238,22 +238,15 @@ public class SubtitleSetting {
 
     @Nullable
     public static ExternalFont.Item getFont() {
-        return ExternalFont.find(Prefers.getString("subtitle_font", ""), null);
+        return ExternalFont.findSubtitle(Prefers.getString("subtitle_font", ""));
     }
 
     public static void putFont(@Nullable ExternalFont.Item font) {
-        Prefers.put("subtitle_font", font == null ? "" : font.storageKey());
+        Prefers.put("subtitle_font", font == null ? "" : font.subtitleStorageKey());
     }
 
-    @Nullable
-    public static String getFontFamily() {
-        ExternalFont.Item font = getFont();
-        return font == null ? null : font.familyName();
-    }
-
-    @Nullable
-    private static Typeface getTypeface() {
-        return ExternalFont.getTypeface(getFont());
+    public static boolean hasFontSelection() {
+        return !Prefers.getString("subtitle_font", "").isEmpty();
     }
 
     private static float getOpacity(String key, float defaultValue) {
@@ -273,7 +266,11 @@ public class SubtitleSetting {
     }
 
     public static CaptionStyleCompat getStyle() {
-        return withTypeface(getBaseStyle(), getTypeface());
+        return getStyle(getFont());
+    }
+
+    public static CaptionStyleCompat getStyle(@Nullable ExternalFont.Item font) {
+        return withTypeface(getBaseStyle(), ExternalFont.getTypeface(font));
     }
 
     private static CaptionStyleCompat getBaseStyle() {

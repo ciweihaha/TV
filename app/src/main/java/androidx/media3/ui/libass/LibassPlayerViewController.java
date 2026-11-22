@@ -10,6 +10,7 @@ package androidx.media3.ui.libass;
 
 import androidx.annotation.Nullable;
 import androidx.media3.common.Player;
+import androidx.media3.common.text.SubtitleFontFile;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.libass.LibassPlaybackSession;
 import androidx.media3.exoplayer.libass.LibassSubtitleController;
@@ -38,6 +39,11 @@ public final class LibassPlayerViewController {
 
   public void setStyleOverride(
       @Nullable CaptionStyleCompat style, @Nullable String fontFamily) {}
+
+  public void setStyleOverride(
+      @Nullable CaptionStyleCompat style,
+      @Nullable String fontFamily,
+      @Nullable SubtitleFontFile fontFile) {}
 
   public void setSecondarySubtitleViewConfigurator(
       Consumer<SubtitleView> configurator) {}

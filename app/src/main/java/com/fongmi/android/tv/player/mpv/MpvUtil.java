@@ -45,7 +45,7 @@ import java.util.List;
 public final class MpvUtil {
 
     private static final List<String> SUBTITLE_LAYOUT_OPTIONS = List.of(
-            "sub-font", "sub-font-size", "sub-font-size-em", "sub-font-provider", "sub-fonts-dir", "embeddedfonts",
+            "sub-font", "sub-font-file", "sub-font-size", "sub-font-size-em", "sub-font-provider", "sub-fonts-dir", "embeddedfonts",
             "sub-color", "sub-back-color", "sub-border-style", "sub-outline-color", "sub-outline-size", "sub-shadow-offset",
             "sub-spacing", "sub-line-spacing", "sub-blur", "sub-bold", "sub-italic", "sub-align-x", "sub-align-y", "sub-justify",
             "sub-margin-x", "sub-margin-y", "sub-margin-y-offset", "sub-use-margins", "sub-ass-force-margins",
@@ -194,7 +194,6 @@ public final class MpvUtil {
 
     static MpvSubtitleOptions buildSubtitleOptions(@Nullable ExternalFont.Item font) {
         MpvSubtitleOptions.Builder builder = new MpvSubtitleOptions.Builder();
-        if (font != null) builder.setFontsDirectory(font.directory().getAbsolutePath());
         builder.setPosition(100.0);
         builder.setVerticalOffset(SubtitleSetting.getPosition());
         builder.setScale(SubtitleSetting.getAppliedScale());
@@ -202,7 +201,7 @@ public final class MpvUtil {
         builder.setSecondarySubtitlePosition(100.0);
         builder.setSecondaryVerticalOffset(100.0 - SubtitleSetting.getSecondaryPosition());
         builder.setSecondaryAssStyleOverride(SubtitleSetting.isStyleForced());
-        if (font != null) builder.setFontFamily(font.familyName());
+        if (font != null) builder.setFontFamily(font.familyName()).setFontFile(font.subtitleFontFile());
         setCaptionStyle(builder);
         return builder.build();
     }

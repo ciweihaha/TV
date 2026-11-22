@@ -163,6 +163,7 @@
     <string name="subtitle_style">Style</string>
     <string name="playback_font">Font</string>
     <string name="playback_font_default">System default</string>
+    <string name="playback_font_choose">Choose font file</string>
     <string name="playback_font_import">Import font</string>
     <string name="playback_font_imported">Font imported: %1$s</string>
     <string name="playback_font_import_failed">Unable to import font</string>

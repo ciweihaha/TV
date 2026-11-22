@@ -46,6 +46,7 @@
 | common/audio | `AudioEffectParameters` | 真实值对象 |
 | common/audio | `AudioEffectProcessor` | 不激活，音频直通 |
 | common/text | `SubtitleContent` / `SubtitleOffsets` / `SubtitleSelectionState` | 真实值对象；字幕内容第 114 轮起由 MpvPlayer 填充（外挂文件），选择状态按当前 Tracks 计算 |
+| common/text | `SubtitleFontFile` | 字体文件 + 集合内 face 序号（第 141 轮新增，上游 e7e7dd0 字幕字体选择用；fork 公开源码里没有这个类） |
 | common/util | `LocalClearKeyLicense` | 真实解析 ClearKey JSON |
 | common/util | `TrackSelectionUtil` | 真实实现（基于 stock Player API 选轨/循环） |
 | datasource | `IsoUri` / `ProgressiveIsoCache` | fragment 编码 edition；缓存直通 |
@@ -59,7 +60,7 @@
 | exoplayer/source | `DefaultPositionMediaSource` / `EndTrimMediaSource` | 真实实现（第 113 轮）：`ForwardingTimeline` 改窗口默认位置 / 截断窗口与 period 时长；直播、未知时长、多 period 不截断 |
 | exoplayer/text | `SecondaryTextOutput` / `SubtitleTranscript` / `SubtitleTranscriptParserFactory` | 无转录字幕（转录即播轨道仍未激活） |
 | exoplayer/trackselection | `SecondaryTextTrackSelector` | 委托给解码器选择器 |
-| exoplayer_libass | `LibassConfiguration` / `LibassFontConfig` / `LibassFontFile` / `LibassSubtitleController` | 配置真实携带；fonts.conf 真实生成；字体族名纯 Java 解析；控制器报无副字幕 |
+| exoplayer_libass | `LibassConfiguration` / `LibassFontConfig` / `LibassFontFile` / `LibassSubtitleController` | 配置真实携带；fonts.conf 真实生成；字体族名纯 Java 解析；控制器报无副字幕；第 141 轮起 `LibassFontFile.listFaces` 枚举 TTC/OTC 集合内各 face（family/style 名纯 Java 解析），并给 `MpvSubtitleOptions` 补 `setFontFile` |
 | mpvplayer | `MpvConfigFileInspector` / `MpvDecoderMode` / `MpvSubtitleContentLoader` / `media/MpvDrmSupport` | mpv.conf 真实解析；DRM 一律判 MPV 不支持（走 Exo） |
 | app 内 | 见上 | 字幕内容：第 114 轮起 `DefaultSubtitleContentLoader` 真实下载并解析（SSA/ASS、WebVTT、SubRip、TX3G、TTML、图片字幕）；第 115 轮起 `SubtitleTranscriptSession.getContent` 真实实现（Exo 引擎对话框：按轨道 id / 语言+标签解析外挂字幕文件，后台加载、按轨道缓存、失败可重试）；第 121 轮起 getContent 按字幕延时平移条目时间（缓存记下每条目集的偏移，延时改了重载）；第 122 轮起 MPV 对话框内容返回时同样按延时平移；转录即播轨道仍未激活；danmaku/libass UI 不激活 |
 

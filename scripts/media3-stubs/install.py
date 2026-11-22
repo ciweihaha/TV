@@ -1963,7 +1963,7 @@ def patch_mpv_subtitle_options(media3: Path) -> None:
     replace_once(
         path,
         "import androidx.annotation.RestrictTo;",
-        "import androidx.annotation.Nullable;\nimport androidx.annotation.RestrictTo;",
+        "import androidx.annotation.Nullable;\nimport androidx.annotation.RestrictTo;\nimport androidx.media3.common.text.SubtitleFontFile;",
         "MpvSubtitleOptions import Nullable",
     )
     replace_once(
@@ -1974,7 +1974,8 @@ def patch_mpv_subtitle_options(media3: Path) -> None:
         "  private final float verticalOffset;\n"
         "  private final float bitmapSubtitleBrightness;\n"
         "  private final double secondaryVerticalOffset;\n"
-        "  @Nullable private final String fontFamily;\n",
+        "  @Nullable private final String fontFamily;\n"
+        "  @Nullable private final SubtitleFontFile fontFile;\n",
         "MpvSubtitleOptions fields",
     )
     replace_once(
@@ -1985,7 +1986,8 @@ def patch_mpv_subtitle_options(media3: Path) -> None:
         "    verticalOffset = builder.verticalOffset;\n"
         "    bitmapSubtitleBrightness = builder.bitmapSubtitleBrightness;\n"
         "    secondaryVerticalOffset = builder.secondaryVerticalOffset;\n"
-        "    fontFamily = builder.fontFamily;\n",
+        "    fontFamily = builder.fontFamily;\n"
+        "    fontFile = builder.fontFile;\n",
         "MpvSubtitleOptions constructor",
     )
     replace_once(
@@ -2019,6 +2021,11 @@ def patch_mpv_subtitle_options(media3: Path) -> None:
   public String getFontFamily() {
     return fontFamily;
   }
+
+  @Nullable
+  public SubtitleFontFile getFontFile() {
+    return fontFile;
+  }
 """,
         "MpvSubtitleOptions getters",
     )
@@ -2030,7 +2037,8 @@ def patch_mpv_subtitle_options(media3: Path) -> None:
         "    private float verticalOffset;\n"
         "    private float bitmapSubtitleBrightness;\n"
         "    private double secondaryVerticalOffset;\n"
-        "    @Nullable private String fontFamily;\n",
+        "    @Nullable private String fontFamily;\n"
+        "    @Nullable private SubtitleFontFile fontFile;\n",
         "MpvSubtitleOptions.Builder fields",
     )
     replace_once(
@@ -2083,6 +2091,13 @@ def patch_mpv_subtitle_options(media3: Path) -> None:
     public Builder setFontFamily(@Nullable String fontFamily) {
       checkState(!buildCalled);
       this.fontFamily = fontFamily;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setFontFile(@Nullable SubtitleFontFile fontFile) {
+      checkState(!buildCalled);
+      this.fontFile = fontFile;
       return this;
     }
 
