@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 百度输入法电视版搜索屏：底部灰色键盘面板 + 右栏实时出结果。
-     面板顶部页签只有拼音全键 / 拼音九键（没有笔画键盘）；候选栏在键盘上方，首选蓝底，
-     遥控选词上屏去搜；全键 QWERTY 三行错列，空格在第三行中间；左列 分词 / ?12 / 中/英，
-     右列 删除 / 完成（完成占两行高）；左下角 du 标志。英文模式没有候选栏，字母直输。
-     2026-11-21：应用/游戏/影片三个死 tab 已去掉，右栏顶部改为“影视”范围说明（搜索只搜影视）。 -->
+<!-- 系统输入法搜索屏：左栏搜索框 + 右栏实时出结果。
+     2026-11-25 输入法改版：统一走系统输入法（电视上当贝市场装的百度输入法电视版），自带九键/全键
+     键盘面板已停用并删除（页签/候选栏/键格/模式行/当前匹配一并去掉）；打字、选词都由系统输入法自己管。
+     焦点只有两个区：左栏搜索框/语音 ↔ 右栏列表（历史/建议）。 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -16,7 +15,7 @@
     android:padding="24dp"
     android:paddingBottom="0dp">
 
-    <!-- 左栏（约 35%）：搜索框 + 百度键盘面板 + 模式行 + 提示行 + 当前匹配 -->
+    <!-- 左栏（约 35%）：搜索框 + 提示行 -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="0dp"
         android:layout_height="match_parent"
@@ -24,7 +23,7 @@
         android:layout_weight="35"
         android:orientation="vertical">
 
-        <!-- 搜索框：放大镜 + 已输字母 + 语音 -->
+        <!-- 搜索框：放大镜 + 已输文字 + 语音 -->
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -56,7 +55,6 @@
                     android:inputType="textCapWords|textAutoCorrect|textAutoComplete"
                     android:letterSpacing="0.02"
                     android:maxLength="255"
-                    android:nextFocusDown="@id/tabFull"
                     android:singleLine="true"
                     android:textColor="@color/white"
                     android:textColorHint="@color/white"
@@ -71,7 +69,6 @@
                     android:layout_marginStart="8dp"
                     android:focusable="true"
                     android:focusableInTouchMode="true"
-                    android:nextFocusDown="@id/tabFull"
                     android:src="@drawable/ic_search_mic" />
 
             </androidx.appcompat.widget.LinearLayoutCompat>
@@ -84,298 +81,15 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- 模式行：绿点“全键盘” / 蓝点“系统输入法”（系统输入法为逃生通道）。
-             面板贴底后模式行移到搜索框下方（仍在面板外，系统输入法模式下面板隐藏、模式行还在，
-             才能切回全键盘）；焦点链：搜索框 ↓ 模式行 ↓ 页签 ↓ 候选栏 ↓ 键格。 -->
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/modeFull"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginEnd="24dp"
-                android:background="@drawable/selector_keyboard_dangbei"
-                android:drawableStart="@drawable/shape_dot_green"
-                android:drawablePadding="6dp"
-                android:focusable="true"
-                android:focusableInTouchMode="false"
-                android:gravity="center_vertical"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:text="@string/search_mode_full"
-                android:textColor="@color/white"
-                android:textSize="16sp" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/modeSystem"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:background="@drawable/selector_keyboard_dangbei"
-                android:drawableStart="@drawable/shape_dot_blue"
-                android:drawablePadding="6dp"
-                android:focusable="true"
-                android:focusableInTouchMode="false"
-                android:gravity="center_vertical"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:text="@string/search_mode_system"
-                android:textColor="@color/white_60"
-                android:textSize="16sp" />
-
-        </androidx.appcompat.widget.LinearLayoutCompat>
-
-        <!-- 提示行（第一行随中/英文模式切换，见 CustomKeyboard.toggleLang）+ 新键用法说明 -->
+        <!-- 提示行：系统输入法用法说明 -->
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/hintText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="8dp"
             android:text="@string/search_hint_dangbei"
             android:textColor="@color/dangbei_hint"
             android:textSize="14sp" />
-
-        <com.google.android.material.textview.MaterialTextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/search_hint_keys"
-            android:textColor="@color/dangbei_hint"
-            android:textSize="14sp" />
-
-        <!-- 弹性空区：把键盘面板顶到屏幕最底边。当前匹配叠在空区顶部（不占流式高度，
-             出现时不把面板往下顶，面板始终贴底）。 -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <!-- 当前匹配：黄色拼音首字母（已输字母）+ 白色大号中文（首个建议标题） -->
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:id="@+id/matchLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:id="@+id/matchPin"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/dangbei_pinyin_yellow"
-                    android:textSize="20sp"
-                    tools:text="T U S H U G U A N" />
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:id="@+id/matchTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/white"
-                    android:textSize="28sp"
-                    tools:text="图书馆员" />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
-
-        </FrameLayout>
-
-        <!-- 百度键盘面板（底部灰色）：页签 + 候选栏 + 键盘行（左列 / 键格 / 右列）+ du 标志。
-             系统输入法模式下整个面板隐藏，只留模式行作切回入口。
-             面板内各键 focusableInTouchMode=false：触摸点按第一下就要激活（为 true 时第一下只取焦点、
-             点击被吞掉，九键连按会多进一位数字；遥控方向键焦点仍靠 focusable=true）。 -->
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:id="@+id/kbPanel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@color/baidu_panel_gray"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <!-- 页签：拼音全键 / 拼音九键（没有笔画键盘） -->
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:id="@+id/kbTabs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:id="@+id/tabFull"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginEnd="12dp"
-                    android:background="@drawable/selector_keyboard_tab"
-                    android:focusable="true"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:text="@string/keyboard_full"
-                    android:textColor="@color/white"
-                    android:textSize="16sp" />
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:id="@+id/tabNine"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:background="@drawable/selector_keyboard_tab"
-                    android:focusable="true"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:text="@string/keyboard_nine"
-                    android:textColor="@color/white"
-                    android:textSize="16sp" />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
-
-            <!-- 候选栏：键盘上方，首选蓝底；中文模式有拼写且有建议时才显示，英文模式不显示 -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/candidateBar"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:orientation="horizontal"
-                android:overScrollMode="never"
-                android:visibility="gone"
-                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                tools:itemCount="4"
-                tools:listitem="@layout/adapter_candidate" />
-
-            <!-- 键盘行：左列（分词 / ?12 / 中/英）+ 键格 + 右列（删除 / 完成， 完成占两行高）。
-                 两列用定高不用 weight：定高 48dp=一键行，102dp=两行+6dp 行间隙，两列共 156dp，
-                 与全键三行（3×48+2×6=156dp）正好对齐；九键/符号盘是四行，侧列在第三行结束。
-                 以前用 weight（删除 1、完成 2）是电视上实测只有一行高——wrap_content 父容器里
-                 match_parent 列的 weight 分配靠不住，改成定高才稳。 -->
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:id="@+id/kbRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-
-                <androidx.appcompat.widget.LinearLayoutCompat
-                    android:layout_width="56dp"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/segKey"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/selector_keyboard_dangbei"
-                        android:focusable="true"
-                        android:focusableInTouchMode="false"
-                        android:gravity="center"
-                        android:text="@string/search_seg"
-                        android:textColor="@color/white"
-                        android:textSize="15sp" />
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/symKey"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/selector_keyboard_dangbei"
-                        android:focusable="true"
-                        android:focusableInTouchMode="false"
-                        android:gravity="center"
-                        android:text="@string/search_symbols"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/langKey"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:background="@drawable/selector_keyboard_dangbei"
-                        android:focusable="true"
-                        android:focusableInTouchMode="false"
-                        android:gravity="center"
-                        android:text="@string/search_lang_toggle"
-                        android:textColor="@color/white"
-                        android:textSize="15sp" />
-
-                </androidx.appcompat.widget.LinearLayoutCompat>
-
-                <!-- 全键 QWERTY 三行错列（20 列，半键为单位）/ 九键 3×4（3 列）/ 符号盘（20 列）共用 -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/keyboard"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:overScrollMode="never"
-                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-                    app:spanCount="20"
-                    tools:itemCount="30"
-                    tools:listitem="@layout/adapter_keyboard_text" />
-
-                <androidx.appcompat.widget.LinearLayoutCompat
-                    android:layout_width="56dp"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/delKey"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/selector_keyboard_dangbei"
-                        android:focusable="true"
-                        android:focusableInTouchMode="false"
-                        android:gravity="center"
-                        android:text="@string/search_delete"
-                        android:textColor="@color/white"
-                        android:textSize="15sp" />
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/doneKey"
-                        android:layout_width="match_parent"
-                        android:layout_height="102dp"
-                        android:background="@drawable/selector_keyboard_dangbei"
-                        android:focusable="true"
-                        android:focusableInTouchMode="false"
-                        android:gravity="center"
-                        android:text="@string/keyboard_done"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-
-                </androidx.appcompat.widget.LinearLayoutCompat>
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
-
-            <!-- 左下角 du 标志 -->
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:id="@+id/duLogo"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:focusable="false"
-                    android:text="du"
-                    android:textColor="@color/baidu_blue"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
-
-        </androidx.appcompat.widget.LinearLayoutCompat>
-
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 

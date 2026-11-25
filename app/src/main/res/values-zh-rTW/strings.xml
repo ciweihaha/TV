@@ -380,21 +380,14 @@
     <string name="search_suggest">建議</string>
     <string name="search_hot">熱搜</string>
     <string name="search_scope_movie">影視</string>
-    <string name="search_lang_toggle">中/英</string>
-    <string name="search_space">空格</string>
-    <string name="search_hint_english">英文輸入：直接輸入字母、單詞搜尋</string>
-    <string name="search_hint_keys">中/英切換輸入模式；空格選首個聯想詞；候選欄選詞直接搜</string>
-    <string name="search_seg">分詞</string>
-    <string name="search_delete">刪除</string>
-    <string name="keyboard_full">拼音全鍵</string>
-    <string name="keyboard_nine">拼音九鍵</string>
     <string name="keyboard_system">使用系統輸入法</string>
     <string name="keyboard_custom">使用自帶鍵盤</string>
-    <string name="keyboard_done">完成</string>
-    <string name="search_mode_full">全鍵盤</string>
-    <string name="search_mode_system">系統輸入法</string>
     <string name="search_result_count">相關搜索結果：<xliff:g name="count">%d</xliff:g>個</string>
-    <string name="search_hint_dangbei">搜索結果：請輸入拼音字母，或漢字</string>
+    <string name="search_hint_dangbei">用系統輸入法輸入片名，選右側建議直接搜尋</string>
+    <string name="search_ime_guide_title">沒有可用的系統輸入法</string>
+    <string name="search_ime_guide_message">請去當貝市場安裝百度輸入法電視版，並在設定裡把它設為預設輸入法，再回來搜尋。</string>
+    <string name="search_ime_guide_settings">去設定</string>
+    <string name="search_ime_guide_dismiss">知道了</string>
 
     <!-- Dialog -->
     <string name="dialog_edit">修改</string>
