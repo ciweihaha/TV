@@ -594,15 +594,24 @@ public class PlayerManager implements ParseCallback {
     }
 
     public float setSpeed(float speed) {
-        if (!player.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH)) return getSpeed();
+        if (!applySpeed(speed)) return getSpeed();
+        clearSpeedPressState();
+        float applied = getSpeed();
+        MediaItem item = player.getCurrentMediaItem();
+        if (item != null && !isEmpty() && item.mediaId.equals(getKey()) && !isLive()) callback.onSpeedChanged(applied);
+        return applied;
+    }
+
+    private boolean applySpeed(float speed) {
+        if (!player.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH)) return false;
         player.setPlaybackParameters(player.getPlaybackParameters().withSpeed(SpeedSetting.clamp(speed)));
-        return getSpeed();
+        return true;
     }
 
     public boolean startSpeedPress(float speed) {
-        if (!player.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH)) return false;
-        if (Float.isNaN(speedBeforePress)) speedBeforePress = getSpeed();
-        setSpeed(speed);
+        float previous = getSpeed();
+        if (!applySpeed(speed)) return false;
+        if (Float.isNaN(speedBeforePress)) speedBeforePress = previous;
         return true;
     }
 
@@ -610,7 +619,7 @@ public class PlayerManager implements ParseCallback {
         if (Float.isNaN(speedBeforePress)) return;
         float speed = speedBeforePress;
         clearSpeedPressState();
-        setSpeed(speed);
+        applySpeed(speed);
     }
 
     private void clearSpeedPressState() {
@@ -721,11 +730,7 @@ public class PlayerManager implements ParseCallback {
         endSpeedPress();
         clearPreload();
         player.clearMediaItems();
-        resetPlaybackSettings();
-    }
-
-    private void resetPlaybackSettings() {
-        setSpeed(SpeedSetting.NORMAL);
+        applySpeed(SpeedSetting.NORMAL);
         setDanmakuConfig(DanmakuSetting.getConfig());
     }
 
@@ -936,13 +941,13 @@ public class PlayerManager implements ParseCallback {
     }
 
     public void parse(String key, Result result, boolean useParse, MediaMetadata metadata, long startPositionMs) {
-        parse(key, result, useParse, metadata, startPositionMs, 0);
+        parse(PlaySpec.fromParse(result, key, metadata), result, useParse, startPositionMs);
     }
 
-    public void parse(String key, Result result, boolean useParse, MediaMetadata metadata, long startPositionMs, long endingMs) {
+    public void parse(PlaySpec spec, Result result, boolean useParse, long startPositionMs) {
         stopParse();
         pendingStartPositionMs = startPositionMs;
-        spec = PlaySpec.fromParse(result, key, metadata).setEnding(endingMs);
+        this.spec = spec;
         parseJob = ParseJob.create(this).start(result, useParse);
     }
 
@@ -968,7 +973,10 @@ public class PlayerManager implements ParseCallback {
         boolean playWhenReady = player.getPlayWhenReady();
         ensureEngine(spec.checkUa());
         if (newMedia) timeshift.start(spec);
-        if (newContent) resetPlaybackSettings();
+        Float initialSpeed = spec.getInitialSpeed();
+        if (newMedia && initialSpeed != null) applySpeed(initialSpeed);
+        else if (newContent) applySpeed(SpeedSetting.NORMAL);
+        if (newContent) setDanmakuConfig(DanmakuSetting.getConfig());
         beginPlaybackAttempt(newMedia);
         if (newMedia) engine.prepareForNewMedia();
         pendingPreload = null;
@@ -1088,6 +1096,9 @@ public class PlayerManager implements ParseCallback {
     }
 
     public interface Callback {
+
+        default void onSpeedChanged(float speed) {
+        }
 
         default void onTimeshiftChanged() {
         }

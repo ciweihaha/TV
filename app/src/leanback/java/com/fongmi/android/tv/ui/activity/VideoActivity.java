@@ -351,6 +351,8 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         mBinding.control.action.prev.setOnClickListener(view -> checkPrev());
         mBinding.control.action.scale.setOnClickListener(view -> onScale());
         mBinding.control.action.speed.setOnClickListener(view -> onSpeed());
+        mBinding.control.action.speed.setUpListener(() -> PlaybackAction.adjustSpeed(player(), mBinding.widget.message, true));
+        mBinding.control.action.speed.setDownListener(() -> PlaybackAction.adjustSpeed(player(), mBinding.widget.message, false));
         mBinding.control.action.reset.setOnClickListener(view -> onReset());
         mBinding.control.action.replay.setOnClickListener(view -> onReplay());
         mBinding.control.action.parse.setOnClickListener(view -> onParse());
@@ -604,6 +606,11 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     @Override
     protected long endingDurationMs() {
         return mHistory == null ? 0 : mHistory.getEnding();
+    }
+
+    @Override
+    protected Float initialPlaybackSpeed() {
+        return mHistory == null ? null : mHistory.getSpeed();
     }
 
     @Override
@@ -1334,6 +1341,11 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         @Override
         public void onSaveProgress() {
             saveHistory(true);
+        }
+
+        @Override
+        public void onSpeedChanged(float speed) {
+            if (isNativePlaybackCurrent()) mVod.setSpeed(speed);
         }
 
         @Override

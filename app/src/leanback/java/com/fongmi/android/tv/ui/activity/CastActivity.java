@@ -124,6 +124,8 @@ public class CastActivity extends PlaybackActivity implements VodInput.Listener 
         mBinding.control.action.video.setOnClickListener(this::onTrack);
         mBinding.control.action.scale.setOnClickListener(view -> onScale());
         mBinding.control.action.speed.setOnClickListener(view -> onSpeed());
+        mBinding.control.action.speed.setUpListener(() -> PlaybackAction.adjustSpeed(player(), mBinding.widget.message, true));
+        mBinding.control.action.speed.setDownListener(() -> PlaybackAction.adjustSpeed(player(), mBinding.widget.message, false));
         mBinding.control.action.reset.setOnClickListener(view -> onReset());
         mBinding.control.action.player.setOnClickListener(view -> onPlayer());
         mBinding.control.action.decoder.setOnClickListener(view -> onDecoder());

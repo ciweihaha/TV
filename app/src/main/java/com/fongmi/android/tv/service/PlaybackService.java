@@ -758,6 +758,11 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     }
 
     @Override
+    public void onSpeedChanged(float speed) {
+        if (isNavigationOwner()) navigation.owner().onSpeedChanged(speed);
+    }
+
+    @Override
     public void onTracksChanged() {
         playerCallbacks.forEach(PlayerCallback::onTracksChanged);
     }
@@ -952,6 +957,9 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
 
         default boolean canSetSpeed() {
             return true;
+        }
+
+        default void onSpeedChanged(float speed) {
         }
 
         @Nullable

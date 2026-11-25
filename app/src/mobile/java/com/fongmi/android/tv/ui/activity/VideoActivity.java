@@ -658,6 +658,11 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
     }
 
     @Override
+    protected Float initialPlaybackSpeed() {
+        return mHistory == null ? null : mHistory.getSpeed();
+    }
+
+    @Override
     public void setPlaybackEnding(long endingMs) {
         if (!isWebPlaybackActive() && isPlaybackCurrent()) player().setEnding(endingMs);
     }
@@ -1447,6 +1452,11 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, T
         @Override
         public void onSaveProgress() {
             saveHistory(true);
+        }
+
+        @Override
+        public void onSpeedChanged(float speed) {
+            if (isNativePlaybackCurrent()) mVod.setSpeed(speed);
         }
 
         @Override
