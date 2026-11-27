@@ -49,7 +49,10 @@ public final class EpgRefreshPolicy {
         if (dayChanged) return true;
         if (lastRefreshMs > 0 && nowMs - lastRefreshMs >= REFRESH_INTERVAL_MS) return true;
         if (!hasCurrentProgram) return true;
-        return lastRefreshMs <= 0 && lastAttemptMs <= 0;
+        // Never refreshed successfully: retry once the last attempt is old
+        // (the recent-attempt throttle above already suppressed fresh
+        // attempts), even when another path supplied a current programme.
+        return lastRefreshMs <= 0;
     }
 
     public static boolean isDayChanged(long lastRefreshMs, long nowMs, ZoneId zoneId) {

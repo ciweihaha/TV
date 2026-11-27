@@ -23,6 +23,16 @@ public class EpgRefreshPolicyTest {
     }
 
     @Test
+    public void failedFirstRefreshRetriesAfterThrottle() {
+        // First download failed (attempt recorded, never refreshed): once the
+        // attempt is older than the throttle, retry even if another path
+        // supplied a current programme — otherwise the XML guide would stay
+        // unloaded for the rest of the process lifetime.
+        assertTrue(EpgRefreshPolicy.shouldRefresh(0, NOW - STALE_RETRY - 1, NOW, true, false));
+        assertTrue(EpgRefreshPolicy.shouldRefresh(0, NOW - STALE_RETRY - 1, NOW, false, false));
+    }
+
+    @Test
     public void recentAttemptSuppressesDuplicateRefresh() {
         // Initial download in flight / just attempted: do not start another one.
         assertFalse(EpgRefreshPolicy.shouldRefresh(0, NOW - 60_000, NOW, false, false));
